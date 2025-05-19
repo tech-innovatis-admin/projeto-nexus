@@ -1,0 +1,277 @@
+/* 
+ * Estilos para a página principal da NEXUS
+ * Inclui animações, efeitos 3D e estilos responsivos
+ */
+
+/* Container principal - ocupa toda a viewport */
+.mainContainer {
+  width: 100%;
+  height: 100vh;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Container da animação de introdução */
+.introContainer {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  animation: fadeOut 0.8s ease-in-out forwards;
+  animation-delay: 3.5s;
+}
+
+/* Animação de fade out para a introdução */
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+/* Canvas para o efeito de partículas */
+.particleCanvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Container principal do conteúdo */
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: linear-gradient(135deg, #0a0c10 0%, #1a1f29 100%);
+  color: #ffffff;
+  text-align: center;
+  padding: 1rem;
+  overflow: hidden;
+  position: relative;
+  perspective: 1000px; /* Habilita efeitos 3D */
+  animation: fadeIn 0.8s ease-in-out forwards;
+  animation-delay: 3.8s;
+  opacity: 0;
+}
+
+/* Animação de fade in para o conteúdo principal */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Gradiente radial animado no background */
+.container::before {
+  content: '';
+  position: absolute;
+  width: 200%;
+  height: 200%;
+  top: -50%;
+  left: -50%;
+  z-index: 0;
+  background: radial-gradient(rgba(29, 78, 216, 0.05) 0%, transparent 70%);
+  animation: rotate 30s linear infinite;
+}
+
+/* Efeito de brilho flutuante */
+.glowEffect {
+  position: absolute;
+  width: 150px;
+  height: 150px;
+  background: radial-gradient(circle, rgba(56, 182, 255, 0.4) 0%, rgba(29, 78, 216, 0.1) 40%, transparent 70%);
+  border-radius: 50%;
+  filter: blur(20px);
+  opacity: 0.7;
+  z-index: 0;
+  animation: float 6s ease-in-out infinite;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* Animação de flutuação para o efeito de brilho */
+@keyframes float {
+  0%, 100% {
+    transform: translate(-50%, -50%) translateY(0) scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translate(-50%, -50%) translateY(-20px) scale(1.2);
+    opacity: 0.9;
+  }
+}
+
+/* Animação de rotação para o gradiente do background */
+@keyframes rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Título principal com efeito 3D */
+.title {
+  font-size: 5rem;
+  font-weight: 900;
+  letter-spacing: 4px;
+  position: relative;
+  z-index: 1;
+  margin-bottom: 2rem;
+  transform-style: preserve-3d;
+  transition: transform 0.1s ease-out;
+  will-change: transform;
+}
+
+/* Efeito de gradiente no texto do título */
+.title span {
+  display: inline-block;
+  background: linear-gradient(to right, #ffffff, #a3c8ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+  position: relative;
+  transform-style: preserve-3d;
+}
+
+/* Camada de profundidade 1 do efeito 3D do título */
+.title span::before {
+  content: attr(data-text);
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: -1;
+  color: #2563eb;
+  opacity: 0.3;
+  filter: blur(8px);
+  transform: translateZ(-10px);
+}
+
+/* Camada de profundidade 2 do efeito 3D do título */
+.title span::after {
+  content: attr(data-text);
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  z-index: -2;
+  color: #60a5fa;
+  opacity: 0.2;
+  filter: blur(4px);
+  transform: translateZ(-5px);
+}
+
+/* Animação do efeito 3D do título */
+@keyframes titleEffect {
+  0% {
+    transform: perspective(500px) rotateX(0deg) rotateY(-5deg);
+    filter: drop-shadow(0 15px 20px rgba(29, 78, 216, 0.4));
+  }
+  100% {
+    transform: perspective(500px) rotateX(0deg) rotateY(5deg);
+    filter: drop-shadow(0 15px 30px rgba(59, 130, 246, 0.6));
+  }
+}
+
+/* Animação de entrada com zoom para elementos */
+@keyframes fadeInZoom {
+  0% {
+    opacity: 0;
+    transform: perspective(500px) scale(0.3) rotateY(-10deg);
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(500px) scale(1) rotateY(0deg);
+  }
+}
+
+/* Container da descrição com efeito de vidro (glassmorphism) */
+.description {
+  margin-top: 2rem;
+  animation: fadeIn 1.5s ease-in-out;
+  position: relative;
+  z-index: 1;
+  max-width: 600px;
+  font-size: 1.2rem;
+  line-height: 1.6;
+  background: rgba(13, 17, 23, 0.6);
+  padding: 1.5rem;
+  border-radius: 12px;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  transform: translateZ(50px);
+  transform-style: preserve-3d;
+}
+
+/* Efeito de borda brilhante na descrição */
+.description::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  z-index: -1;
+  border-radius: 13px;
+}
+
+/* Estilo para texto em negrito na descrição */
+.description strong {
+  color: #60a5fa;
+  font-weight: 600;
+}
+
+/* Botão de login com efeito de gradiente */
+.loginButton {
+  margin-top: 2rem;
+  padding: 1rem 2.5rem;
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: #fff;
+  background: linear-gradient(45deg, #2563eb, #3b82f6);
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  transform-style: preserve-3d;
+  transform: translateZ(20px);
+}
+
+/* Efeito de brilho no hover do botão */
+.loginButton:hover {
+  transform: translateZ(20px) scale(1.05);
+  box-shadow: 0 10px 25px rgba(37, 99, 235, 0.5);
+}
+
+/* Responsividade para tablets */
+@media (max-width: 768px) {
+  .title {
+    font-size: 4rem;
+  }
+  
+  .description {
+    font-size: 1.1rem;
+    padding: 1.2rem;
+  }
+}
+
+/* Responsividade para smartphones */
+@media (max-width: 480px) {
+  .title {
+    font-size: 3rem;
+  }
+}

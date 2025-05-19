@@ -1,0 +1,268 @@
+[
+  {
+    "parce": "ABCANV",
+    "categoria": "funda",
+    "lat": -23.5044,
+    "lng": -46.3872,
+    "marker_color": "lightblue"
+  },
+  {
+    "parce": "ADIS",
+    "categoria": "funda",
+    "lat": -7.1605,
+    "lng": -34.8495,
+    "marker_color": "lightblue"
+  },
+  {
+    "parce": "FACTO",
+    "categoria": "funda",
+    "lat": -20.2938,
+    "lng": -40.3024,
+    "marker_color": "lightblue"
+  },
+  {
+    "parce": "FADEX",
+    "categoria": "funda",
+    "lat": -5.058,
+    "lng": -42.7874,
+    "marker_color": "lightblue"
+  },
+  {
+    "parce": "FADURPE",
+    "categoria": "funda",
+    "lat": -8.0526,
+    "lng": -34.9116,
+    "marker_color": "lightblue"
+  },
+  {
+    "parce": "FAEPI",
+    "categoria": "funda",
+    "lat": -3.107,
+    "lng": -60.0241,
+    "marker_color": "lightblue"
+  },
+  {
+    "parce": "FAPTO",
+    "categoria": "funda",
+    "lat": -10.1875,
+    "lng": -48.3637,
+    "marker_color": "lightblue"
+  },
+  {
+    "parce": "FUNCERN",
+    "categoria": "funda",
+    "lat": -5.8112,
+    "lng": -35.2026,
+    "marker_color": "lightblue"
+  },
+  {
+    "parce": "Fundação CETREDE",
+    "categoria": "funda",
+    "lat": -3.7419,
+    "lng": -38.5401,
+    "marker_color": "lightblue"
+  },
+  {
+    "parce": "Fundação José Bonifácio",
+    "categoria": "funda",
+    "lat": -22.9528,
+    "lng": -43.1736,
+    "marker_color": "lightblue"
+  },
+  {
+    "parce": "Fundação José Montello",
+    "categoria": "funda",
+    "lat": -2.5243,
+    "lng": -44.2936,
+    "marker_color": "lightblue"
+  },
+  {
+    "parce": "Fundação Sousândrade",
+    "categoria": "funda",
+    "lat": -2.5066,
+    "lng": -44.2967,
+    "marker_color": "lightblue"
+  },
+  {
+    "parce": "Fundação Tumucumaque",
+    "categoria": "funda",
+    "lat": -0.0088,
+    "lng": -51.0808,
+    "marker_color": "lightblue"
+  },
+  {
+    "parce": "FUNPEC",
+    "categoria": "funda",
+    "lat": -5.8526,
+    "lng": -35.2104,
+    "marker_color": "lightblue"
+  },
+  {
+    "parce": "FUNTEC",
+    "categoria": "funda",
+    "lat": -16.6799,
+    "lng": -49.2523,
+    "marker_color": "lightblue"
+  },
+  {
+    "parce": "IDEIAS",
+    "categoria": "funda",
+    "lat": -7.116,
+    "lng": -34.8834,
+    "marker_color": "lightblue"
+  },
+  {
+    "parce": "IFES",
+    "categoria": "inst",
+    "lat": -20.3073,
+    "lng": -40.3023,
+    "marker_color": "darkblue"
+  },
+  {
+    "parce": "IFG",
+    "categoria": "inst",
+    "lat": -16.2434,
+    "lng": -47.9619,
+    "marker_color": "darkblue"
+  },
+  {
+    "parce": "IFMA",
+    "categoria": "inst",
+    "lat": -2.5096,
+    "lng": -44.3036,
+    "marker_color": "darkblue"
+  },
+  {
+    "parce": "IFMT",
+    "categoria": "inst",
+    "lat": -15.5885,
+    "lng": -56.0652,
+    "marker_color": "darkblue"
+  },
+  {
+    "parce": "IFSertãoPE",
+    "categoria": "inst",
+    "lat": -93.6226,
+    "lng": -40.5396,
+    "marker_color": "darkblue"
+  },
+  {
+    "parce": "INAÔ",
+    "categoria": "funda",
+    "lat": -20.3109,
+    "lng": -40.3198,
+    "marker_color": "lightblue"
+  },
+  {
+    "parce": "Instituto Costa do Sol",
+    "categoria": "funda",
+    "lat": -7.1215,
+    "lng": -34.8458,
+    "marker_color": "lightblue"
+  },
+  {
+    "parce": "Instituto IDCC",
+    "categoria": "funda",
+    "lat": -7.1196,
+    "lng": -34.8746,
+    "marker_color": "lightblue"
+  },
+  {
+    "parce": "Instituto Iracema",
+    "categoria": "funda",
+    "lat": -3.7236,
+    "lng": -38.5153,
+    "marker_color": "lightblue"
+  },
+  {
+    "parce": "Instituto Lótus",
+    "categoria": "funda",
+    "lat": -22.4775,
+    "lng": -43.1536,
+    "marker_color": "lightblue"
+  },
+  {
+    "parce": "Instituto Oscar Niemeyer",
+    "categoria": "funda",
+    "lat": -23.002,
+    "lng": -43.3183,
+    "marker_color": "lightblue"
+  },
+  {
+    "parce": "Milagre Sertão",
+    "categoria": "funda",
+    "lat": -7.1308,
+    "lng": -34.8414,
+    "marker_color": "lightblue"
+  },
+  {
+    "parce": "Potyrõ",
+    "categoria": "funda",
+    "lat": -7.117,
+    "lng": -34.8721,
+    "marker_color": "lightblue"
+  },
+  {
+    "parce": "UFCAT",
+    "categoria": "inst",
+    "lat": -18.1547,
+    "lng": -47.9308,
+    "marker_color": "darkblue"
+  },
+  {
+    "parce": "Ufdpar",
+    "categoria": "inst",
+    "lat": -2.9091,
+    "lng": -41.7543,
+    "marker_color": "darkblue"
+  },
+  {
+    "parce": "UFMA",
+    "categoria": "inst",
+    "lat": -2.5585,
+    "lng": -44.3092,
+    "marker_color": "darkblue"
+  },
+  {
+    "parce": "UFMS",
+    "categoria": "inst",
+    "lat": -20.5044,
+    "lng": -54.6141,
+    "marker_color": "darkblue"
+  },
+  {
+    "parce": "UFPB",
+    "categoria": "inst",
+    "lat": -7.1377,
+    "lng": -34.8459,
+    "marker_color": "darkblue"
+  },
+  {
+    "parce": "UFPI",
+    "categoria": "inst",
+    "lat": -5.0586,
+    "lng": -42.7985,
+    "marker_color": "darkblue"
+  },
+  {
+    "parce": "UFRN",
+    "categoria": "inst",
+    "lat": -5.8397,
+    "lng": -35.2015,
+    "marker_color": "darkblue"
+  },
+  {
+    "parce": "Univasf",
+    "categoria": "inst",
+    "lat": -9.3905,
+    "lng": -40.4973,
+    "marker_color": "darkblue"
+  },
+  {
+    "parce": "UFT",
+    "categoria": "inst",
+    "lat": -10.1792,
+    "lng": -48.3603,
+    "marker_color": "darkblue"
+  }
+]

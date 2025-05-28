@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { downloadS3File } from "@/utils/s3";
+import { downloadS3File } from "@/utils/s3Service";
+// mudei aqui  de s3 para s3Service
 
 export async function GET() {
   try {

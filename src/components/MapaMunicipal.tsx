@@ -4,6 +4,13 @@ import L, { Map as LeafletMap, GeoJSON, Layer, LayerGroup } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet-draw/dist/leaflet.draw.css";
 import LayerControl from "./LayerControl";
+import { fetchAllGeoJSONFiles } from "../utils/s3Service";
+
+// Interface para os dados do S3
+interface GeoJSONFile {
+  name: string;
+  data: any;
+}
 
 // Tipos para as props do componente
 interface MapaMunicipalProps {
@@ -128,6 +135,20 @@ function popupPDSemPlano(p: any) {
   `;
 }
 
+// Função para carregar dados via API
+async function loadGeoJSONData() {
+  try {
+    const response = await fetch('/api/proxy-geojson/files');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Erro ao carregar arquivos GeoJSON:', error);
+    throw error;
+  }
+}
+
 export default function MapaMunicipal({ municipio, estado, onMunicipioEncontrado }: MapaMunicipalProps) {
   const mapRef = useRef<LeafletMap | null>(null);
   const layersRef = useRef<{ [key: string]: GeoJSON | LayerGroup | null }>({});
@@ -144,7 +165,7 @@ export default function MapaMunicipal({ municipio, estado, onMunicipioEncontrado
   // Carrega o mapa e as camadas apenas uma vez
   useEffect(() => {
     // Aguarda o DOM estar pronto
-    setTimeout(() => {
+    setTimeout(async () => {
       if (mapRef.current) return;
       
       const mapContainer = document.getElementById("mapa-leaflet");
@@ -206,20 +227,25 @@ export default function MapaMunicipal({ municipio, estado, onMunicipioEncontrado
         console.error("Erro ao inicializar controle de desenho:", error);
       }
 
-      console.log("Carregando camadas GeoJSON");
-      // Carregar todas as camadas GeoJSON
-      Promise.all([
-        fetch("/data/base_municipios.geojson").then(r => r.json()),
-        fetch("/data/base_pd_sem_plano.geojson").then(r => r.json()),
-        fetch("/data/base_produtos.geojson").then(r => r.json()),
-        fetch("/data/base_pd_vencendo.geojson").then(r => r.json()),
-        fetch("/data/parceiros1.json").then(r => r.json()),
-      ]).then(([dados, pdsemplano, produtos, pdvencendo, parceiros]) => {
-        console.log("GeoJSON carregados com sucesso");
-        
+      console.log("Carregando dados GeoJSON via API");
+      try {
+        const files = await loadGeoJSONData();
+        console.log("Dados carregados:", files);
+
+        if (!files || files.length === 0) {
+          console.error("Erro: Dados não foram carregados corretamente");
+          return;
+        }
+
+        // Converter array de arquivos para objeto para facilitar o acesso
+        const dados = files.reduce((acc: Record<string, any>, file: GeoJSONFile) => {
+          acc[file.name] = file.data;
+          return acc;
+        }, {} as Record<string, any>);
+
         // Dados Gerais
-        dadosGeraisRef.current = dados;
-        layersRef.current.dados = L.geoJSON(dados, {
+        dadosGeraisRef.current = dados['base_municipios.geojson'];
+        layersRef.current.dados = L.geoJSON(dados['base_municipios.geojson'], {
           style: function(feature) {
             return {
               color: "#222",
@@ -234,7 +260,7 @@ export default function MapaMunicipal({ municipio, estado, onMunicipioEncontrado
         });
         
         // PD sem plano
-        layersRef.current.pdsemplano = L.geoJSON(pdsemplano, {
+        layersRef.current.pdsemplano = L.geoJSON(dados['base_pd_sem_plano.geojson'], {
           style: function(feature) {
             return {
               color: "#222",
@@ -249,7 +275,7 @@ export default function MapaMunicipal({ municipio, estado, onMunicipioEncontrado
         });
         
         // Produtos
-        layersRef.current.produtos = L.geoJSON(produtos, {
+        layersRef.current.produtos = L.geoJSON(dados['base_produtos.geojson'], {
           style: function(feature) {
             return {
               color: "#222",
@@ -264,7 +290,7 @@ export default function MapaMunicipal({ municipio, estado, onMunicipioEncontrado
         });
         
         // PD vencendo
-        layersRef.current.pdvencendo = L.geoJSON(pdvencendo, {
+        layersRef.current.pdvencendo = L.geoJSON(dados['base_pd_vencendo.geojson'], {
           style: function(feature) {
             return {
               color: "#222",
@@ -280,8 +306,9 @@ export default function MapaMunicipal({ municipio, estado, onMunicipioEncontrado
         
         // Parceiros (marcadores customizados)
         const parceirosGroup = L.layerGroup();
+        const parceiros = dados['parceiros1.json'];
         parceiros.forEach((p: any) => {
-          const corMarcador = p.categoria === "funda" ? "#7DD3FC" : "#1E40AF"; // lightblue e darkblue em hex
+          const corMarcador = p.categoria === "funda" ? "#7DD3FC" : "#1E40AF";
           const buildingIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="${corMarcador}">
             <path d="M17 11V3H7v4H3v14h8v-4h2v4h8V11h-4zM7 19H5v-2h2v2zm0-4H5v-2h2v2zm0-4H5V9h2v2zm4 4H9v-2h2v2zm0-4H9V9h2v2zm0-4H9V5h2v2zm4 8h-2v-2h2v2zm0-4h-2V9h2v2zm0-4h-2V5h2v2zm4 12h-2v-2h2v2zm0-4h-2v-2h2v2z"/>
           </svg>`;
@@ -289,8 +316,8 @@ export default function MapaMunicipal({ municipio, estado, onMunicipioEncontrado
           const icon = L.divIcon({
             className: "custom-building-icon",
             html: buildingIcon,
-            iconSize: [29, 29], // Aumentei um pouco o tamanho para melhor visibilidade
-            iconAnchor: [16, 32], // Centraliza o ícone no ponto
+            iconSize: [29, 29],
+            iconAnchor: [16, 32],
           });
           
           const marker = L.marker([p.lat, p.lng], { icon })
@@ -328,9 +355,7 @@ export default function MapaMunicipal({ municipio, estado, onMunicipioEncontrado
             layersRef.current[key]!.addTo(mapRef.current!);
           }
         });
-        // Força atualização do estado para garantir sincronização
-        setLayerState(state => ({ ...state }));
-        layersRef.current.parceiros = parceirosGroup;
+
         // Adiciona controle de camadas do Leaflet para as camadas temáticas
         const overlayMaps = {
           "Dados Gerais": layersRef.current.dados,
@@ -348,11 +373,12 @@ export default function MapaMunicipal({ municipio, estado, onMunicipioEncontrado
           overlayMaps,
           { collapsed: false, position: "bottomleft" }
         ).addTo(mapRef.current!);
-      }).catch(err => {
-        console.error("Erro ao carregar GeoJSON:", err);
-      });
-    }, 100); // Pequeno delay para garantir que o DOM está pronto
-  }, []);
+
+      } catch (error) {
+        console.error("Erro ao carregar dados do S3:", error);
+      }
+    }, 100);
+  }, [layerState]);
 
   // Atualiza visibilidade das camadas ao mudar o estado
   useEffect(() => {

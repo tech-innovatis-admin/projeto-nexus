@@ -1,0 +1,55 @@
+import { NextRequest, NextResponse } from "next/server";
+import { downloadS3File } from "@/utils/s3";
+
+// Esta API serve como uma alternativa para o middleware
+// Isso garante acesso aos arquivos do S3 mesmo se o middleware não estiver funcionando
+export async function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams;
+  const fileName = searchParams.get('file');
+  
+  if (!fileName) {
+    return NextResponse.json({ error: "Parâmetro 'file' não especificado" }, { status: 400 });
+  }
+  
+  console.log(`API proxy-redirect: Buscando arquivo ${fileName}`);
+  
+  try {
+    // Lista de arquivos permitidos
+    const allowedFiles = [
+      "base_municipios.geojson",
+      "base_pd_sem_plano.geojson",
+      "base_pd_vencendo.geojson", 
+      "base_produtos.geojson",
+      "parceiros1.json"
+    ];
+    
+    // Extrai apenas o nome do arquivo, sem qualquer caminho
+    const fileBaseName = fileName.split('/').pop() || '';
+    
+    // Verifica se o arquivo é permitido
+    if (!allowedFiles.includes(fileBaseName)) {
+      return NextResponse.json({ error: "Arquivo não permitido" }, { status: 403 });
+    }
+    
+    // Busca o arquivo do S3
+    const buffer = await downloadS3File(fileBaseName);
+    
+    // Determina o tipo MIME com base na extensão
+    const contentType = fileName.endsWith('.geojson') ? 'application/geo+json' : 'application/json';
+    
+    // Retorna o conteúdo do arquivo
+    return new NextResponse(buffer, {
+      headers: {
+        'Content-Type': contentType,
+        'Content-Length': buffer.length.toString(),
+        'Cache-Control': 'public, max-age=3600' // Cache de 1 hora
+      }
+    });
+  } catch (error) {
+    console.error("Erro ao buscar arquivo do S3:", error);
+    return NextResponse.json({
+      error: "Erro ao buscar arquivo",
+      details: error instanceof Error ? error.message : String(error)
+    }, { status: 500 });
+  }
+} 

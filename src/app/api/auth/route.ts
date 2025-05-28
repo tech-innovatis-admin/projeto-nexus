@@ -1,30 +1,64 @@
-import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { sign } from 'jsonwebtoken';
+import { loadEnvFromS3 } from '@/utils/envManager';
 
-const ADMIN_USER = process.env.ADMIN_USER;
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
-const JWT_SECRET = process.env.JWT_SECRET;
-
-if (!ADMIN_USER || !ADMIN_PASSWORD || !JWT_SECRET) {
-  throw new Error('Variáveis de ambiente necessárias não configuradas');
+// Aviso em desenvolvimento se JWT_SECRET não estiver definido
+if (!process.env.JWT_SECRET) {
+  console.warn('⚠️ JWT_SECRET não definido. Usando valor padrão inseguro. Não recomendado para produção!');
 }
 
 export async function POST(request: Request) {
   try {
+    // Carrega variáveis de ambiente do S3 antes de verificar credenciais
+    await loadEnvFromS3();
+
     const { username, password } = await request.json();
-    if (username !== ADMIN_USER || password !== ADMIN_PASSWORD) {
-      return NextResponse.json({ error: 'Usuário ou senha inválidos' }, { status: 401 });
+    console.log('Tentativa de login com username:', username);
+    
+    // Verificar credenciais usando as variáveis carregadas do S3
+    if (username === process.env.ADMIN_USER && 
+        password === process.env.ADMIN_PASSWORD) {
+      console.log('Login bem-sucedido');
+      
+      // Criar token JWT
+      const token = sign(
+        { username, role: 'admin' },
+        process.env.JWT_SECRET || 'sua_chave_secreta_aqui',
+        { expiresIn: '1h' }
+      );
+
+      // Configurar cookie
+      const cookieStore = await cookies();
+      cookieStore.set('auth_token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 3600 // 1 hora
+      });
+
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
-    const token = sign({ username, role: 'admin' }, JWT_SECRET, { expiresIn: '8h' });
-    cookies().set('auth-token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 8 * 60 * 60
+
+    console.log('Credenciais inválidas');
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: 'Credenciais inválidas' 
+    }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' }
     });
-    return NextResponse.json({ success: true });
+
   } catch (error) {
-    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 });
+    console.error('Erro na autenticação:', error);
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: 'Erro interno do servidor' 
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 } 

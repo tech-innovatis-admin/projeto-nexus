@@ -4,7 +4,7 @@
  */
 
 /* Importação da fonte Poppins do Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;900&display=swap');
 
 /* Importação das camadas base do Tailwind CSS */
 @tailwind base;
@@ -16,13 +16,11 @@
   --foreground-rgb: 255, 255, 255;
   --background-start-rgb: 0, 0, 0;
   --background-end-rgb: 0, 0, 0;
-  --font-family-base: 'Poppins', sans-serif;
 }
 
-@layer base {
-  html {
-    font-family: var(--font-family-base);
-  }
+/* Configuração global de fonte */
+* {
+  font-family: 'Poppins', sans-serif;
 }
 
 /* Estilos base do corpo da aplicação */
@@ -34,7 +32,6 @@ body {
     rgb(var(--background-end-rgb))
   )
   rgb(var(--background-start-rgb));
-  font-family: var(--font-family-base);
 }
 
 /* Configurações de rolagem suave */
@@ -64,11 +61,6 @@ html {
 ::selection {
   background: rgba(59, 130, 246, 0.3);
   color: white;
-}
-
-/* Configurações de fonte para código */
-code, pre {
-  font-family: var(--font-geist-mono), 'Courier New', Courier, monospace;
 }
 
 /* Animações globais */
@@ -107,7 +99,6 @@ input, textarea, select {
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: inherit;
   transition: all 0.2s ease;
-  font-family: var(--font-family-base);
 }
 
 input:focus, textarea:focus, select:focus {
@@ -119,7 +110,6 @@ input:focus, textarea:focus, select:focus {
 /* Estilos para botões */
 button {
   transition: all 0.2s ease;
-  font-family: var(--font-family-base);
 }
 
 button:active {
@@ -135,22 +125,6 @@ a {
 
 a:hover {
   color: rgb(96, 165, 250);
-}
-
-/* Estilos para texto selecionado */
-::selection {
-  background: rgba(59, 130, 246, 0.3);
-  color: white;
-}
-
-/* Configurações de fonte para código */
-code, pre {
-  font-family: var(--font-geist-mono), 'Courier New', Courier, monospace;
-}
-
-/* Configuração global de fontes */
-* {
-  font-family: var(--font-family-base);
 }
 
 @import "tailwindcss";

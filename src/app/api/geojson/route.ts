@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { downloadS3File } from "@/utils/s3";
+import { downloadS3File } from "@/utils/s3Service";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);

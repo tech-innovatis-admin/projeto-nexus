@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { downloadS3File } from "@/utils/s3";
+import { downloadS3File } from "@/utils/s3Service";
 import { join } from "path";
 
 // Esta rota captura solicitações para /api/proxy-geojson/[...path]

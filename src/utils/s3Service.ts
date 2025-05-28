@@ -10,7 +10,7 @@ const s3Client = new S3Client({
   }
 });
 
-async function downloadS3File(fileName: string): Promise<string> {
+export async function downloadS3File(fileName: string): Promise<string> {
   const bucketName = process.env.AWS_S3_BUCKET || 'projetonexusinnovatis';
   console.log(`Iniciando download do arquivo: ${fileName} do bucket ${bucketName}`);
   
@@ -38,7 +38,7 @@ async function downloadS3File(fileName: string): Promise<string> {
   }
 }
 
-export async function getFileFromS3(filename: string) {
+async function getFileFromS3(filename: string) {
   const bucketName = process.env.AWS_S3_BUCKET || 'projetonexusinnovatis';
   try {
     const command = new GetObjectCommand({

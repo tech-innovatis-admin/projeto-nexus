@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { downloadS3File } from '@/utils/s3';
+import { downloadS3File } from '@/utils/s3Service';
 
 // Função para parsear o conteúdo de um arquivo .env
 function parseEnv(content: string): Record<string, string> {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { downloadS3File } from "@/utils/s3";
+import { downloadS3File } from "@/utils/s3Service";
 
 // Esta API serve como uma alternativa para o middleware
 // Isso garante acesso aos arquivos do S3 mesmo se o middleware não estiver funcionando

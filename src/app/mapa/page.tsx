@@ -30,7 +30,7 @@ function LoadingProgressBar({ progress }: { progress: number }) {
 
 // Componente principal que usa o contexto
 function MapaPageContent() {
-  const { municipioSelecionado, setMunicipioSelecionado, loading, loadingProgress } = useMapData();
+  const { municipioSelecionado, setMunicipioSelecionado, loading, loadingProgress, mapData } = useMapData();
   const [municipio, setMunicipio] = useState<string>("");
   const [estado, setEstado] = useState<string>("");
   const [erroBusca, setErroBusca] = useState<string | null>(null);
@@ -39,55 +39,33 @@ function MapaPageContent() {
   const [estadoSelecionado, setEstadoSelecionado] = useState<string>("");
   const [municipioSelecionadoDropdown, setMunicipioSelecionadoDropdown] = useState<string>("");
   
-  const [geojsonMunicipios, setGeojsonMunicipios] = useState<FeatureCollection | null>(null);
-  const [loadingGeojson, setLoadingGeojson] = useState(false);
-
-  // Carrega o GeoJSON dos municípios uma vez
+  // Extrair estados únicos do GeoJSON quando os dados forem carregados
   useEffect(() => {
-    async function fetchGeojson() {
-      try {
-        setLoadingGeojson(true);
-        const response = await fetch('/api/geojson');
-        if (!response.ok) {
-          throw new Error('Falha ao carregar dados do mapa');
-        }
-        const data = await response.json();
-        setGeojsonMunicipios(data);
-        
-        // Extrair estados únicos do GeoJSON
-        if (data && data.features) {
-          const estadosUnicos = [...new Set(data.features
-            .map((feature: any) => feature.properties?.name_state)
-            .filter(Boolean)
-            .sort()
-          )];
-          setEstados(estadosUnicos as string[]);
-        }
-      } catch (error) {
-        console.error('Erro ao carregar dados do mapa:', error);
-      } finally {
-        setLoadingGeojson(false);
-      }
+    if (mapData?.dados && mapData.dados.features) {
+      const estadosUnicos = [...new Set(mapData.dados.features
+        .map((feature: Feature) => feature.properties?.name_state)
+        .filter(Boolean)
+        .sort()
+      )];
+      setEstados(estadosUnicos as string[]);
     }
-    
-    fetchGeojson();
-  }, []);
+  }, [mapData]);
   
   // Atualizar municípios quando um estado for selecionado
   useEffect(() => {
-    if (!estadoSelecionado || !geojsonMunicipios) {
+    if (!estadoSelecionado || !mapData?.dados) {
       setMunicipios([]);
       return;
     }
     
-    const municipiosDoEstado = geojsonMunicipios.features
-      .filter(feature => feature.properties?.name_state === estadoSelecionado)
-      .map(feature => feature.properties?.nome_municipio || feature.properties?.municipio)
+    const municipiosDoEstado = mapData.dados.features
+      .filter((feature: Feature) => feature.properties?.name_state === estadoSelecionado)
+      .map((feature: Feature) => feature.properties?.nome_municipio || feature.properties?.municipio)
       .filter(Boolean)
       .sort();
     
-    setMunicipios([...new Set(municipiosDoEstado)]);
-  }, [estadoSelecionado, geojsonMunicipios]);
+    setMunicipios([...new Set(municipiosDoEstado)] as string[]);
+  }, [estadoSelecionado, mapData]);
   
   // Atualizar os campos de texto quando os dropdowns mudarem
   useEffect(() => {
@@ -107,11 +85,11 @@ function MapaPageContent() {
     setMunicipioSelecionado(null);
     setErroBusca(null);
     
-    if (!geojsonMunicipios) return;
+    if (!mapData?.dados) return;
     
     // Se temos o município selecionado no dropdown, usamos ele diretamente
     if (estadoSelecionado && municipioSelecionadoDropdown) {
-      const municipioEncontrado = geojsonMunicipios.features.find(feature => 
+      const municipioEncontrado = mapData.dados.features.find((feature: Feature) => 
         (feature.properties?.nome_municipio === municipioSelecionadoDropdown || 
          feature.properties?.municipio === municipioSelecionadoDropdown) && 
         feature.properties?.name_state === estadoSelecionado
@@ -129,7 +107,7 @@ function MapaPageContent() {
     const municipioBuscaNorm = removerAcentos(municipio.toLowerCase());
     const estadoBuscaNorm = removerAcentos(estado.toLowerCase());
     
-    const municipioEncontrado = geojsonMunicipios.features.find(feature => {
+    const municipioEncontrado = mapData.dados.features.find((feature: Feature) => {
       const nomeMunicipio = feature.properties?.nome_municipio || feature.properties?.municipio || "";
       const nomeEstado = feature.properties?.name_state || "";
       

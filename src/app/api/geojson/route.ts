@@ -1,19 +1,14 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
+import { getFileFromS3 } from '@/utils/s3Service';
 
 export async function GET() {
   try {
-    // Caminho para o arquivo GeoJSON
-    const filePath = path.join(process.cwd(), 'public', 'data', 'base_municipios.geojson');
-    
-    // Lê o arquivo GeoJSON
-    const fileContent = fs.readFileSync(filePath, 'utf8');
-    const geojsonData = JSON.parse(fileContent);
+    // Buscar o arquivo GeoJSON do S3
+    const geojsonData = await getFileFromS3('base_municipios.geojson');
     
     return NextResponse.json(geojsonData);
   } catch (error) {
-    console.error('Erro ao carregar dados GeoJSON:', error);
+    console.error('Erro ao carregar dados GeoJSON do S3:', error);
     return NextResponse.json({ error: 'Erro ao carregar dados GeoJSON' }, { status: 500 });
   }
 } 

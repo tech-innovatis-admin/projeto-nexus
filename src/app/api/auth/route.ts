@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { sign } from 'jsonwebtoken';
 import { loadEnvFromS3 } from '@/utils/envManager';
+import { fetchEnvConfig } from '@/utils/s3Service';
 
 // Aviso em desenvolvimento se JWT_SECRET não estiver definido
 if (!process.env.JWT_SECRET) {
@@ -14,15 +15,26 @@ export async function POST(request: Request) {
 
     const { username, password } = await request.json();
     console.log('Tentativa de login com username:', username);
-    
-    // Verificar credenciais usando as variáveis carregadas do S3
-    if (username === process.env.ADMIN_USER && 
-        password === process.env.ADMIN_PASSWORD) {
-      console.log('Login bem-sucedido');
-      
+
+    // Carrega o arquivo de configuração do S3 (senhas_s3.json)
+    const config = await fetchEnvConfig();
+    if (!config || !Array.isArray(config.USERS)) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Configuração de usuários inválida.'
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Procura o usuário no array USERS
+    const user = config.USERS.find((u: any) => u.username === username && u.password === password);
+    if (user) {
+      console.log('Login bem-sucedido para', username);
       // Criar token JWT
       const token = sign(
-        { username, role: 'admin' },
+        { username: user.username, role: user.role },
         process.env.JWT_SECRET || 'sua_chave_secreta_aqui',
         { expiresIn: '1h' }
       );
@@ -36,7 +48,7 @@ export async function POST(request: Request) {
         maxAge: 3600 // 1 hora
       });
 
-      return new Response(JSON.stringify({ success: true }), {
+      return new Response(JSON.stringify({ success: true, role: user.role }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       });

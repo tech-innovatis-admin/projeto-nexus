@@ -3,8 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import L, { Map as LeafletMap, GeoJSON, Layer, LayerGroup } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet-draw/dist/leaflet.draw.css";
-import LayerControl from "./LayerControl";
-import { fetchAllGeoJSONFiles } from "../utils/s3Service";
+import { useMapData } from "../contexts/MapDataContext";
+import * as turf from '@turf/turf';
 
 // Interface para os dados do S3
 interface GeoJSONFile {
@@ -14,9 +14,7 @@ interface GeoJSONFile {
 
 // Tipos para as props do componente
 interface MapaMunicipalProps {
-  municipio: string;
-  estado: string;
-  onMunicipioEncontrado: (feature: any | null) => void;
+  municipioSelecionado: any;
 }
 
 // Função utilitária para remover acentos
@@ -135,38 +133,28 @@ function popupPDSemPlano(p: any) {
   `;
 }
 
-// Função para carregar dados via API
-async function loadGeoJSONData() {
-  try {
-    const response = await fetch('/api/proxy-geojson/files');
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    return await response.json();
-  } catch (error) {
-    console.error('Erro ao carregar arquivos GeoJSON:', error);
-    throw error;
-  }
-}
-
-export default function MapaMunicipal({ municipio, estado, onMunicipioEncontrado }: MapaMunicipalProps) {
+export default function MapaMunicipal({ municipioSelecionado }: MapaMunicipalProps) {
   const mapRef = useRef<LeafletMap | null>(null);
   const layersRef = useRef<{ [key: string]: GeoJSON | LayerGroup | null }>({});
+  const popupRef = useRef<L.Popup | null>(null);
   const dadosGeraisRef = useRef<any>(null);
   const drawnItemsRef = useRef<L.FeatureGroup | null>(null);
+  const alfineteMarkerRef = useRef<L.Marker | null>(null);
   const [layerState, setLayerState] = useState({
-    dados: true,
+    dados: false,
     pdsemplano: false,
     produtos: false,
     pdvencendo: false,
     parceiros: false,
   });
 
+  const { mapData, loading, error } = useMapData();
+
   // Carrega o mapa e as camadas apenas uma vez
   useEffect(() => {
-    // Aguarda o DOM estar pronto
+    // Aguarda o DOM estar pronto e os dados estarem carregados
     setTimeout(async () => {
-      if (mapRef.current) return;
+      if (mapRef.current || loading || !mapData) return;
       
       const mapContainer = document.getElementById("mapa-leaflet");
       if (!mapContainer) {
@@ -184,26 +172,18 @@ export default function MapaMunicipal({ municipio, estado, onMunicipioEncontrado
         attributionControl: false,
       });
       
-      // Camadas base
-      const osm = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "&copy; OpenStreetMap contributors",
-      });
-      
+      // Camada base
       const carto = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
         attribution: "&copy; CartoDB",
       }).addTo(mapRef.current);
       
-      const sat = L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {
-        attribution: "&copy; Esri",
-      });
-      
       // Adiciona controle de desenho
       try {
-        const drawControl = require("leaflet-draw");
         drawnItemsRef.current = new L.FeatureGroup();
         drawnItemsRef.current.addTo(mapRef.current);
         
-        const drawControlOptions = new L.Control.Draw({
+        // Corrigindo o erro com a tipagem do L.Control.Draw
+        const drawControl = new (L.Control as any).Draw({
           draw: {
             polygon: false,
             polyline: true,
@@ -218,7 +198,8 @@ export default function MapaMunicipal({ municipio, estado, onMunicipioEncontrado
             edit: false
           }
         });
-        mapRef.current.addControl(drawControlOptions);
+        
+        mapRef.current.addControl(drawControl);
         
         mapRef.current.on(L.Draw.Event.CREATED, function (event) {
           drawnItemsRef.current?.addLayer(event.layer);
@@ -227,25 +208,11 @@ export default function MapaMunicipal({ municipio, estado, onMunicipioEncontrado
         console.error("Erro ao inicializar controle de desenho:", error);
       }
 
-      console.log("Carregando dados GeoJSON via API");
+      console.log("Configurando camadas do mapa");
       try {
-        const files = await loadGeoJSONData();
-        console.log("Dados carregados:", files);
-
-        if (!files || files.length === 0) {
-          console.error("Erro: Dados não foram carregados corretamente");
-          return;
-        }
-
-        // Converter array de arquivos para objeto para facilitar o acesso
-        const dados = files.reduce((acc: Record<string, any>, file: GeoJSONFile) => {
-          acc[file.name] = file.data;
-          return acc;
-        }, {} as Record<string, any>);
-
         // Dados Gerais
-        dadosGeraisRef.current = dados['base_municipios.geojson'];
-        layersRef.current.dados = L.geoJSON(dados['base_municipios.geojson'], {
+        dadosGeraisRef.current = mapData.dados;
+        layersRef.current.dados = L.geoJSON(mapData.dados, {
           style: function(feature) {
             return {
               color: "#222",
@@ -260,7 +227,7 @@ export default function MapaMunicipal({ municipio, estado, onMunicipioEncontrado
         });
         
         // PD sem plano
-        layersRef.current.pdsemplano = L.geoJSON(dados['base_pd_sem_plano.geojson'], {
+        layersRef.current.pdsemplano = L.geoJSON(mapData.pdsemplano, {
           style: function(feature) {
             return {
               color: "#222",
@@ -275,7 +242,7 @@ export default function MapaMunicipal({ municipio, estado, onMunicipioEncontrado
         });
         
         // Produtos
-        layersRef.current.produtos = L.geoJSON(dados['base_produtos.geojson'], {
+        layersRef.current.produtos = L.geoJSON(mapData.produtos, {
           style: function(feature) {
             return {
               color: "#222",
@@ -290,7 +257,7 @@ export default function MapaMunicipal({ municipio, estado, onMunicipioEncontrado
         });
         
         // PD vencendo
-        layersRef.current.pdvencendo = L.geoJSON(dados['base_pd_vencendo.geojson'], {
+        layersRef.current.pdvencendo = L.geoJSON(mapData.pdvencendo, {
           style: function(feature) {
             return {
               color: "#222",
@@ -306,7 +273,7 @@ export default function MapaMunicipal({ municipio, estado, onMunicipioEncontrado
         
         // Parceiros (marcadores customizados)
         const parceirosGroup = L.layerGroup();
-        const parceiros = dados['parceiros1.json'];
+        const parceiros = mapData.parceiros;
         parceiros.forEach((p: any) => {
           const corMarcador = p.categoria === "funda" ? "#7DD3FC" : "#1E40AF";
           const buildingIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="${corMarcador}">
@@ -326,28 +293,6 @@ export default function MapaMunicipal({ municipio, estado, onMunicipioEncontrado
         });
         layersRef.current.parceiros = parceirosGroup;
         
-        // Adiciona legenda
-        const legenda = L.control({ position: "topright" });
-        legenda.onAdd = function () {
-          const div = L.DomUtil.create("div", "info legend");
-          div.style.padding = "6px 8px";
-          div.style.background = "rgba(255, 255, 255, 0.8)";
-          div.style.boxShadow = "0 0 15px rgba(0,0,0,0.2)";
-          div.style.borderRadius = "5px";
-          
-          let labels = [];
-          for (let estado in coresEstados) {
-            if (estado !== "Outro") {
-              labels.push(
-                `<i style="background:${coresEstados[estado as keyof typeof coresEstados]}; width:18px; height:18px; display:inline-block; margin-right:5px;"></i> <span style='color:#222;'>${estado}</span>`
-              );
-            }
-          }
-          div.innerHTML = "<strong style='color:#000;'>Estados</strong><br>" + labels.join("<br>");
-          return div;
-        };
-        legenda.addTo(mapRef.current!);
-        
         console.log("Adicionando camadas ao mapa");
         // Adiciona camadas iniciais
         Object.entries(layerState).forEach(([key, checked]) => {
@@ -366,19 +311,17 @@ export default function MapaMunicipal({ municipio, estado, onMunicipioEncontrado
         };
         L.control.layers(
           {
-            "Padrão (OSM)": osm,
-            "CartoDB - Claro": carto,
-            "Imagem de Satélite": sat
+            "CartoDB - Claro": carto
           },
           overlayMaps,
           { collapsed: false, position: "bottomleft" }
         ).addTo(mapRef.current!);
 
       } catch (error) {
-        console.error("Erro ao carregar dados do S3:", error);
+        console.error("Erro ao configurar camadas do mapa:", error);
       }
     }, 100);
-  }, [layerState]);
+  }, [mapData, loading, layerState]);
 
   // Atualiza visibilidade das camadas ao mudar o estado
   useEffect(() => {
@@ -394,12 +337,9 @@ export default function MapaMunicipal({ municipio, estado, onMunicipioEncontrado
     });
   }, [layerState]);
 
-  // Busca e destaca município apenas quando municipio ou estado são passados
+  // Adicionar efeito para destacar municípioSelecionado e adicionar o alfinete
   useEffect(() => {
-    // Não faz nada se municipio ou estado estão vazios
-    if (!municipio || !estado || !dadosGeraisRef.current || !mapRef.current) return;
-    
-    console.log("Buscando município:", municipio, estado);
+    if (!municipioSelecionado || !dadosGeraisRef.current || !mapRef.current) return;
     
     // Remove destaque anterior
     if (layersRef.current.destaque) {
@@ -407,42 +347,77 @@ export default function MapaMunicipal({ municipio, estado, onMunicipioEncontrado
       layersRef.current.destaque = null;
     }
     
-    // Busca o município
-    const feature = dadosGeraisRef.current.features.find((f: any) =>
-      f.properties &&
-      typeof f.properties.nome_municipio === "string" &&
-      typeof f.properties.name_state === "string" &&
-      removerAcentos(f.properties.nome_municipio.toLowerCase()) === removerAcentos(municipio.toLowerCase()) &&
-      removerAcentos(f.properties.name_state.toLowerCase()) === removerAcentos(estado.toLowerCase())
-    );
-    
-    if (!feature) {
-      console.log("Município não encontrado");
-      onMunicipioEncontrado(null);
-      return;
+    // Remove alfinete anterior se existir
+    if (alfineteMarkerRef.current) {
+      mapRef.current.removeLayer(alfineteMarkerRef.current);
+      alfineteMarkerRef.current = null;
     }
     
-    console.log("Município encontrado, destacando...");
+    // Fecha popup anterior se existir
+    if (popupRef.current) {
+      mapRef.current.closePopup(popupRef.current);
+      popupRef.current = null;
+    }
+    
     // Destaca o município
-    layersRef.current.destaque = L.geoJSON(feature, {
+    const destaqueLayer = L.geoJSON(municipioSelecionado, {
       style: {
         color: "red",
         weight: 3,
         fillOpacity: 0.2,
       },
-    }).addTo(mapRef.current!);
-    
-    // Zoom menor (8 em vez de 12)
-    mapRef.current!.fitBounds(layersRef.current.destaque.getBounds(), { maxZoom: 8 });
-    
-    layersRef.current.destaque.eachLayer((layer: Layer) => {
-      if ((layer as any).getBounds) {
-        layer.bindPopup(popupDadosGerais(feature.properties)).openPopup();
-      }
     });
     
-    onMunicipioEncontrado(feature);
-  }, [municipio, estado, onMunicipioEncontrado]);
+    layersRef.current.destaque = destaqueLayer;
+    destaqueLayer.addTo(mapRef.current);
+    
+    // Calcula o centro do polígono usando Turf.js para maior precisão
+    const bounds = destaqueLayer.getBounds();
+    
+    // Tenta usar Turf.js para calcular o centroide real do polígono
+    let center;
+    try {
+      // Usa o centroide do Turf para um posicionamento mais preciso
+      const centroid = turf.centroid(municipioSelecionado);
+      // Converte as coordenadas do Turf (longitude, latitude) para o formato do Leaflet (latitude, longitude)
+      center = L.latLng(centroid.geometry.coordinates[1], centroid.geometry.coordinates[0]);
+      
+      // Verifica se o centroide está dentro do polígono
+      // Se não estiver, usamos o centro da bounding box como fallback
+      const point = turf.point([center.lng, center.lat]);
+      const polygon = municipioSelecionado.geometry.type === 'MultiPolygon' 
+        ? turf.multiPolygon(municipioSelecionado.geometry.coordinates)
+        : turf.polygon(municipioSelecionado.geometry.coordinates);
+      
+      const isInside = turf.booleanPointInPolygon(point, polygon);
+      if (!isInside) {
+        console.log("Centroide fora do polígono, usando centro da bounding box");
+        center = bounds.getCenter();
+      }
+    } catch (error) {
+      console.error("Erro ao calcular centroide com Turf.js:", error);
+      // Fallback para o método padrão do Leaflet se o Turf falhar
+      center = bounds.getCenter();
+    }
+    
+    // Cria um ícone personalizado para o alfinete
+    const alfineteIcon = L.icon({
+      iconUrl: '/alfinete_logo_branca.svg',
+      iconSize: [74, 74],     // tamanho do ícone aumentado em +30% (de 57 para 74)
+      iconAnchor: [37, 74],   // ponto do ícone que corresponderá à localização do marcador (ajustado proporcionalmente)
+      popupAnchor: [0, -74]   // ponto a partir do qual o popup deve abrir em relação ao iconAnchor (ajustado)
+    });
+    
+    // Adiciona o alfinete no centro do polígono
+    alfineteMarkerRef.current = L.marker(center, { icon: alfineteIcon })
+      .bindPopup(`<b>${municipioSelecionado.properties?.nome_municipio || municipioSelecionado.properties?.municipio}</b><br>
+                  <b>Estado:</b> ${municipioSelecionado.properties?.name_state || ""}`)
+      .addTo(mapRef.current);
+    
+    // Ajusta o zoom para mostrar o município
+    mapRef.current.fitBounds(bounds, { maxZoom: 10 });
+    
+  }, [municipioSelecionado]);
 
   // Handler para alternar camadas
   function handleToggleLayer(key: string, checked: boolean) {
@@ -450,19 +425,21 @@ export default function MapaMunicipal({ municipio, estado, onMunicipioEncontrado
   }
 
   // Renderiza o mapa e o controle de camadas
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center w-full h-full">
+        <div className="animate-pulse w-16 h-16 rounded-full bg-sky-500/20"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return <div>Erro ao carregar dados do mapa: {error}</div>;
+  }
+
   return (
     <div className="relative w-full h-full">
-      <LayerControl
-        layers={[
-          { key: "dados", label: "Dados Gerais", checked: layerState.dados },
-          { key: "pdsemplano", label: "PD - Sem Plano e +20K", checked: layerState.pdsemplano },
-          { key: "produtos", label: "Produtos Innovatis", checked: layerState.produtos },
-          { key: "pdvencendo", label: "PD em Vencimento", checked: layerState.pdvencendo },
-          { key: "parceiros", label: "Parceiros", checked: layerState.parceiros },
-        ]}
-        onToggle={handleToggleLayer}
-      />
-      <div id="mapa-leaflet" className="w-full h-full rounded-lg" style={{ minHeight: "400px" }}></div>
+      <div id="mapa-leaflet" className="w-full h-full rounded-lg" style={{ minHeight: "300px" }}></div>
     </div>
   );
 }

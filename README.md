@@ -1,36 +1,107 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# NEXUS - Plataforma de Produtos e Dados Municipais
 
-## Getting Started
+## Visão Geral
 
-First, run the development server:
+O NEXUS é uma plataforma web desenvolvida para a Innovatis MC que oferece suporte estratégico à Diretoria de Estratégia e Mercado. A plataforma disponibiliza visualização geoespacial e análise de dados municipais, com foco em informações sobre planos diretores, produtos e serviços relacionados a municípios brasileiros.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Principais Funcionalidades
+
+- **Visualização Geoespacial**: Mapa interativo com dados municipais de todo o Brasil
+- **Busca por Município**: Filtro por estado e município para localização rápida
+- **Camadas de Dados**: Visualização de diferentes conjuntos de dados (planos diretores, produtos, etc.)
+- **Informações Detalhadas**: Dados específicos sobre cada município selecionado
+- **Autenticação Segura**: Sistema de login para acesso controlado à plataforma
+
+## Arquitetura do Projeto
+
+### Frontend
+- Desenvolvido com **Next.js 15** (App Router)
+- Interface responsiva com **TailwindCSS**
+- Componentes interativos com **React 19**
+- Animações com **Framer Motion**
+- Visualização de mapas com **Leaflet**
+- Visualização 3D com **Three.js** e **React Three Fiber**
+
+### Backend
+- API Routes do Next.js
+- Integração com **AWS S3** para armazenamento e acesso a dados GeoJSON
+- Autenticação via **JWT** (JSON Web Tokens)
+- Middleware para redirecionamento de rotas
+
+### Dados
+- Arquivos GeoJSON com informações municipais
+- Dados armazenados no AWS S3
+- Camadas de dados:
+  - Base de municípios
+  - Municípios sem plano diretor
+  - Municípios com plano diretor vencendo
+  - Produtos disponíveis
+  - Parceiros
+
+## Estrutura do Projeto
+
+```
+frontend/
+├── public/            # Arquivos estáticos e dados GeoJSON
+├── src/
+│   ├── app/           # Páginas e API routes (Next.js App Router)
+│   ├── components/    # Componentes React reutilizáveis
+│   ├── contexts/      # Contextos React para gerenciamento de estado
+│   ├── hooks/         # Hooks personalizados
+│   ├── types/         # Definições de tipos TypeScript
+│   └── utils/         # Funções utilitárias (S3, autenticação, etc.)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Fluxo da Aplicação
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. O usuário acessa a página inicial com animação 3D de introdução
+2. Autenticação via tela de login
+3. Acesso ao mapa interativo com dados municipais
+4. Busca e seleção de municípios para visualização detalhada
+5. Alternância entre diferentes camadas de dados
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Tecnologias Utilizadas
 
-## Learn More
+- **Next.js**: Framework React para renderização do lado do servidor
+- **React**: Biblioteca para construção de interfaces
+- **TypeScript**: Tipagem estática para JavaScript
+- **TailwindCSS**: Framework CSS utilitário
+- **Leaflet**: Biblioteca para mapas interativos
+- **Three.js/React Three Fiber**: Renderização 3D
+- **AWS SDK**: Integração com serviços da AWS
+- **JWT**: Autenticação baseada em tokens
 
-To learn more about Next.js, take a look at the following resources:
+## Requisitos de Ambiente
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Node.js 18.0.0 ou superior
+- Credenciais AWS configuradas para acesso ao S3
+- Variáveis de ambiente:
+  - AWS_REGION
+  - AWS_ACCESS_KEY_ID
+  - AWS_SECRET_ACCESS_KEY
+  - AWS_S3_BUCKET
+  - JWT_SECRET
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Executando o Projeto
 
-## Deploy on Vercel
+```bash
+# Instalar dependências
+npm install
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+# Executar em modo de desenvolvimento
+npm run dev
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# Construir para produção
+npm run build
+
+# Iniciar em modo de produção
+npm start
+```
+
+## Acesso
+
+A aplicação estará disponível em [http://localhost:3000](http://localhost:3000)
+
+---
+
+Desenvolvido pela equipe de Data Science da Innovatis MC

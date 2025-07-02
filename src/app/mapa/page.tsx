@@ -13,14 +13,14 @@ const MapaMunicipal = dynamic(() => import("../../components/MapaMunicipal"), { 
 // Componente de barra de progresso
 function LoadingProgressBar({ progress }: { progress: number }) {
   return (
-    <div className="w-full max-w-3xl mx-auto mb-2">
-      <div className="w-full bg-gray-700 h-1 rounded-full overflow-hidden">
+    <div className="w-full max-w-3xl mx-auto mb-3">
+      <div className="w-full bg-gray-700 h-2 rounded-full overflow-hidden shadow-inner">
         <div 
-          className="bg-sky-500 h-full rounded-full transition-all duration-300 ease-out"
+          className="bg-sky-500 h-full rounded-full transition-all duration-300 ease-out shadow-lg"
           style={{ width: `${progress}%` }}
         />
       </div>
-      <div className="flex justify-between text-xs text-slate-400 mt-0.5">
+      <div className="flex justify-between text-sm text-slate-400 mt-1">
         <span>Carregando dados...</span>
         <span>{progress}%</span>
       </div>
@@ -128,7 +128,7 @@ function MapaPageContent() {
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#0f172a] to-[#1e293b] text-white overflow-hidden">
       {/* Cabeçalho */}
       <header className="w-full py-2 px-6 bg-[#1e293b] text-white shadow-md">
-        <div className="w-full max-w-7xl mx-auto grid grid-cols-3 items-center">
+        <div className="w-full max-w-7xl mx-auto flex flex-col md:grid md:grid-cols-3 items-center gap-2 md:gap-0">
           {/* Logo e nome no canto esquerdo */}
           <div className="flex items-center gap-4 justify-self-start">
             <div className="text-gray-400">
@@ -141,14 +141,14 @@ function MapaPageContent() {
                 priority
               />
             </div>
-            <h1 className="text-white text-xl font-bold tracking-wide">Nexus - Plataforma de Produtos</h1>
+            <h1 className="text-white text-lg md:text-xl font-bold tracking-wide">Nexus - Plataforma de Produtos</h1>
           </div>
           {/* Texto centralizado */}
-          <div className="flex justify-center">
-            <span className="text-xs text-slate-300">Powered by Data Science Team - Innovatis MC</span>
+          <div className="flex justify-center mt-1 md:mt-0">
+            <span className="text-xs text-slate-300 text-center">Powered by Data Science Team - Innovatis MC</span>
           </div>
           {/* Espaço vazio à direita para equilíbrio */}
-          <div></div>
+          <div className="hidden md:block"></div>
         </div>
       </header>
 

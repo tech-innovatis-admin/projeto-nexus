@@ -6,6 +6,7 @@ import "leaflet/dist/leaflet.css";
 import Image from "next/image";
 import InformacoesMunicipio from "../../components/InformacoesMunicipio";
 import { MapDataProvider, useMapData } from "../../contexts/MapDataContext";
+import ExportPDFButton from "@/components/ExportPDFButton";
 
 // Importação dinâmica do mapa para evitar problemas de SSR
 const MapaMunicipal = dynamic(() => import("../../components/MapaMunicipal"), { ssr: false });
@@ -192,13 +193,30 @@ function MapaPageContent() {
                 ))}
               </select>
               
-              <button
-                className="bg-gray-600 hover:bg-gray-700 text-white font-semibold py-1.5 px-4 rounded-md transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#0f172a]"
-                type="submit"
-              >
-                Buscar
-              </button>
+              <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+                <button
+                  className="w-full md:w-auto bg-gray-600 hover:bg-gray-700 text-white font-semibold py-1.5 px-4 rounded-md transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#0f172a]"
+                  type="submit"
+                >
+                  Buscar
+                </button>
+                
+                {/* Botão de Exportar PDF - agora ao lado do botão Buscar */}
+                {municipioSelecionado && (
+                  <ExportPDFButton 
+                    city={{
+                      municipio: municipioSelecionado.properties?.nome_municipio || municipioSelecionado.properties?.municipio,
+                      nome: municipioSelecionado.properties?.nome_municipio || municipioSelecionado.properties?.municipio,
+                      name_state: municipioSelecionado.properties?.name_state,
+                      VALOR_PD: municipioSelecionado.properties?.VALOR_PD,
+                      VALOR_CTM: municipioSelecionado.properties?.VALOR_CTM,
+                      VALOR_PMSB: municipioSelecionado.properties?.VALOR_PMSB
+                    }}
+                  />
+                )}
+              </div>
             </form>
+
             {erroBusca && <span className="text-red-400 mt-1 text-sm">{erroBusca}</span>}
           </section>
           
@@ -382,7 +400,7 @@ function MapaPageContent() {
                 <>
                   {/* Título fixo */}
                   <div className="sticky top-0 left-0 right-0 bg-[#1e293b] py-1 px-4 z-30 border-b border-slate-700 shadow-sm">
-                    <h2 className="text-base font-bold text-gray-300 text-center">Produtos Innovatis</h2>
+                    <h2 className="text-base font-bold text-gray-300 text-center">Produtos Municipais</h2>
                   </div>
                   
                   {/* Conteúdo rolável */}

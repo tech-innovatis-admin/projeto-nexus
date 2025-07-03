@@ -17,6 +17,7 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
   const chavesValores = [
     'VALOR_PD',
     'VALOR_PMSB',
+    'VALOR_CTM',
     'VALOR_REURB',
     'desert',
     'dec_ambiente',
@@ -29,12 +30,13 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
   const nomesCustomizados: Record<string, string> = {
     VALOR_PD: "Plano Diretor",
     VALOR_PMSB: "PMSB",
+    VALOR_CTM: "IPTU Legal",
     VALOR_REURB: "REURB",
     desert: "Plano de Desertificação",
     dec_ambiente: "Plano Decenal do Meio Ambiente",
-    VALOR_START_INICIAIS_FINAIS: "Start Iniciais e Finais",
-    VALOR_START_INICIAIS: "Start Iniciais",
-    VALOR_START_FINAIS: "Start Finais"
+    VALOR_START_INICIAIS_FINAIS: "Start anos iniciais e ginais",
+    VALOR_START_INICIAIS: "Start anos iniciais",
+    VALOR_START_FINAIS: "Start finais"
   };
 
   // Filtra apenas as chaves que queremos exibir

@@ -305,7 +305,7 @@ export default function MapaMunicipal({ municipioSelecionado }: MapaMunicipalPro
         const overlayMaps = {
           "Dados Gerais": layersRef.current.dados,
           "PD - Sem Plano e +20K": layersRef.current.pdsemplano,
-          "Produtos Innovatis": layersRef.current.produtos,
+          "Produtos Municipais": layersRef.current.produtos,
           "PD em Vencimento": layersRef.current.pdvencendo,
           "Parceiros": layersRef.current.parceiros,
         };
@@ -362,9 +362,10 @@ export default function MapaMunicipal({ municipioSelecionado }: MapaMunicipalPro
     // Destaca o município
     const destaqueLayer = L.geoJSON(municipioSelecionado, {
       style: {
-        color: "red",
+        color: "#1E40AF", // azul escuro (blue-800) para as bordas
         weight: 3,
-        fillOpacity: 0.2,
+        fillOpacity: 0.15,
+        fillColor: "#60A5FA" // azul mais claro (blue-400) para o preenchimento
       },
     });
     
@@ -403,9 +404,9 @@ export default function MapaMunicipal({ municipioSelecionado }: MapaMunicipalPro
     // Cria um ícone personalizado para o alfinete
     const alfineteIcon = L.icon({
       iconUrl: '/alfinete_logo_branca.svg',
-      iconSize: [74, 74],     // tamanho do ícone aumentado em +30% (de 57 para 74)
-      iconAnchor: [37, 74],   // ponto do ícone que corresponderá à localização do marcador (ajustado proporcionalmente)
-      popupAnchor: [0, -74]   // ponto a partir do qual o popup deve abrir em relação ao iconAnchor (ajustado)
+      iconSize: [81, 81],     // tamanho do ícone aumentado em +10% (de 74 para 81)
+      iconAnchor: [40, 81],   // ponto do ícone que corresponderá à localização do marcador (ajustado proporcionalmente)
+      popupAnchor: [0, -81]   // ponto a partir do qual o popup deve abrir em relação ao iconAnchor (ajustado)
     });
     
     // Adiciona o alfinete no centro do polígono

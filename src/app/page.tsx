@@ -14,6 +14,8 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 // Estilos CSS modulares
 import styles from './mapa/page.module.css';
+// Componente para voltar ao topo
+import ScrollToTopButton from '@/components/ScrollToTopButton';
 
 // Importação dinâmica do componente 3D para evitar problemas com SSR (Server Side Rendering)
 // O componente só será carregado no lado do cliente
@@ -95,6 +97,9 @@ export default function HomePage() {
           </div>
         )}
       </div>
+
+      {/* Botão para voltar ao topo (visível apenas em mobile) */}
+      <ScrollToTopButton />
     </div>
   );
 } 

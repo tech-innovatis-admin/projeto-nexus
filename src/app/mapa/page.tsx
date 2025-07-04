@@ -7,21 +7,44 @@ import Image from "next/image";
 import InformacoesMunicipio from "../../components/InformacoesMunicipio";
 import { MapDataProvider, useMapData } from "../../contexts/MapDataContext";
 import ExportPDFButton from "@/components/ExportPDFButton";
+import ScrollToTopButton from "@/components/ScrollToTopButton";
 
 // Importação dinâmica do mapa para evitar problemas de SSR
 const MapaMunicipal = dynamic(() => import("../../components/MapaMunicipal"), { ssr: false });
 
 // Componente de barra de progresso
 function LoadingProgressBar({ progress }: { progress: number }) {
+  // Função para gerar o gradiente de cor baseado no progresso
+  const getProgressColor = (progress: number) => {
+    // Cores para diferentes estágios de progresso usando apenas tons de azul
+    // Início (0-33%): azul claro para azul médio
+    // Meio (33-66%): azul médio para azul mais escuro
+    // Final (66-100%): azul escuro para azul muito escuro
+    
+    if (progress < 33) {
+      // De azul claro para azul médio
+      return `linear-gradient(to right, #38bdf8, #0ea5e9, #0284c7)`;
+    } else if (progress < 66) {
+      // De azul médio para azul mais escuro
+      return `linear-gradient(to right,rgb(31, 152, 207),rgb(34, 138, 190),rgb(30, 69, 175))`;
+    } else {
+      // De azul escuro para azul muito escuro
+      return `linear-gradient(to right,rgb(29, 85, 170),rgb(28, 59, 160),rgb(27, 54, 128))`;
+    }
+  };
+
   return (
-    <div className="w-full max-w-3xl mx-auto mb-3">
+    <div className="w-full max-w-3xl mx-auto mb-3 px-4">
       <div className="w-full bg-gray-700 h-2 rounded-full overflow-hidden shadow-inner">
         <div 
-          className="bg-sky-500 h-full rounded-full transition-all duration-300 ease-out shadow-lg"
-          style={{ width: `${progress}%` }}
+          className="h-full rounded-full transition-all duration-300 ease-out shadow-lg progress-bar-shine"
+          style={{ 
+            width: `${progress}%`,
+            background: getProgressColor(progress)
+          }}
         />
       </div>
-      <div className="flex justify-between text-sm text-slate-400 mt-1">
+      <div className="flex justify-between text-sm text-slate-400 mt-1 px-0.5">
         <span>Carregando dados...</span>
         <span>{progress}%</span>
       </div>
@@ -201,19 +224,17 @@ function MapaPageContent() {
                   Buscar
                 </button>
                 
-                {/* Botão de Exportar PDF - agora ao lado do botão Buscar */}
-                {municipioSelecionado && (
-                  <ExportPDFButton 
-                    city={{
-                      municipio: municipioSelecionado.properties?.nome_municipio || municipioSelecionado.properties?.municipio,
-                      nome: municipioSelecionado.properties?.nome_municipio || municipioSelecionado.properties?.municipio,
-                      name_state: municipioSelecionado.properties?.name_state,
-                      VALOR_PD: municipioSelecionado.properties?.VALOR_PD,
-                      VALOR_CTM: municipioSelecionado.properties?.VALOR_CTM,
-                      VALOR_PMSB: municipioSelecionado.properties?.VALOR_PMSB
-                    }}
-                  />
-                )}
+                {/* Botão de Exportar PDF - sempre visível */}
+                <ExportPDFButton 
+                  city={municipioSelecionado ? {
+                    municipio: municipioSelecionado.properties?.nome_municipio || municipioSelecionado.properties?.municipio,
+                    nome: municipioSelecionado.properties?.nome_municipio || municipioSelecionado.properties?.municipio,
+                    name_state: municipioSelecionado.properties?.name_state,
+                    VALOR_PD: municipioSelecionado.properties?.VALOR_PD,
+                    VALOR_CTM: municipioSelecionado.properties?.VALOR_CTM,
+                    VALOR_PMSB: municipioSelecionado.properties?.VALOR_PMSB
+                  } : null}
+                />
               </div>
             </form>
 
@@ -232,8 +253,8 @@ function MapaPageContent() {
       {/* Divisor visual */}
       <div className="mx-auto border-t border-slate-700 opacity-50 my-0.5 w-full"></div>
 
-      {/* Barra de progresso - com margem superior para posicioná-la mais abaixo */}
-      {loading && <div className="mt-4">{/* Adicionado espaço acima da barra */}
+      {/* Barra de progresso - com margens adequadas */}
+      {loading && <div className="mt-4 px-2">
         <LoadingProgressBar progress={loadingProgress} />
       </div>}
 
@@ -418,6 +439,9 @@ function MapaPageContent() {
       <footer className="w-full py-0.25 text-center text-xs text-slate-400 opacity-70">
         &copy; {new Date().getFullYear()} Innovatis MC. Todos os direitos reservados.
       </footer>
+
+      {/* Botão para voltar ao topo (visível apenas em mobile) */}
+      <ScrollToTopButton />
     </div>
   );
 }

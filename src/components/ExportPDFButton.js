@@ -6,6 +6,7 @@ import { useState, useRef, useEffect } from 'react';
 function ExportPDFButton({ city, className = '' }) {
   const [isOpen, setIsOpen] = useState(false);
   const [pdfUrl, setPdfUrl] = useState('');
+  const [showAlert, setShowAlert] = useState(false);
   const dropdownRef = useRef(null);
   
   // Fechar o dropdown quando clicar fora dele
@@ -30,6 +31,19 @@ function ExportPDFButton({ city, className = '' }) {
       }
     };
   }, [pdfUrl]);
+
+  // Efeito para esconder a mensagem de alerta após 3 segundos
+  useEffect(() => {
+    let timer;
+    if (showAlert) {
+      timer = setTimeout(() => {
+        setShowAlert(false);
+      }, 3000);
+    }
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [showAlert]);
 
   // Função para converter nome do estado para sigla
   const getEstadoSigla = (nomeEstado) => {
@@ -80,9 +94,6 @@ function ExportPDFButton({ city, className = '' }) {
 
       // 3. Preencher os campos do formulário com os dados da cidade
       form.getTextField('nome_munic').setText(`${city.municipio} - ${estadoSigla}`);
-      form.getTextField('paragraf_nome_munic').setText(
-        `A Innovatis é uma empresa especializada em captação e gestão de projetos adotando quatro pilares fundamentais: Comprometimento, inovação, praticidade e resultados. Desenvolvemos soluções em parceria com a academia, governos e o setor privado, visando transformar soluções para o desenvolvimento do município de ${city.nome} - ${estadoSigla} que podem ser contratadas por meio de dispensa de licitação prevista na Nova Lei de Licitações n° 14.133/2021, artigo 75, inciso XV.`
-      );
       form.getTextField('VALOR_PD').setText(city.VALOR_PD || 'N/A');
       form.getTextField('VALOR_CTM').setText(city.VALOR_CTM || 'N/A');
       form.getTextField('VALOR_PMSB').setText(city.VALOR_PMSB || 'N/A');
@@ -106,7 +117,20 @@ function ExportPDFButton({ city, className = '' }) {
     }
   };
 
+  const handleButtonClick = () => {
+    if (!city) {
+      setShowAlert(true);
+      return;
+    }
+    setIsOpen(!isOpen);
+  };
+
   const handleDownload = async () => {
+    if (!city) {
+      setShowAlert(true);
+      return;
+    }
+    
     const pdf = await generatePDF();
     if (pdf) {
       download(pdf.bytes, pdf.fileName, 'application/pdf');
@@ -115,6 +139,11 @@ function ExportPDFButton({ city, className = '' }) {
   };
 
   const handleShareWhatsApp = async () => {
+    if (!city) {
+      setShowAlert(true);
+      return;
+    }
+    
     try {
       const pdf = await generatePDF();
       if (!pdf) return;
@@ -166,9 +195,8 @@ function ExportPDFButton({ city, className = '' }) {
   return (
     <div className="relative" ref={dropdownRef}>
       <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center gap-2 bg-sky-600 hover:bg-sky-700 text-white font-semibold py-1.5 px-4 rounded-md transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-[#0f172a] disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
-        disabled={!city}
+        onClick={handleButtonClick}
+        className={`w-full md:w-auto flex items-center justify-center md:justify-start gap-2 bg-sky-600 hover:bg-sky-700 text-white font-semibold py-1.5 px-4 rounded-md transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-[#0f172a] ${!city ? 'opacity-90' : ''} ${className}`}
       >
         <Image
           src="/file.svg"
@@ -189,7 +217,19 @@ function ExportPDFButton({ city, className = '' }) {
         </svg>
       </button>
       
-      {isOpen && (
+      {/* Alerta de município não selecionado */}
+      {showAlert && (
+        <div className="absolute top-full left-0 right-0 mt-2 bg-red-500/90 backdrop-blur-sm text-white text-sm py-2 px-3 rounded-md shadow-lg z-50 animate-fade-in">
+          <div className="flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            Nenhum município selecionado
+          </div>
+        </div>
+      )}
+      
+      {isOpen && city && (
         <div className="absolute right-0 mt-1 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50">
           <div className="py-1" role="menu" aria-orientation="vertical">
             <button

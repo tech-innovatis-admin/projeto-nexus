@@ -147,6 +147,8 @@ export default function MapaMunicipal({ municipioSelecionado }: MapaMunicipalPro
     pdvencendo: false,
     parceiros: false,
   });
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const previousMunicipioRef = useRef<any>(null);
 
   const { mapData, loading, error } = useMapData();
 
@@ -341,82 +343,152 @@ export default function MapaMunicipal({ municipioSelecionado }: MapaMunicipalPro
   useEffect(() => {
     if (!municipioSelecionado || !dadosGeraisRef.current || !mapRef.current) return;
     
-    // Remove destaque anterior
-    if (layersRef.current.destaque) {
-      mapRef.current.removeLayer(layersRef.current.destaque);
-      layersRef.current.destaque = null;
-    }
+    // Inicia a transição
+    setIsTransitioning(true);
     
-    // Remove alfinete anterior se existir
-    if (alfineteMarkerRef.current) {
-      mapRef.current.removeLayer(alfineteMarkerRef.current);
-      alfineteMarkerRef.current = null;
-    }
+    // Armazena o município anterior para referência
+    const previousMunicipio = previousMunicipioRef.current;
+    previousMunicipioRef.current = municipioSelecionado;
     
-    // Fecha popup anterior se existir
-    if (popupRef.current) {
-      mapRef.current.closePopup(popupRef.current);
-      popupRef.current = null;
-    }
-    
-    // Destaca o município
-    const destaqueLayer = L.geoJSON(municipioSelecionado, {
-      style: {
-        color: "#1E40AF", // azul escuro (blue-800) para as bordas
-        weight: 3,
-        fillOpacity: 0.15,
-        fillColor: "#60A5FA" // azul mais claro (blue-400) para o preenchimento
-      },
-    });
-    
-    layersRef.current.destaque = destaqueLayer;
-    destaqueLayer.addTo(mapRef.current);
-    
-    // Calcula o centro do polígono usando Turf.js para maior precisão
-    const bounds = destaqueLayer.getBounds();
-    
-    // Tenta usar Turf.js para calcular o centroide real do polígono
-    let center;
-    try {
-      // Usa o centroide do Turf para um posicionamento mais preciso
-      const centroid = turf.centroid(municipioSelecionado);
-      // Converte as coordenadas do Turf (longitude, latitude) para o formato do Leaflet (latitude, longitude)
-      center = L.latLng(centroid.geometry.coordinates[1], centroid.geometry.coordinates[0]);
+    // Função para aplicar o destaque com fade
+    const applyHighlight = () => {
+      // Remove destaque anterior
+      if (layersRef.current.destaque) {
+        mapRef.current?.removeLayer(layersRef.current.destaque);
+        layersRef.current.destaque = null;
+      }
       
-      // Verifica se o centroide está dentro do polígono
-      // Se não estiver, usamos o centro da bounding box como fallback
-      const point = turf.point([center.lng, center.lat]);
-      const polygon = municipioSelecionado.geometry.type === 'MultiPolygon' 
-        ? turf.multiPolygon(municipioSelecionado.geometry.coordinates)
-        : turf.polygon(municipioSelecionado.geometry.coordinates);
+      // Remove alfinete anterior se existir
+      if (alfineteMarkerRef.current) {
+        mapRef.current?.removeLayer(alfineteMarkerRef.current);
+        alfineteMarkerRef.current = null;
+      }
       
-      const isInside = turf.booleanPointInPolygon(point, polygon);
-      if (!isInside) {
-        console.log("Centroide fora do polígono, usando centro da bounding box");
+      // Fecha popup anterior se existir
+      if (popupRef.current) {
+        mapRef.current?.closePopup(popupRef.current);
+        popupRef.current = null;
+      }
+      
+      // Destaca o município com opacidade inicial baixa para o efeito de fade
+      const destaqueLayer = L.geoJSON(municipioSelecionado, {
+        style: {
+          color: "#1E40AF", // azul escuro (blue-800) para as bordas
+          weight: 3,
+          fillOpacity: 0,  // Começa com opacidade zero para o efeito de fade
+          fillColor: "#60A5FA" // azul mais claro (blue-400) para o preenchimento
+        },
+      });
+      
+      layersRef.current.destaque = destaqueLayer;
+      destaqueLayer.addTo(mapRef.current!);
+      
+      // Calcula o centro do polígono usando Turf.js para maior precisão
+      const bounds = destaqueLayer.getBounds();
+      
+      // Tenta usar Turf.js para calcular o centroide real do polígono
+      let center;
+      try {
+        // Usa o centroide do Turf para um posicionamento mais preciso
+        const centroid = turf.centroid(municipioSelecionado);
+        // Converte as coordenadas do Turf (longitude, latitude) para o formato do Leaflet (latitude, longitude)
+        center = L.latLng(centroid.geometry.coordinates[1], centroid.geometry.coordinates[0]);
+        
+        // Verifica se o centroide está dentro do polígono
+        // Se não estiver, usamos o centro da bounding box como fallback
+        const point = turf.point([center.lng, center.lat]);
+        const polygon = municipioSelecionado.geometry.type === 'MultiPolygon' 
+          ? turf.multiPolygon(municipioSelecionado.geometry.coordinates)
+          : turf.polygon(municipioSelecionado.geometry.coordinates);
+        
+        const isInside = turf.booleanPointInPolygon(point, polygon);
+        if (!isInside) {
+          console.log("Centroide fora do polígono, usando centro da bounding box");
+          center = bounds.getCenter();
+        }
+      } catch (error) {
+        console.error("Erro ao calcular centroide com Turf.js:", error);
+        // Fallback para o método padrão do Leaflet se o Turf falhar
         center = bounds.getCenter();
       }
-    } catch (error) {
-      console.error("Erro ao calcular centroide com Turf.js:", error);
-      // Fallback para o método padrão do Leaflet se o Turf falhar
-      center = bounds.getCenter();
+      
+      // Cria um ícone personalizado para o alfinete
+      const alfineteIcon = L.icon({
+        iconUrl: '/alfinete_logo_branca.svg',
+        iconSize: [81, 81],     // tamanho do ícone aumentado em +10% (de 74 para 81)
+        iconAnchor: [40, 81],   // ponto do ícone que corresponderá à localização do marcador (ajustado proporcionalmente)
+        popupAnchor: [0, -81],  // ponto a partir do qual o popup deve abrir em relação ao iconAnchor (ajustado)
+        className: 'pin-animation' // Adiciona a classe para a animação
+      });
+      
+      // Adiciona o alfinete no centro do polígono com opacidade inicial baixa
+      alfineteMarkerRef.current = L.marker(center, { 
+        icon: alfineteIcon,
+        opacity: 0 // Começa com opacidade zero
+      }).bindPopup(`<b>${municipioSelecionado.properties?.nome_municipio || municipioSelecionado.properties?.municipio}</b><br>
+                    <b>Estado:</b> ${municipioSelecionado.properties?.name_state || ""}`)
+        .addTo(mapRef.current!);
+      
+      // Ajusta o zoom para mostrar o município com animação
+      mapRef.current!.flyToBounds(bounds, { 
+        maxZoom: 10,
+        duration: 0.75 // Duração da animação em segundos
+      });
+      
+      // Aplica o efeito de fade gradualmente
+      let opacity = 0;
+      const fadeInterval = setInterval(() => {
+        opacity += 0.05;
+        if (opacity >= 0.15) {
+          clearInterval(fadeInterval);
+          opacity = 0.15;
+          setIsTransitioning(false); // Finaliza a transição
+        }
+        
+        // Atualiza a opacidade do destaque
+        if (layersRef.current.destaque) {
+          (layersRef.current.destaque as L.GeoJSON).setStyle({
+            fillOpacity: opacity
+          });
+        }
+        
+        // Atualiza a opacidade do alfinete
+        if (alfineteMarkerRef.current) {
+          alfineteMarkerRef.current.setOpacity(Math.min(opacity * 6.67, 1)); // Multiplicador para chegar a 1 mais rápido
+        }
+      }, 50);
+    };
+    
+    // Se for a primeira seleção, aplica imediatamente
+    if (!previousMunicipio) {
+      applyHighlight();
+    } else {
+      // Se já havia um município selecionado, faz um fade-out antes
+      if (layersRef.current.destaque) {
+        let opacity = 0.15;
+        const fadeOutInterval = setInterval(() => {
+          opacity -= 0.05;
+          if (opacity <= 0) {
+            clearInterval(fadeOutInterval);
+            applyHighlight(); // Aplica o novo destaque após o fade-out
+          }
+          
+          // Atualiza a opacidade do destaque durante o fade-out
+          if (layersRef.current.destaque) {
+            (layersRef.current.destaque as L.GeoJSON).setStyle({
+              fillOpacity: opacity
+            });
+          }
+          
+          // Atualiza a opacidade do alfinete durante o fade-out
+          if (alfineteMarkerRef.current) {
+            alfineteMarkerRef.current.setOpacity(Math.max(opacity * 6.67, 0));
+          }
+        }, 40);
+      } else {
+        applyHighlight();
+      }
     }
-    
-    // Cria um ícone personalizado para o alfinete
-    const alfineteIcon = L.icon({
-      iconUrl: '/alfinete_logo_branca.svg',
-      iconSize: [81, 81],     // tamanho do ícone aumentado em +10% (de 74 para 81)
-      iconAnchor: [40, 81],   // ponto do ícone que corresponderá à localização do marcador (ajustado proporcionalmente)
-      popupAnchor: [0, -81]   // ponto a partir do qual o popup deve abrir em relação ao iconAnchor (ajustado)
-    });
-    
-    // Adiciona o alfinete no centro do polígono
-    alfineteMarkerRef.current = L.marker(center, { icon: alfineteIcon })
-      .bindPopup(`<b>${municipioSelecionado.properties?.nome_municipio || municipioSelecionado.properties?.municipio}</b><br>
-                  <b>Estado:</b> ${municipioSelecionado.properties?.name_state || ""}`)
-      .addTo(mapRef.current);
-    
-    // Ajusta o zoom para mostrar o município
-    mapRef.current.fitBounds(bounds, { maxZoom: 10 });
     
   }, [municipioSelecionado]);
 

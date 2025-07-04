@@ -1,6 +1,6 @@
 "use client";
 import dynamic from "next/dynamic";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { Feature, FeatureCollection } from "geojson";
 import "leaflet/dist/leaflet.css";
 import Image from "next/image";
@@ -62,6 +62,7 @@ function MapaPageContent() {
   const [municipios, setMunicipios] = useState<string[]>([]);
   const [estadoSelecionado, setEstadoSelecionado] = useState<string>("");
   const [municipioSelecionadoDropdown, setMunicipioSelecionadoDropdown] = useState<string>("");
+  const dadosRef = useRef<HTMLDivElement>(null);
   
   // Extrair estados únicos do GeoJSON quando os dados forem carregados
   useEffect(() => {
@@ -121,6 +122,12 @@ function MapaPageContent() {
       
       if (municipioEncontrado) {
         setMunicipioSelecionado(municipioEncontrado);
+        // Scroll para os dados no mobile
+        setTimeout(() => {
+          if (window.innerWidth < 768 && dadosRef.current) {
+            dadosRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 200);
       } else {
         setErroBusca(`Município "${municipioSelecionadoDropdown}" não encontrado no estado "${estadoSelecionado}".`);
       }
@@ -270,7 +277,7 @@ function MapaPageContent() {
 
       {/* Conteúdo principal com visualização lado a lado */}
       <main className="flex-1 w-full flex flex-col items-center justify-center gap-1 p-0.5 md:p-0.5">
-        <div className="w-full max-w-7xl">
+        <div className="w-full max-w-7xl" ref={dadosRef}>
           {/* Dashboard com informações administrativas */}
           {municipioSelecionado && (
             <div className="w-full bg-[#1e293b] rounded-lg shadow-lg p-0.5 mb-0.5 border border-slate-600 animate-fade-in">

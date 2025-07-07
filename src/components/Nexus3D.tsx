@@ -7,6 +7,7 @@ export default function Nexus3D({ hideText3D = false }: { hideText3D?: boolean }
   const containerRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLDivElement>(null);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+  const [touchPosition, setTouchPosition] = useState<{ x: number; y: number } | null>(null);
   const [particles, setParticles] = useState<Array<{ id: number; x: number; y: number; size: number; color: string; dx?: number; dy?: number }>>([]);
   const animationFrameId = useRef<number | null>(null); // Para requestAnimationFrame
 
@@ -28,7 +29,7 @@ export default function Nexus3D({ hideText3D = false }: { hideText3D?: boolean }
     setParticles(newParticles);
   }, []);
 
-  // Movimento contínuo das partículas
+  // Movimento contínuo das partículas com efeito de repulsão
   useEffect(() => {
     let animationId: number;
     function animateParticles() {
@@ -36,9 +37,32 @@ export default function Nexus3D({ hideText3D = false }: { hideText3D?: boolean }
         prevParticles.map((p) => {
           let newX = p.x + (p.dx ?? 0);
           let newY = p.y + (p.dy ?? 0);
-          // Rebote nas bordas
           let dx = p.dx ?? 0;
           let dy = p.dy ?? 0;
+
+          // Repulsão do mouse/touch
+          let pointer = null;
+          if (touchPosition) {
+            pointer = touchPosition;
+          } else if (containerRef.current && mousePosition) {
+            pointer = {
+              x: (mousePosition.x + 0.5) * 100,
+              y: (mousePosition.y + 0.5) * 100,
+            };
+          }
+          if (pointer) {
+            const dist = Math.sqrt((newX - pointer.x) ** 2 + (newY - pointer.y) ** 2);
+            const repulseRadius = 9; // raio de repulsão reduzido
+            if (dist < repulseRadius) {
+              // Força de repulsão proporcional à proximidade
+              const angle = Math.atan2(newY - pointer.y, newX - pointer.x);
+              const force = (repulseRadius - dist) / repulseRadius * 0.7; // intensidade
+              dx += Math.cos(angle) * force;
+              dy += Math.sin(angle) * force;
+            }
+          }
+
+          // Rebote nas bordas
           if (newX < 0 || newX > 100) dx = -dx;
           if (newY < 0 || newY > 100) dy = -dy;
           // Pequena variação aleatória na direção
@@ -60,7 +84,7 @@ export default function Nexus3D({ hideText3D = false }: { hideText3D?: boolean }
     }
     animateParticles();
     return () => cancelAnimationFrame(animationId);
-  }, []);
+  }, [mousePosition, touchPosition]);
 
   // Efeito de rastreamento do mouse com requestAnimationFrame
   useEffect(() => {
@@ -77,9 +101,25 @@ export default function Nexus3D({ hideText3D = false }: { hideText3D?: boolean }
         }
       });
     };
+    const handleTouchMove = (e: TouchEvent) => {
+      if (containerRef.current && e.touches.length > 0) {
+        const { left, top, width, height } = containerRef.current.getBoundingClientRect();
+        const touch = e.touches[0];
+        const x = ((touch.clientX - left) / width) * 100;
+        const y = ((touch.clientY - top) / height) * 100;
+        setTouchPosition({ x, y });
+      }
+    };
+    const handleTouchEnd = () => {
+      setTouchPosition(null);
+    };
     window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('touchmove', handleTouchMove);
+    window.addEventListener('touchend', handleTouchEnd);
     return () => {
       window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleTouchEnd);
       if (animationFrameId.current) {
         cancelAnimationFrame(animationFrameId.current);
       }

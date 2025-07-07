@@ -10,6 +10,7 @@ import { useState } from "react"; // Hook para gerenciamento de estado
 import { useRouter } from "next/navigation"; // Hook para navegação
 import { motion } from "framer-motion"; // Biblioteca de animações
 import Image from "next/image"; // Importação do componente Image
+import { FaEye, FaEyeSlash } from 'react-icons/fa'; // Ícones para mostrar/ocultar senha
 
 export default function LoginPage() {
   // Estados para controle do formulário
@@ -17,6 +18,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState(""); // Estado para a senha
   const [error, setError] = useState(""); // Estado para mensagens de erro
   const [isLoading, setIsLoading] = useState(false); // Estado para controle de carregamento
+  const [showPassword, setShowPassword] = useState(false); // Estado para mostrar/ocultar senha
   const router = useRouter(); // Hook de navegação
 
   /**
@@ -106,14 +108,22 @@ export default function LoginPage() {
           <div className="relative">
             <input
               id="password"
-              type="password"
+              type={showPassword ? "text" : "password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full h-11 pl-4 pr-4 text-sm leading-none bg-slate-800/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition duration-150 ease-in-out"
+              className="w-full h-11 pl-4 pr-10 text-sm leading-none bg-slate-800/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition duration-150 ease-in-out"
               placeholder="Senha"
               disabled={isLoading}
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-white focus:outline-none"
+              aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+            >
+              {showPassword ? <FaEyeSlash size={16} /> : <FaEye size={16} />}
+            </button>
           </div>
 
           {/* Mensagem de erro com animação */}

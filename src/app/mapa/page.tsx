@@ -368,10 +368,12 @@ function MapaPageContent() {
                     </div>
                   )}
                   
-                  <div className="flex items-center mt-1 group">
-                    <span className="text-xs text-gray-300 mr-1 group-hover:text-gray-400 transition-colors">Plano Diretor Vencido:</span>
-                    <span className="text-white font-bold">{municipioSelecionado.properties?.pd_venci || "N/A"}</span>
-                  </div>
+                  {municipioSelecionado.properties?.PD_ALTERADA === "Sim" && (
+                    <div className="flex items-center mt-1 group">
+                      <span className="text-xs text-gray-300 mr-1 group-hover:text-gray-400 transition-colors">Plano Diretor Vencido:</span>
+                      <span className="text-white font-bold">{municipioSelecionado.properties?.pd_venci || "N/A"}</span>
+                    </div>
+                  )}
                   
                   <div className="flex items-center mt-1 group">
                     <span className="text-xs text-gray-300 mr-1 group-hover:text-gray-400 transition-colors">Lei do REURB:</span>

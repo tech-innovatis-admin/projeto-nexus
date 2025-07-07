@@ -5,6 +5,7 @@ import "leaflet/dist/leaflet.css";
 import "leaflet-draw/dist/leaflet.draw.css";
 import { useMapData } from "../contexts/MapDataContext";
 import * as turf from '@turf/turf';
+import polylabel from 'polylabel';
 
 // Interface para os dados do S3
 interface GeoJSONFile {
@@ -383,33 +384,106 @@ export default function MapaMunicipal({ municipioSelecionado }: MapaMunicipalPro
       layersRef.current.destaque = destaqueLayer;
       destaqueLayer.addTo(mapRef.current!);
       
-      // Calcula o centro do polígono usando Turf.js para maior precisão
+      // Calcula o centro do polígono usando múltiplos métodos para garantir um ponto visualmente central
       const bounds = destaqueLayer.getBounds();
       
-      // Tenta usar Turf.js para calcular o centroide real do polígono
       let center;
       try {
-        // Usa o centroide do Turf para um posicionamento mais preciso
-        const centroid = turf.centroid(municipioSelecionado);
-        // Converte as coordenadas do Turf (longitude, latitude) para o formato do Leaflet (latitude, longitude)
-        center = L.latLng(centroid.geometry.coordinates[1], centroid.geometry.coordinates[0]);
+        // Função para extrair o maior polígono (em caso de MultiPolygon)
+        const extractLargestPolygon = (feature: any) => {
+          if (feature.geometry.type === 'Polygon') {
+            return turf.polygon(feature.geometry.coordinates);
+          } else if (feature.geometry.type === 'MultiPolygon') {
+            // Para MultiPolygon, encontramos o maior polígono (por área)
+            let maxArea = 0;
+            let largestPolygon = null;
+            
+            for (const polygonCoords of feature.geometry.coordinates) {
+              const polygon = turf.polygon(polygonCoords);
+              const area = turf.area(polygon);
+              if (area > maxArea) {
+                maxArea = area;
+                largestPolygon = polygon;
+              }
+            }
+            return largestPolygon;
+          }
+          return null;
+        };
+
+        // 1. Primeiro, tenta encontrar o ponto interno mais central
+        const largestPolygon = extractLargestPolygon(municipioSelecionado);
         
-        // Verifica se o centroide está dentro do polígono
-        // Se não estiver, usamos o centro da bounding box como fallback
-        const point = turf.point([center.lng, center.lat]);
-        const polygon = municipioSelecionado.geometry.type === 'MultiPolygon' 
-          ? turf.multiPolygon(municipioSelecionado.geometry.coordinates)
-          : turf.polygon(municipioSelecionado.geometry.coordinates);
-        
-        const isInside = turf.booleanPointInPolygon(point, polygon);
-        if (!isInside) {
-          console.log("Centroide fora do polígono, usando centro da bounding box");
-          center = bounds.getCenter();
+        if (largestPolygon) {
+          // Obtém o centro geométrico (centroid)
+          const centroid = turf.centroid(largestPolygon);
+          const centroidPoint = turf.point(centroid.geometry.coordinates);
+          
+          // Verifica se o centroide está dentro do polígono
+          if (turf.booleanPointInPolygon(centroidPoint, municipioSelecionado as any)) {
+            // Centroide está dentro - podemos usá-lo
+            center = L.latLng(centroid.geometry.coordinates[1], centroid.geometry.coordinates[0]);
+          } else {
+            // Se o centroide estiver fora, usamos pointOnFeature e depois tentamos melhorar
+            const insidePoint = turf.pointOnFeature(municipioSelecionado);
+            
+            // Tenta melhorar a posição do ponto interno para ficar mais centralizado
+            // Cria múltiplos pontos candidatos dentro do polígono e escolhe o mais central
+            const bbox = turf.bbox(municipioSelecionado);
+            const width = bbox[2] - bbox[0];
+            const height = bbox[3] - bbox[1];
+            const centerX = (bbox[0] + bbox[2]) / 2;
+            const centerY = (bbox[1] + bbox[3]) / 2;
+            
+            // Gera uma grade de pontos candidatos em torno do centro da bounding box
+            const candidatePoints = [];
+            const steps = 5; // número de pontos a testar em cada direção
+            
+            for (let i = -steps; i <= steps; i++) {
+              for (let j = -steps; j <= steps; j++) {
+                const testX = centerX + (i * width / (steps * 2));
+                const testY = centerY + (j * height / (steps * 2));
+                const testPoint = turf.point([testX, testY]);
+                
+                if (turf.booleanPointInPolygon(testPoint, municipioSelecionado as any)) {
+                  // Calcula a distância até o centro da bounding box
+                  const distanceToCenter = Math.sqrt(
+                    Math.pow(testX - centerX, 2) + Math.pow(testY - centerY, 2)
+                  );
+                  candidatePoints.push({
+                    point: testPoint,
+                    distance: distanceToCenter
+                  });
+                }
+              }
+            }
+            
+            // Se encontramos pontos candidatos, usa o mais próximo do centro
+            if (candidatePoints.length > 0) {
+              // Ordena por distância (mais próximo primeiro)
+              candidatePoints.sort((a, b) => a.distance - b.distance);
+              const bestPoint = candidatePoints[0].point;
+              center = L.latLng(bestPoint.geometry.coordinates[1], bestPoint.geometry.coordinates[0]);
+            } else {
+              // Se não encontrou pontos candidatos, usa o ponto garantido dentro
+              center = L.latLng(insidePoint.geometry.coordinates[1], insidePoint.geometry.coordinates[0]);
+            }
+          }
+        } else {
+          throw new Error('Não foi possível processar a geometria do polígono');
         }
       } catch (error) {
-        console.error("Erro ao calcular centroide com Turf.js:", error);
-        // Fallback para o método padrão do Leaflet se o Turf falhar
-        center = bounds.getCenter();
+        console.error('Erro ao calcular ponto central:', error);
+        
+        try {
+          // Fallback para pointOnFeature, que garante um ponto dentro do polígono
+          const insidePoint = turf.pointOnFeature(municipioSelecionado);
+          center = L.latLng(insidePoint.geometry.coordinates[1], insidePoint.geometry.coordinates[0]);
+        } catch (err) {
+          console.error('Erro ao calcular ponto dentro do polígono:', err);
+          // Último fallback para o centro da bounding box
+          center = bounds.getCenter();
+        }
       }
       
       // Cria um ícone personalizado para o alfinete

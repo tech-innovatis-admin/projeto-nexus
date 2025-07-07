@@ -36,7 +36,7 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
     dec_ambiente: "Plano Decenal do Meio Ambiente",
     VALOR_START_INICIAIS_FINAIS: "Start anos iniciais e finais",
     VALOR_START_INICIAIS: "Start anos iniciais",
-    VALOR_START_FINAIS: "Start finais"
+    VALOR_START_FINAIS: "Start anos finais"
   };
 
   // Filtra apenas as chaves que queremos exibir

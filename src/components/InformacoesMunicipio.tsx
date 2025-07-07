@@ -34,7 +34,7 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
     VALOR_REURB: "REURB",
     desert: "Plano de Desertificação",
     dec_ambiente: "Plano Decenal do Meio Ambiente",
-    VALOR_START_INICIAIS_FINAIS: "Start anos iniciais e ginais",
+    VALOR_START_INICIAIS_FINAIS: "Start anos iniciais e finais",
     VALOR_START_INICIAIS: "Start anos iniciais",
     VALOR_START_FINAIS: "Start finais"
   };

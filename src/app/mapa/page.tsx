@@ -156,7 +156,7 @@ function MapaPageContent() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#0f172a] to-[#1e293b] text-white overflow-hidden">
+    <div className="h-screen flex flex-col bg-gradient-to-br from-[#0f172a] to-[#1e293b] text-white overflow-hidden">
       {/* Cabeçalho */}
       <header className="w-full py-2 px-6 bg-[#1e293b] text-white shadow-md">
         <div className="w-full max-w-7xl mx-auto flex flex-col md:grid md:grid-cols-3 items-center gap-2 md:gap-0">
@@ -276,125 +276,349 @@ function MapaPageContent() {
       )}
 
       {/* Conteúdo principal com visualização lado a lado */}
-      <main className="flex-1 w-full flex flex-col items-center justify-center gap-1 p-0.5 md:p-0.5">
+      <main className="flex-1 w-full flex flex-col items-center justify-center gap-1 p-0.5 md:p-0.5 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700/70 scrollbar-track-transparent">
         <div className="w-full max-w-7xl" ref={dadosRef}>
           {/* Dashboard com informações administrativas */}
           {municipioSelecionado && (
-            <div className="w-full bg-[#1e293b] rounded-lg shadow-lg p-0.5 mb-0.5 border border-slate-600 animate-fade-in">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-1">
-                {/* Coluna 1: Informações básicas */}
-                <div className="bg-[#0f172a] rounded p-2 flex flex-col transition-all duration-300 hover:bg-[#111a2d] hover:shadow-md hover:border-gray-800 border border-transparent cursor-pointer">
-                  <div className="flex items-center mb-1">
-                    <div className="w-6 h-6 rounded-full bg-[#0f172a] flex items-center justify-center mr-2">
-                      <Image 
-                        src="/municipio-icon.svg" 
-                        alt="Município" 
-                        width={18} 
-                        height={18} 
-                        className="text-sky-500" 
-                      />
+            <>
+              {/* Removido o Resumo com Indicadores separado */}
+              <div className="w-full bg-[#1e293b] rounded-lg shadow-lg p-0.5 mb-0.5 border border-slate-600 animate-fade-in">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
+                  {/* Coluna 1: Informações Municipais + Gestão (fundidas) */}
+                  <div className="bg-[#0f172a] rounded-lg p-4 flex flex-col transition-all duration-300 hover:bg-[#111a2d] hover:shadow-lg border border-slate-700 relative overflow-hidden">
+                    {/* Efeito de brilho no canto superior */}
+                    <div className="absolute -top-10 -right-10 w-20 h-20 bg-blue-500/10 rounded-full blur-xl"></div>
+                    
+                    <div className="flex items-center mb-3">
+                      <div className="w-10 h-10 rounded-full bg-blue-900/50 flex items-center justify-center mr-3 shadow-lg">
+                        <Image 
+                          src="/municipio-icon.svg" 
+                          alt="Município" 
+                          width={24} 
+                          height={24} 
+                          className="text-sky-500" 
+                        />
+                      </div>
+                      <h3 className="text-base text-sky-300 font-bold tracking-wide">Município e Gestão</h3>
                     </div>
-                    <span className="text-sm text-gray-400 font-semibold">Informações Municipais</span>
-                  </div>
-                  <div className="flex items-center mt-0.5 group">
-                    <span className="text-xs text-gray-300 mr-1 group-hover:text-gray-400 transition-colors">Município:</span>
-                    <span className="text-white font-bold">{municipioSelecionado.properties?.nome_municipio || municipioSelecionado.properties?.municipio || "N/A"}</span>
-                  </div>
-                  <div className="flex items-center mt-0.5 group">
-                    <span className="text-xs text-gray-300 mr-1 group-hover:text-gray-400 transition-colors">Estado:</span>
-                    <span className="text-white font-bold">{municipioSelecionado.properties?.name_state || "N/A"}</span>
-                  </div>
-                  <div className="flex items-center mt-0.5 group">
-                    <span className="text-xs text-gray-300 mr-1 group-hover:text-gray-400 transition-colors">População:</span>
-                    <span className="text-white font-bold">{municipioSelecionado.properties?.POPULACAO_FORMAT || "N/A"}</span>
-                  </div>
-                  <div className="flex items-center mt-0.5 group">
-                    <span className="text-xs text-gray-300 mr-1 group-hover:text-gray-400 transition-colors">Domicílios:</span>
-                    <span className="text-white font-bold">{municipioSelecionado.properties?.DOMICILIO_FORMAT || "N/A"}</span>
-                  </div>
-                </div>
-                
-                {/* Coluna 2: Informações políticas */}
-                <div className="bg-[#0f172a] rounded p-2 flex flex-col transition-all duration-300 hover:bg-[#111a2d] hover:shadow-md hover:border-gray-800 border border-transparent cursor-pointer">
-                  <div className="flex items-center mb-1">
-                    <div className="w-6 h-6 rounded-full bg-[#0f172a] flex items-center justify-center mr-2">
-                      <Image 
-                        src="/gestao-icon.svg" 
-                        alt="Gestão" 
-                        width={18} 
-                        height={18} 
-                        className="text-sky-500" 
-                      />
+                    
+                    {/* Destaque para o nome do município e estado no topo */}
+                    <div className="flex flex-col items-center mb-4 pb-4 border-b border-slate-700/50">
+                      <div className="text-center">
+                        <div className="text-xs text-gray-400 uppercase tracking-wider mb-1">MUNICÍPIO</div>
+                        <div className="text-2xl text-cyan-300 font-bold mb-1">
+                          {municipioSelecionado.properties?.nome_municipio || municipioSelecionado.properties?.municipio || "N/A"}
+                        </div>
+                        <div className="flex items-center justify-center">
+                          <div className="text-xs text-gray-400 uppercase tracking-wider mr-2">ESTADO</div>
+                          <div className="text-base text-white font-semibold">
+                            {municipioSelecionado.properties?.name_state || "N/A"}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <span className="text-sm text-gray-400 font-semibold">Gestão</span>
-                  </div>
-                  <div className="flex items-center mt-1 group">
-                    <span className="text-xs text-gray-300 mr-1 group-hover:text-gray-400 transition-colors">Prefeito:</span>
-                    <span className="text-white font-bold">{municipioSelecionado.properties?.nome2024 || "N/A"}</span>
-                  </div>
-                  <div className="flex items-center mt-1 group">
-                    <span className="text-xs text-gray-300 mr-1 group-hover:text-gray-400 transition-colors">Partido 2024:</span>
-                    <span className="text-white font-bold">{municipioSelecionado.properties?.sigla_partido2024 || "N/A"}</span>
-                  </div>
-                  <div className="flex items-center mt-1 group">
-                    <span className="text-xs text-gray-300 mr-1 group-hover:text-gray-400 transition-colors">Mandato:</span>
-                    <span className="text-white font-bold">{(municipioSelecionado.properties?.mandato || "N/A").replace("º mandato", "º")}</span>
-                  </div>
-                </div>
-                
-                {/* Coluna 3: Plano Diretor e REURB */}
-                <div className="bg-[#0f172a] rounded p-2 flex flex-col transition-all duration-300 hover:bg-[#111a2d] hover:shadow-md hover:border-gray-800 border border-transparent cursor-pointer">
-                  <div className="flex items-center mb-1">
-                    <div className="w-6 h-6 rounded-full bg-[#0f172a] flex items-center justify-center mr-2">
-                      <Image 
-                        src="/planos-icon.svg" 
-                        alt="Planos" 
-                        width={18} 
-                        height={18} 
-                        className="text-sky-500" 
-                      />
+                    
+                    {/* Informações em duas colunas com ícones */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Coluna esquerda - Gestão */}
+                      <div className="bg-slate-800/30 rounded-lg p-3 backdrop-blur-sm">
+                        <div className="text-xs text-sky-400 uppercase tracking-wider mb-2 font-semibold">Gestão</div>
+                        
+                        <div className="space-y-3">
+                          {/* Prefeito */}
+                          <div className="flex flex-col">
+                            <div className="flex items-center mb-1">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-sky-400 mr-1.5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                              </svg>
+                              <span className="text-xs text-gray-400">Prefeito</span>
+                            </div>
+                            <span className="text-base text-white font-bold pl-5.5">
+                              {municipioSelecionado.properties?.nome2024 || "N/A"}
+                            </span>
+                          </div>
+                          
+                          {/* Partido */}
+                          <div className="flex flex-col">
+                            <div className="flex items-center mb-1">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-sky-400 mr-1.5" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M2 5a2 2 0 012-2h8a2 2 0 012 2v10a2 2 0 002 2H4a2 2 0 01-2-2V5z" />
+                              </svg>
+                              <span className="text-xs text-gray-400">Partido</span>
+                            </div>
+                            <div className="flex items-center pl-5.5">
+                              <span className="text-sm text-white font-semibold">
+                                {municipioSelecionado.properties?.sigla_partido2024 || "N/A"}
+                              </span>
+                              {municipioSelecionado.properties?.sigla_partido2024 && (
+                                <span className="ml-2 px-2 py-0.5 bg-indigo-900/40 text-indigo-300 text-xs rounded-full border border-indigo-700/50">
+                                  2024
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {/* Mandato */}
+                          <div className="flex flex-col">
+                            <div className="flex items-center mb-1">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-sky-400 mr-1.5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                              </svg>
+                              <span className="text-xs text-gray-400">Mandato</span>
+                            </div>
+                            <div className="flex items-center pl-5.5">
+                              <span className="text-sm text-white font-semibold">
+                                {(municipioSelecionado.properties?.mandato || "N/A").replace("º mandato", "º")}
+                              </span>
+                              {municipioSelecionado.properties?.mandato?.includes("1") && (
+                                <span className="ml-2 px-2 py-0.5 bg-emerald-900/40 text-emerald-300 text-xs rounded-full border border-emerald-700/50">
+                                  Primeiro
+                                </span>
+                              )}
+                              {municipioSelecionado.properties?.mandato?.includes("2") && (
+                                <span className="ml-2 px-2 py-0.5 bg-blue-900/40 text-blue-300 text-xs rounded-full border border-blue-700/50">
+                                  Segundo
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Coluna direita - Demografia */}
+                      <div className="bg-slate-800/30 rounded-lg p-3 backdrop-blur-sm">
+                        <div className="text-xs text-emerald-400 uppercase tracking-wider mb-2 font-semibold">Demografia</div>
+                        
+                        <div className="space-y-3">
+                          {/* População */}
+                          <div className="flex flex-col">
+                            <div className="flex items-center mb-1">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-emerald-400 mr-1.5" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
+                              </svg>
+                              <span className="text-xs text-gray-400">População</span>
+                            </div>
+                            <div className="flex items-center pl-5.5">
+                              <span className="text-sm text-white font-semibold">
+                                {municipioSelecionado.properties?.POPULACAO_FORMAT || "N/A"}
+                              </span>
+                              <span className="ml-1.5 px-2 py-0.5 bg-emerald-900/40 text-emerald-300 text-xs rounded-full border border-emerald-700/50">
+                                hab.
+                              </span>
+                            </div>
+                          </div>
+                          
+                          {/* Domicílios */}
+                          <div className="flex flex-col">
+                            <div className="flex items-center mb-1">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-emerald-400 mr-1.5" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+                              </svg>
+                              <span className="text-xs text-gray-400">Domicílios</span>
+                            </div>
+                            <span className="text-sm text-white font-semibold pl-5.5">
+                              {municipioSelecionado.properties?.DOMICILIO_FORMAT || "N/A"}
+                            </span>
+                          </div>
+                          
+                          {/* Espaço adicional para manter a altura igual */}
+                          <div className="h-6"></div>
+                        </div>
+                      </div>
                     </div>
-                    <span className="text-sm text-gray-400 font-semibold">Planos e Regulamentos</span>
-                  </div>
-                  <div className="flex items-center mt-1 group">
-                    <span className="text-xs text-gray-300 mr-1 group-hover:text-gray-400 transition-colors">Plano Diretor:</span>
-                    <span className="text-white font-bold">{municipioSelecionado.properties?.PD_ALTERADA || "N/A"}</span>
                   </div>
                   
-                  {municipioSelecionado.properties?.PD_ANO && municipioSelecionado.properties.PD_ANO !== "0" && (
-                    <div className="flex items-center mt-1 group">
-                      <span className="text-xs text-gray-300 mr-1 group-hover:text-gray-400 transition-colors">Ano do Plano Diretor:</span>
-                      <span className="text-white font-bold">{municipioSelecionado.properties.PD_ANO}</span>
+                  {/* Coluna 2: Planos e Regulamentos */}
+                  <div className="bg-[#0f172a] rounded-lg p-4 flex flex-col transition-all duration-300 hover:bg-[#111a2d] hover:shadow-lg border border-slate-700 relative overflow-hidden">
+                    {/* Efeito de brilho no canto superior */}
+                    <div className="absolute -top-10 -right-10 w-20 h-20 bg-emerald-500/10 rounded-full blur-xl"></div>
+                    
+                    <div className="flex items-center mb-3">
+                      <div className="w-10 h-10 rounded-full bg-emerald-900/50 flex items-center justify-center mr-3 shadow-lg">
+                        <Image 
+                          src="/planos-icon.svg" 
+                          alt="Planos" 
+                          width={24} 
+                          height={24} 
+                          className="text-emerald-300" 
+                        />
+                      </div>
+                      <h3 className="text-base text-emerald-300 font-bold tracking-wide">Planos e Regulamentos</h3>
                     </div>
-                  )}
-                  
-                  {municipioSelecionado.properties?.PD_ALTERADA === "Sim" && (
-                    <div className="flex items-center mt-1 group">
-                      <span className="text-xs text-gray-300 mr-1 group-hover:text-gray-400 transition-colors">Plano Diretor Vencido:</span>
-                      <span className="text-white font-bold">{municipioSelecionado.properties?.pd_venci || "N/A"}</span>
+                    
+                    <div className="overflow-y-auto max-h-64">
+                      <table className="min-w-full divide-y divide-slate-700/50 text-sm">
+                        <thead>
+                          <tr className="text-left text-xs text-slate-400">
+                            <th className="pb-2 font-medium">Plano/Política</th>
+                            <th className="pb-2 font-medium">Status</th>
+                            <th className="pb-2 font-medium">Ano</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800">
+                          <tr>
+                            <td className="py-2 text-gray-300">Plano Diretor</td>
+                            <td className="py-2">
+                              {municipioSelecionado.properties?.PD_ALTERADA === "Sim" ? (
+                                <span className="px-2 py-0.5 bg-green-900/50 text-green-200 text-xs rounded-full">Sim</span>
+                              ) : (
+                                <span className="px-2 py-0.5 bg-red-900/50 text-red-200 text-xs rounded-full">Não</span>
+                              )}
+                            </td>
+                            <td className="py-2 text-white">
+                              {municipioSelecionado.properties?.PD_ANO && municipioSelecionado.properties.PD_ANO !== "0" ? 
+                                municipioSelecionado.properties.PD_ANO : "—"}
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="py-2 text-gray-300">Lei do REURB</td>
+                            <td className="py-2">
+                              {municipioSelecionado.properties?.reurb_exist?.startsWith("Sim") ? (
+                                <span className="px-2 py-0.5 bg-green-900/50 text-green-200 text-xs rounded-full">Sim</span>
+                              ) : (
+                                <span className="px-2 py-0.5 bg-red-900/50 text-red-200 text-xs rounded-full">Não</span>
+                              )}
+                            </td>
+                            <td className="py-2 text-white">
+                              {municipioSelecionado.properties?.REURB_ANO && municipioSelecionado.properties.REURB_ANO !== "0" ? 
+                                municipioSelecionado.properties.REURB_ANO : "—"}
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="py-2 text-gray-300">Política do PMSB</td>
+                            <td className="py-2">
+                              {municipioSelecionado.properties?.politica_saneamento_existe === "Sim" ? (
+                                <span className="px-2 py-0.5 bg-green-900/50 text-green-200 text-xs rounded-full">Sim</span>
+                              ) : municipioSelecionado.properties?.politica_saneamento_existe === "Em elaboração" ? (
+                                <span className="px-2 py-0.5 bg-yellow-900/50 text-yellow-200 text-xs rounded-full">Em elaboração</span>
+                              ) : (
+                                <span className="px-2 py-0.5 bg-red-900/50 text-red-200 text-xs rounded-full">Não</span>
+                              )}
+                            </td>
+                            <td className="py-2 text-white">
+                              {municipioSelecionado.properties?.politica_saneamento_ano && municipioSelecionado.properties.politica_saneamento_ano !== "0" ? 
+                                municipioSelecionado.properties.politica_saneamento_ano : "—"}
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="py-2 text-gray-300">Plano do PMSB</td>
+                            <td className="py-2">
+                              {municipioSelecionado.properties?.plano_saneamento_existe === "Sim" ? (
+                                <span className="px-2 py-0.5 bg-green-900/50 text-green-200 text-xs rounded-full">Sim</span>
+                              ) : municipioSelecionado.properties?.plano_saneamento_existe === "Em elaboração" ? (
+                                <span className="px-2 py-0.5 bg-yellow-900/50 text-yellow-200 text-xs rounded-full">Em elaboração</span>
+                              ) : (
+                                <span className="px-2 py-0.5 bg-red-900/50 text-red-200 text-xs rounded-full">Não</span>
+                              )}
+                            </td>
+                            <td className="py-2 text-white">
+                              {municipioSelecionado.properties?.plano_saneamento_ano && municipioSelecionado.properties.plano_saneamento_ano !== "0" ? 
+                                municipioSelecionado.properties.plano_saneamento_ano : "—"}
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="py-2 text-gray-300">Política Educacional Ambiental</td>
+                            <td className="py-2">
+                              {municipioSelecionado.properties?.politica_educambiental_existe === "Sim" ? (
+                                <span className="px-2 py-0.5 bg-green-900/50 text-green-200 text-xs rounded-full">Sim</span>
+                              ) : municipioSelecionado.properties?.politica_educambiental_existe === "Em elaboração" ? (
+                                <span className="px-2 py-0.5 bg-yellow-900/50 text-yellow-200 text-xs rounded-full">Em elaboração</span>
+                              ) : (
+                                <span className="px-2 py-0.5 bg-red-900/50 text-red-200 text-xs rounded-full">Não</span>
+                              )}
+                            </td>
+                            <td className="py-2 text-white">
+                              {municipioSelecionado.properties?.politica_educambiental_ano && municipioSelecionado.properties.politica_educambiental_ano !== "0" ? 
+                                municipioSelecionado.properties.politica_educambiental_ano : "—"}
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="py-2 text-gray-300">Política de Resíduos Sólidos</td>
+                            <td className="py-2">
+                              {municipioSelecionado.properties?.politica_residuos_existe === "Sim" ? (
+                                <span className="px-2 py-0.5 bg-green-900/50 text-green-200 text-xs rounded-full">Sim</span>
+                              ) : municipioSelecionado.properties?.politica_residuos_existe === "Em elaboração" ? (
+                                <span className="px-2 py-0.5 bg-yellow-900/50 text-yellow-200 text-xs rounded-full">Em elaboração</span>
+                              ) : (
+                                <span className="px-2 py-0.5 bg-red-900/50 text-red-200 text-xs rounded-full">Não</span>
+                              )}
+                            </td>
+                            <td className="py-2 text-white">
+                              {/^\d{4}$/.test(municipioSelecionado.properties?.politica_residuos_ano ?? "") ? 
+                                municipioSelecionado.properties?.politica_residuos_ano : "—"}
+                            </td>
+                          </tr>
+                          <tr>
+                            <td className="py-2 text-gray-300">Plano de Resíduos Sólidos</td>
+                            <td className="py-2">
+                              {municipioSelecionado.properties?.plano_residuos_existe === "Sim" ? (
+                                <span className="px-2 py-0.5 bg-green-900/50 text-green-200 text-xs rounded-full">Sim</span>
+                              ) : municipioSelecionado.properties?.plano_residuos_existe === "Em elaboração" ? (
+                                <span className="px-2 py-0.5 bg-yellow-900/50 text-yellow-200 text-xs rounded-full">Em elaboração</span>
+                              ) : (
+                                <span className="px-2 py-0.5 bg-red-900/50 text-red-200 text-xs rounded-full">Não</span>
+                              )}
+                            </td>
+                            <td className="py-2 text-white">
+                              {/^\d{4}$/.test(municipioSelecionado.properties?.plano_residuos_ano ?? "") ? 
+                                municipioSelecionado.properties?.plano_residuos_ano : "—"}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                      
                     </div>
-                  )}
-                  
-                  <div className="flex items-center mt-1 group">
-                    <span className="text-xs text-gray-300 mr-1 group-hover:text-gray-400 transition-colors">Lei do REURB:</span>
-                    <span className="text-white font-bold">{municipioSelecionado.properties?.reurb_exist || "N/A"}</span>
+                    {/* Resumo de implementação simplificado - FIXO */}
+                    <div className="sticky bottom-0 left-0 right-0 bg-[#0f172a] pt-3 mt-3 border-t border-slate-700/50 z-10">
+                      {(() => {
+                        // Calcula o número de políticas implementadas
+                        const planosEPoliticas = [
+                          { nome: "Plano Diretor", status: municipioSelecionado.properties?.PD_ALTERADA },
+                          { nome: "Lei do REURB", status: municipioSelecionado.properties?.reurb_exist },
+                          { nome: "Política do PMSB", status: municipioSelecionado.properties?.politica_saneamento_existe },
+                          { nome: "Plano do PMSB", status: municipioSelecionado.properties?.plano_saneamento_existe },
+                          { nome: "Política Educacional Ambiental", status: municipioSelecionado.properties?.politica_educambiental_existe },
+                          { nome: "Política de Resíduos Sólidos", status: municipioSelecionado.properties?.politica_residuos_existe },
+                          { nome: "Plano de Resíduos Sólidos", status: municipioSelecionado.properties?.plano_residuos_existe }
+                        ];
+                        const implementados = planosEPoliticas.filter(item => item.status?.startsWith("Sim")).length;
+                        const total = planosEPoliticas.length;
+                        const percentualImplementado = Math.round((implementados / total) * 100);
+                        return (
+                          <div>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <div className="text-xs text-blue-400 font-medium">
+                                {implementados}/{total} planos implementados
+                              </div>
+                              <div className="text-xs font-medium text-blue-400">
+                                {percentualImplementado}%
+                              </div>
+                            </div>
+                            {/* Barra de progresso */}
+                            <div className="w-full bg-slate-700/50 h-1.5 rounded-full overflow-hidden">
+                              <div 
+                                className="h-full rounded-full transition-all duration-500 ease-out"
+                                style={{ 
+                                  width: `${percentualImplementado}%`,
+                                  background: `linear-gradient(to right, #1e40af, #3b82f6, #60a5fa, #93c5fd)`,
+                                  boxShadow: '0 0 8px rgba(59, 130, 246, 0.5)'
+                                }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
                   </div>
-                  
-                  {municipioSelecionado.properties?.REURB_ANO && municipioSelecionado.properties.REURB_ANO !== "0" && (
-                    <div className="flex items-center mt-1 group">
-                      <span className="text-xs text-gray-300 mr-1 group-hover:text-gray-400 transition-colors">Ano da Lei REURB:</span>
-                      <span className="text-white font-bold">{municipioSelecionado.properties.REURB_ANO}</span>
-                    </div>
-                  )}
                 </div>
               </div>
-            </div>
+            </>
           )}
           
           {/* Contêineres principais */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-1.5">
             {/* Mapa interativo */}
-            <div className="h-[45vh] lg:h-[45vh] rounded-lg overflow-hidden shadow-lg bg-[#0f172a] border border-slate-600 animate-fade-in">
+            <div className="h-[40vh] lg:h-[40vh] rounded-lg overflow-hidden shadow-lg bg-[#0f172a] border border-slate-600 animate-fade-in">
               {loading ? (
                 <div className="flex flex-col items-center justify-center w-full h-full p-4">
                   <Image 
@@ -414,7 +638,7 @@ function MapaPageContent() {
             </div>
             
             {/* Painel de informações, agora com fundo escuro para combinar com o dashboard */}
-            <div className="bg-[#1e293b] rounded-lg shadow-lg p-0 animate-fade-in text-white h-auto lg:h-[45vh] flex flex-col overflow-hidden border border-slate-600">
+            <div className="bg-[#1e293b] rounded-lg shadow-lg p-0 animate-fade-in text-white h-auto lg:h-[40vh] flex flex-col overflow-hidden border border-slate-600">
               {loading ? (
                 <div className="flex flex-col items-center justify-center w-full h-full p-4">
                   <Image 
@@ -429,12 +653,17 @@ function MapaPageContent() {
               ) : (
                 <>
                   {/* Título fixo */}
-                  <div className="sticky top-0 left-0 right-0 bg-[#1e293b] py-1 px-4 z-30 border-b border-slate-700 shadow-sm">
-                    <h2 className="text-base font-bold text-gray-300 text-center">Produtos Municipais</h2>
+                  <div className="sticky top-0 left-0 right-0 bg-[#1e293b] py-2 px-4 z-30 border-b border-slate-700 shadow-sm">
+                    <div className="flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-400 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                      </svg>
+                      <h2 className="text-base font-bold text-indigo-300">Produtos Municipais</h2>
+                    </div>
                   </div>
                   
                   {/* Conteúdo rolável */}
-                  <div className="flex-1 overflow-y-auto p-2 pt-1.5">
+                  <div className="flex-1 overflow-y-auto p-3 pt-2">
                     <InformacoesMunicipio municipioSelecionado={municipioSelecionado} />
                   </div>
                 </>

@@ -153,6 +153,8 @@ export default function MapaMunicipal({ municipioSelecionado }: MapaMunicipalPro
   });
   const [isTransitioning, setIsTransitioning] = useState(false);
   const previousMunicipioRef = useRef<any>(null);
+  // Flag para indicar quando o mapa está totalmente pronto
+  const [mapReady, setMapReady] = useState(false);
 
   const { mapData, loading, error } = useMapData();
 
@@ -170,7 +172,7 @@ export default function MapaMunicipal({ municipioSelecionado }: MapaMunicipalPro
 
       console.log("Iniciando mapa Leaflet");
       mapRef.current = L.map("mapa-leaflet", {
-        center: [-14, -55],
+        center: [-14, -55], // Centralizado em Brasília
         zoom: 4,
         minZoom: 3,
         maxZoom: 18,
@@ -221,16 +223,21 @@ export default function MapaMunicipal({ municipioSelecionado }: MapaMunicipalPro
         layersRef.current.dados = L.geoJSON(mapData.dados, {
           style: function(feature) {
             return {
-              color: "#222",
-              weight: 0.7,
-              fillOpacity: 0.7,
+              color: "#475569", // Cor da borda mais suave (slate-600)
+              weight: 0.5, // Borda mais fina
+              fillOpacity: 0.4, // Opacidade fixa
               fillColor: getCorEstado(feature?.properties?.name_state || "Outro")
             };
           },
           onEachFeature: (feature, layer) => {
             layer.bindPopup(popupDadosGerais(feature.properties));
+            // Nenhum efeito de hover
           },
         });
+
+        // Adiciona a camada de dados gerais por padrão
+        layersRef.current.dados.addTo(mapRef.current);
+        setLayerState(prev => ({ ...prev, dados: true }));
         
         // PD sem plano
         layersRef.current.pdsemplano = L.geoJSON(mapData.pdsemplano, {
@@ -326,6 +333,9 @@ export default function MapaMunicipal({ municipioSelecionado }: MapaMunicipalPro
       } catch (error) {
         console.error("Erro ao configurar camadas do mapa:", error);
       }
+
+      // Marca que o mapa está pronto para receber destaques
+      setMapReady(true);
     }, 100);
   }, [mapData, loading, layerState]);
 
@@ -345,7 +355,7 @@ export default function MapaMunicipal({ municipioSelecionado }: MapaMunicipalPro
 
   // Adicionar efeito para destacar municípioSelecionado e adicionar o alfinete
   useEffect(() => {
-    if (!municipioSelecionado || !dadosGeraisRef.current || !mapRef.current) return;
+    if (!mapReady || !municipioSelecionado || !dadosGeraisRef.current || !mapRef.current) return;
     
     // Inicia a transição
     setIsTransitioning(true);
@@ -567,7 +577,7 @@ export default function MapaMunicipal({ municipioSelecionado }: MapaMunicipalPro
       }
     }
     
-  }, [municipioSelecionado]);
+  }, [municipioSelecionado, mapReady]);
 
   // Handler para alternar camadas
   function handleToggleLayer(key: string, checked: boolean) {

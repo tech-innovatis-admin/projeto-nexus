@@ -191,7 +191,7 @@ function MapaPageContent() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gradient-to-br from-[#0f172a] to-[#1e293b] text-white overflow-hidden">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#0f172a] to-[#1e293b] text-white">
       {/* Cabeçalho */}
       <header className="w-full py-2 px-6 bg-[#1e293b] text-white shadow-md">
         <div className="w-full max-w-7xl mx-auto flex flex-col md:grid md:grid-cols-3 items-center gap-2 md:gap-0">
@@ -283,12 +283,7 @@ function MapaPageContent() {
             {erroBusca && <span className="text-red-400 mt-1 text-sm">{erroBusca}</span>}
           </section>
           
-          {/* Título à direita (visível apenas quando não estiver carregando) */}
-          {!loading && (
-            <div className="text-center md:text-right mt-2 mb-1">
-              <h2 className="text-lg font-bold text-gray-300">Dados Municipais</h2>
-            </div>
-          )}
+          {/* Heading removido */}
         </div>
       </div>
 
@@ -302,7 +297,7 @@ function MapaPageContent() {
 
       {/* Título centralizado (visível apenas durante o carregamento) */}
       {loading && (
-        <div className="flex justify-center mt-4 mb-3">
+        <div className="flex justify-center mt-8 mb-6">
           <div className="text-center">
             <h2 className="text-lg font-bold text-gray-300">Informações e Mapa Interativo</h2>
             <p className="text-xs text-slate-300 mt-1">Visualização detalhada do município</p>
@@ -311,7 +306,7 @@ function MapaPageContent() {
       )}
 
       {/* Conteúdo principal com visualização lado a lado */}
-      <main className="flex-1 w-full flex flex-col items-center justify-center gap-1 p-0.5 md:p-0.5 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-700/70 scrollbar-track-transparent">
+      <main className="flex-1 w-full flex flex-col items-center justify-center gap-1 p-0.5 md:p-0.5">
         <div className="w-full max-w-7xl" ref={dadosRef}>
           {/* Dashboard com informações administrativas */}
           {municipioSelecionado ? (
@@ -320,7 +315,7 @@ function MapaPageContent() {
               <div className="grid grid-cols-1 md:grid-cols-2 auto-rows-auto gap-1.5">
                 {/* Container 1: Município e Gestão (linha 1, coluna 1) */}
                 <div className="bg-[#1e293b] rounded-lg shadow-lg p-0.5 border border-slate-600 animate-fade-in md:col-start-1 md:row-start-1">
-                  <div className="bg-[#0f172a] rounded-lg p-2 flex flex-col transition-all duration-300 hover:bg-[#111a2d] hover:shadow-lg border border-slate-700 relative overflow-hidden max-h-[260px] h-full">
+                  <div className="bg-[#0f172a] rounded-lg p-2 flex flex-col transition-all duration-300 hover:bg-[#111a2d] hover:shadow-lg border border-slate-700 relative overflow-hidden max-h-[320px] h-full">
                     {/* Efeito de brilho no canto superior */}
                     <div className="absolute -top-10 -right-10 w-20 h-20 bg-blue-500/10 rounded-full blur-xl"></div>
                     
@@ -337,7 +332,7 @@ function MapaPageContent() {
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1">
                       {/* Coluna esquerda - Gestão */}
                       <div className="bg-slate-800/30 rounded-lg p-3 backdrop-blur-sm">
-                        <div className="text-xs text-sky-400 uppercase tracking-wider mb-2 font-semibold">
+                        <div className="text-xs text-sky-400 uppercase tracking-wider mb-2 font-semibold text-center">
                           {municipioSelecionado && municipioSelecionado.properties?.nome_municipio && municipioSelecionado.properties?.name_state
                             ? `${municipioSelecionado.properties.nome_municipio} - ${municipioSelecionado.properties.name_state}`
                             : 'Município - UF'}
@@ -401,7 +396,7 @@ function MapaPageContent() {
                       
                       {/* Coluna direita - Demografia */}
                       <div className="bg-slate-800/30 rounded-lg p-3 backdrop-blur-sm">
-                        <div className="text-xs text-emerald-400 uppercase tracking-wider mb-2 font-semibold">Demografia</div>
+                        <div className="text-xs text-emerald-400 uppercase tracking-wider mb-2 font-semibold text-center">Demografia</div>
                         
                         <div className="space-y-3">
                           {/* População */}
@@ -415,9 +410,6 @@ function MapaPageContent() {
                             <div className="flex items-center pl-5.5">
                               <span className="text-sm text-white font-semibold">
                                 {municipioSelecionado.properties?.POPULACAO_FORMAT || "N/A"}
-                              </span>
-                              <span className="ml-1.5 px-2 py-0.5 bg-emerald-900/40 text-emerald-300 text-xs rounded-full border border-emerald-700/50">
-                                hab.
                               </span>
                             </div>
                           </div>

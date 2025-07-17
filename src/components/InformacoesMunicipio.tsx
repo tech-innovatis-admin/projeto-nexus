@@ -100,21 +100,9 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
     // VAAT removido
     PROCON_VAA: (
       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-        <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm1 11H9v-1h2v1zm0-2H9V7h2v4z" />
+        <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z" />
       </svg>
     ),
-  };
-
-  // Cores para cada categoria de produto
-  const coresProdutos: Record<string, string> = {
-    VALOR_PD: "text-sky-500",         // Azul mais vibrante para Plano Diretor
-    VALOR_PMSB: "text-teal-400",      // Verde-azulado para PMSB
-    VALOR_CTM: "text-emerald-500",    // Verde esmeralda para IPTU Legal (antes violeta)
-    VALOR_REURB: "text-blue-500",     // Azul forte para REURB (antes amarelo)
-    VALOR_START_INICIAIS_FINAIS: "text-blue-400", // Azul clássico para Start
-    VALOR_START_INICIAIS: "text-rose-400",    // Rosa suave para Start Iniciais
-    VALOR_START_FINAIS: "text-cyan-400",      // Ciano para Start Finais
-    PROCON_VAA: "text-teal-500",      // Verde teal mais escuro para Procon (antes laranja)
   };
 
   // Removendo o objeto não utilizado
@@ -223,10 +211,10 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
           </thead>
           <tbody>
             {valoresFiltrados.map(([k, vMin, vMax], index) => (
-              <tr key={k} className={`border-b border-slate-700/30 ${index % 2 === 0 ? 'bg-transparent' : 'bg-slate-800/20'}`} style={{height: '64px'}}>
-                <td className="px-4 py-6">
+              <tr key={k} className={`border-b border-slate-700/30 ${index % 2 === 0 ? 'bg-transparent' : 'bg-slate-800/20'}`} style={{height: '80px'}}>
+                <td className="px-4 py-8">
                   <div className="flex items-center">
-                    <span className={`mr-3 ${coresProdutos[k] || "text-gray-400"}`}>
+                    <span className={`mr-3 ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>
                       {iconesProdutos[k] || (
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                           <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
@@ -238,13 +226,13 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
                     </span>
                   </div>
                 </td>
-                <td className="px-4 py-6 text-right">
-                  <span className="text-sm text-gray-400">
+                <td className="px-4 py-8 text-right">
+                  <span className={`text-base font-bold ${index % 2 === 0 ? 'text-sky-300' : 'text-gray-300'}`}>
                     {formatarValor(vMin?.toString())}
                   </span>
                 </td>
-                <td className={`px-4 py-6 text-right`}>
-                  <span className={`text-base font-bold ${coresProdutos[k] || "text-white"}`}>
+                <td className={`px-4 py-8 text-right`}>
+                  <span className={`text-base font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>
                     {formatarValor(vMax?.toString())}
                   </span>
                 </td>
@@ -256,21 +244,26 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
         {/* VAAT - Agora após a tabela */}
         {municipioSelecionado.properties?.valor_vaat_formato && (
           <div className="px-4 py-4 border-t border-slate-700/50 mt-1 bg-slate-800/20">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <span className="text-blue-400 mr-3">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-                  </svg>
+            {(() => {
+              const isEven = valoresFiltrados.length % 2 === 0; // determina cor
+              const colorClass = isEven ? 'text-sky-400' : 'text-white';
+              return (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <span className={`${colorClass} mr-3`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                    </svg>
+                  </span>
+                  <span className="text-base font-medium text-gray-300">Valor disponível VAAT</span>
+                </div>
+                <span className={`text-lg font-bold ${colorClass}`}>
+                  {municipioSelecionado.properties?.valor_vaat_formato || "—"}
                 </span>
-                <span className="text-base font-medium text-gray-300">Valor disponível VAAT</span>
               </div>
-              <span className="text-lg font-bold text-blue-400">
-                {municipioSelecionado.properties?.valor_vaat_formato || "—"}
-              </span>
+              );})()}
             </div>
-          </div>
-        )}
+          )}
       </div>
     </div>
   );

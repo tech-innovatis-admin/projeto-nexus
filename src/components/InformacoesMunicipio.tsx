@@ -52,7 +52,7 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
         : "PMSB",
     VALOR_CTM: "IPTU Legal",
     VALOR_REURB: "REURB",
-    VALOR_START_INICIAIS_FINAIS: "Start anos iniciais e finais",
+    VALOR_START_INICIAIS_FINAIS: "Start Lab",
     VALOR_START_INICIAIS: "Start anos iniciais",
     VALOR_START_FINAIS: "Start anos finais",
     // VAAT removido

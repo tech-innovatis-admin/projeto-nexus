@@ -307,20 +307,20 @@ function MapaPageContent() {
 
       {/* Conteúdo principal com visualização lado a lado */}
       <main className="flex-1 w-full flex flex-col items-center justify-center gap-1 p-0.5 md:p-0.5">
-        <div className="w-full max-w-7xl" ref={dadosRef}>
+        <div className="w-full max-w-[1400px] mx-auto px-4" ref={dadosRef}>
           {/* Dashboard com informações administrativas */}
           {municipioSelecionado ? (
             <>
               {/* Grid para organizar os containers lado a lado */}
-              <div className="grid grid-cols-1 md:grid-cols-2 auto-rows-auto gap-1.5">
+              <div className="grid grid-cols-1 md:grid-cols-[55fr_45fr] auto-rows-auto gap-1.5 md:max-w-[1200px] w-full mx-auto">
                 {/* Container 1: Município e Gestão (linha 1, coluna 1) */}
                 <div className="bg-[#1e293b] rounded-lg shadow-lg p-0.5 border border-slate-600 animate-fade-in md:col-start-1 md:row-start-1">
                   <div className="bg-[#0f172a] rounded-lg p-2 flex flex-col transition-all duration-300 hover:bg-[#111a2d] hover:shadow-lg border border-slate-700 relative overflow-hidden max-h-[320px] h-full">
                     {/* Efeito de brilho no canto superior */}
                     <div className="absolute -top-10 -right-10 w-20 h-20 bg-blue-500/10 rounded-full blur-xl"></div>
                     
-                    <div className="flex items-center mb-3">
-                      <div className="w-10 h-10 rounded-full bg-blue-900/50 flex items-center justify-center mr-3 shadow-lg">
+                    <div className="flex flex-row items-center justify-center mb-3 gap-3">
+                      <div className="w-10 h-10 rounded-full bg-blue-900/50 flex items-center justify-center shadow-lg">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-sky-400" viewBox="0 0 20 20" fill="currentColor">
                           <path fillRule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clipRule="evenodd" />
                         </svg>
@@ -331,7 +331,7 @@ function MapaPageContent() {
                     {/* Informações em duas colunas com ícones */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1">
                       {/* Coluna esquerda - Gestão */}
-                      <div className="bg-slate-800/30 rounded-lg p-3 backdrop-blur-sm">
+                      <div className="bg-slate-800/30 rounded-lg p-3 backdrop-blur-sm flex flex-col">
                         <div className="text-xs text-sky-400 uppercase tracking-wider mb-2 font-semibold text-center">
                           {municipioSelecionado && municipioSelecionado.properties?.nome_municipio && municipioSelecionado.properties?.name_state
                             ? `${municipioSelecionado.properties.nome_municipio} - ${municipioSelecionado.properties.name_state}`
@@ -339,13 +339,16 @@ function MapaPageContent() {
                         </div>
                         
                         <div className="space-y-3">
-                          {/* Prefeito */}
+                          {/* Prefeito + Mandato */}
                           <div className="flex flex-col">
                             <div className="flex items-center mb-1">
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-sky-400 mr-1.5" viewBox="0 0 20 20" fill="currentColor">
                                 <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
                               </svg>
-                              <span className="text-xs text-gray-400">Prefeito</span>
+                              <span className="text-sm text-gray-400">
+                                Prefeito
+                                {municipioSelecionado.properties?.mandato ? ` - ${municipioSelecionado.properties.mandato}` : ''}
+                              </span>
                             </div>
                             <span className="text-base text-white font-bold pl-5.5">
                               {municipioSelecionado.properties?.nome2024 || "N/A"}
@@ -358,7 +361,7 @@ function MapaPageContent() {
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-sky-400 mr-1.5" viewBox="0 0 20 20" fill="currentColor">
                                 <path d="M2 5a2 2 0 012-2h8a2 2 0 012 2v10a2 2 0 002 2H4a2 2 0 01-2-2V5z" />
                               </svg>
-                              <span className="text-xs text-gray-400">Partido</span>
+                              <span className="text-sm text-gray-400">Partido</span>
                             </div>
                             <div className="flex items-center pl-5.5">
                               <span className="text-sm text-white font-semibold">
@@ -367,45 +370,22 @@ function MapaPageContent() {
                             </div>
                           </div>
                           
-                          {/* Mandato */}
-                          <div className="flex flex-col">
-                            <div className="flex items-center mb-1">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-sky-400 mr-1.5" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
-                              </svg>
-                              <span className="text-xs text-gray-400">Mandato</span>
-                            </div>
-                            <div className="flex items-center pl-5.5">
-                              <span className="text-sm text-white font-semibold">
-                                {(municipioSelecionado.properties?.mandato || "N/A").replace("º mandato", "º")}
-                              </span>
-                              {municipioSelecionado.properties?.mandato?.includes("1") && (
-                                <span className="ml-2 px-2 py-0.5 bg-emerald-900/40 text-emerald-300 text-xs rounded-full border border-emerald-700/50">
-                                  Primeiro
-                                </span>
-                              )}
-                              {municipioSelecionado.properties?.mandato?.includes("2") && (
-                                <span className="ml-2 px-2 py-0.5 bg-blue-900/40 text-blue-300 text-xs rounded-full border border-blue-700/50">
-                                  Segundo
-                                </span>
-                              )}
-                            </div>
-                          </div>
+                          {/* Mandato removido conforme design */}
                         </div>
                       </div>
                       
                       {/* Coluna direita - Demografia */}
-                      <div className="bg-slate-800/30 rounded-lg p-3 backdrop-blur-sm">
+                      <div className="bg-slate-800/30 rounded-lg p-3 backdrop-blur-sm flex flex-col">
                         <div className="text-xs text-emerald-400 uppercase tracking-wider mb-2 font-semibold text-center">Demografia</div>
                         
-                        <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-x-6 gap-y-3 flex-1 items-center">
                           {/* População */}
                           <div className="flex flex-col">
                             <div className="flex items-center mb-1">
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-emerald-400 mr-1.5" viewBox="0 0 20 20" fill="currentColor">
                                 <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
                               </svg>
-                              <span className="text-xs text-gray-400">População</span>
+                              <span className="text-sm text-gray-400">População</span>
                             </div>
                             <div className="flex items-center pl-5.5">
                               <span className="text-sm text-white font-semibold">
@@ -420,7 +400,7 @@ function MapaPageContent() {
                               <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-emerald-400 mr-1.5" viewBox="0 0 20 20" fill="currentColor">
                                 <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
                               </svg>
-                              <span className="text-xs text-gray-400">Domicílios</span>
+                              <span className="text-sm text-gray-400">Domicílios</span>
                             </div>
                             <span className="text-sm text-white font-semibold pl-5.5">
                               {municipioSelecionado.properties?.DOMICILIO_FORMAT || "N/A"}
@@ -433,13 +413,16 @@ function MapaPageContent() {
                   </div>
                   
                 {/* Container 2: Produtos Municipais (ocupa toda a coluna direita) */}
-                <div className="bg-[#1e293b] rounded-lg shadow-lg p-0.5 border border-slate-600 animate-fade-in md:col-start-2 md:row-span-2">
+                <div className="bg-[#1e293b] rounded-lg shadow-lg p-0.5 border border-slate-600 animate-fade-in md:col-start-2 md:row-span-2 w-full md:w-fit">
                   <div className="bg-[#0f172a] rounded-lg p-2 flex flex-col transition-all duration-300 hover:bg-[#111a2d] hover:shadow-lg border border-slate-700 relative overflow-hidden h-full">
                     {/* Efeito de brilho no canto superior */}
                     <div className="absolute -top-10 -right-10 w-20 h-20 bg-indigo-500/10 rounded-full blur-xl"></div>
                     
-                    <div className="flex-1 overflow-y-auto">
+                    {/* Ajuste para garantir largura automática e centralização */}
+                    <div className="flex flex-col w-auto mx-auto">
+                      <div className="table-fixed w-auto mx-auto overflow-y-auto">
                       <InformacoesMunicipio municipioSelecionado={municipioSelecionado} />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -469,7 +452,7 @@ function MapaPageContent() {
             // Tela de carregamento
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
               {/* Painel de mapa carregando */}
-              <div className="bg-[#1e293b] rounded-lg shadow-lg p-0.5 border border-slate-600 h-[300px] flex items-center justify-center">
+              <div className="bg-[#1e293b] rounded-lg shadow-lg p-0.5 border border-slate-600 h-[400px] flex items-center justify-center">
                 <div className="flex flex-col items-center">
                   <Image 
                     src="/map-icon.svg" 
@@ -483,7 +466,7 @@ function MapaPageContent() {
               </div>
               
               {/* Painel de dados carregando */}
-              <div className="bg-[#1e293b] rounded-lg shadow-lg p-0.5 border border-slate-600 h-[300px] flex items-center justify-center">
+              <div className="bg-[#1e293b] rounded-lg shadow-lg p-0.5 border border-slate-600 h-[400px] flex items-center justify-center">
                 <div className="flex flex-col items-center">
                   <Image 
                     src="/database-icon.svg" 

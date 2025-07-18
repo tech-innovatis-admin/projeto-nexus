@@ -98,7 +98,7 @@ function ExportPDFButton({ city, className = '' }) {
       form.getTextField('VALOR_CTM').setText(city.VALOR_CTM || 'N/A');
       form.getTextField('VALOR_PMSB').setText(city.VALOR_PMSB || 'N/A');
       form.getTextField('VALOR_REURB').setText('R$1.500,00/unid.');
-      form.getTextField('VALOR_START').setText('R$ 390,00/aluno');
+      form.getTextField('VALOR_START').setText('R$ 395,00/aluno');
 
       // 4. "Flatten" (achatar) o formulário para incorporar o texto e evitar edição futura
       form.flatten();

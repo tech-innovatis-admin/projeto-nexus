@@ -38,7 +38,6 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
   const nomesCustomizados: Record<string, string> = {
     VALOR_PD:
       municipioSelecionado.properties &&
-      normalizar(municipioSelecionado.properties.pd_venci) === 'sim' &&
       municipioSelecionado.properties.PD_ANO &&
       String(municipioSelecionado.properties.PD_ANO) !== '0'
         ? `Plano Diretor - ${municipioSelecionado.properties.PD_ANO}`
@@ -58,6 +57,13 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
     // VAAT removido
     PROCON_VAA: 'Procon Vai às Aulas',
   };
+
+  // Verifica se o município possui Plano Diretor conforme PD_ALTERADA === 'sim'
+  const temPlanoDiretor = normalizar(municipioSelecionado.properties?.PD_ALTERADA) === 'sim';
+
+  // Verifica se o município possui PMSB (Sim ou Em elaboração)
+  const statusPMSB = normalizar(municipioSelecionado.properties?.plano_saneamento_existe);
+  const temPMSB = statusPMSB === 'sim' || statusPMSB === 'em elaboracao';
 
   // Ícones para cada produto
   const iconesProdutos: Record<string, React.ReactNode> = {
@@ -108,40 +114,13 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
   // Removendo o objeto não utilizado
   // const categoriasProdutos = { ... };
 
-  // Valores mínimos fixos para produtos (mantendo os valores originais)
-  const valoresMinimosFixos: Record<string, string> = {
-    VALOR_CTM: '318895.00',
-    VALOR_PMSB: '119850.00',
-    VALOR_PD: '233707.50',
-    VALOR_START_INICIAIS_FINAIS: '78000.00',
-    VALOR_REURB: '300000.00',
-  };
-
   // Determina quais produtos exibir conforme condições independentes
   const chavesParaExibir = chavesValores.filter(k => {
     if (k === 'VALOR_PD') {
-      const pdAlterada = municipioSelecionado.properties?.PD_ALTERADA;
-      const pdVenci = municipioSelecionado.properties?.pd_venci;
-      const pdAno = municipioSelecionado.properties?.PD_ANO;
-      // Exibe se PD_ALTERADA for 'nao' OU (for 'sim' e pd_venci for 'sim') OU PD_ANO for '2016'
-      return (
-        normalizar(pdAlterada) === 'nao' ||
-        (normalizar(pdAlterada) === 'sim' && normalizar(pdVenci) === 'sim') ||
-        normalizar(pdAno) === '2016'
-      );
+      return true; // Sempre exibe Plano Diretor
     }
     if (k === 'VALOR_PMSB') {
-      const planoSaneamentoExiste = municipioSelecionado.properties?.plano_saneamento_existe;
-      const anoPMSB = municipioSelecionado.properties?.plano_saneamento_ano;
-      const anoAtual = new Date().getFullYear();
-      // Exibe se NÃO tem PMSB
-      if (normalizar(planoSaneamentoExiste) === 'nao') return true;
-      // Exibe se PMSB está vencido (ano válido e ano + 9 < ano atual)
-      if (anoPMSB && !['-', 'recusa', '', null, undefined].includes(normalizar(anoPMSB))) {
-        const anoNum = parseInt(anoPMSB, 10);
-        if (!isNaN(anoNum) && anoNum + 9 < anoAtual) return true;
-      }
-      return false;
+      return true; // Agora sempre exibe PMSB, independentemente de condições
     }
     return true;
   });
@@ -150,21 +129,23 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
     // Para o VAAT, tratamos diferente
     if (k === 'valor_vaat_formato') {
       const valorVaat = municipioSelecionado.properties?.valor_vaat_formato;
-      return [k, null, valorVaat === "N/A" ? null : valorVaat];
+      return [k, valorVaat === "N/A" ? null : valorVaat];
     }
-    // Para o Procon Vai às Aulas, valores fixos
+    // Para o Procon Vai às Aulas, valor fixo (valor de referência)
     if (k === 'PROCON_VAA') {
-      return [k, 'R$ 200,00/aluno', 'R$ 450,00/aluno'];
+      return [k, 'R$ 450,00/aluno'];
     }
-    // Para os outros valores
-    const valorMaximo = municipioSelecionado.properties?.[k];
-    const valorMinimo = valoresMinimosFixos[k];
-
-    return [
-      k,
-      valorMinimo,
-      valorMaximo
-    ];
+    // Para o REURB, exibir texto fixo
+    if (k === 'VALOR_REURB') {
+      return [k, 'R$ 1.500,00/unid. (200 imóveis)'];
+    }
+    // Para o Start Lab, valor mínimo fixo por aluno
+    if (k === 'VALOR_START_INICIAIS_FINAIS') {
+      return [k, 'R$ 395,00/aluno'];
+    }
+    // Para os demais produtos, usamos o valor presente nas propriedades
+    const valor = municipioSelecionado.properties?.[k];
+    return [k, valor];
   });
 
   // Formata valor monetário (mantendo a função original para garantir consistência)
@@ -185,56 +166,98 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
     // Tenta converter para número
     const numero = parseFloat(String(valor));
 
-    // Se não for número válido, retorna travessão
-    if (isNaN(numero)) return '—';
+    // Se não for número válido, retorna o próprio texto (ex.: "Mín. 200unid.")
+    if (isNaN(numero)) return valor.toString();
 
     return `R$ ${numero.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   return (
-    <div className="grid grid-cols-1 gap-3">
+    <div className="grid grid-cols-1 gap-3 w-full">
       {/* Produtos em formato de tabela profissional */}
-      <div className="bg-[#0f172a] rounded-lg border border-slate-700/50 shadow-md overflow-hidden">
-        <table className="w-full">
-          <thead className="bg-slate-800/30 border-b border-slate-700/50">
+      <div className="bg-[#0f172a] rounded-lg border border-slate-700/50 shadow-md overflow-hidden w-full">
+        <table className="w-full table-fixed min-w-full">
+          <thead className="bg-slate-900 border-b border-slate-700/50">
             <tr>
-              <th className="text-left px-4 py-3 text-xs uppercase text-slate-400 font-medium tracking-wider">
+              <th className="w-1/2 text-center px-2 sm:px-4 py-3 text-xs uppercase text-white font-bold tracking-wider bg-slate-900/80">
                 Produto
               </th>
-              <th className="text-right px-4 py-3 text-xs uppercase text-slate-400 font-medium tracking-wider">
-                Valor Mín.
-              </th>
-              <th className="text-right px-4 py-3 text-xs uppercase text-slate-400 font-medium tracking-wider">
-                Valor Máx.
+              <th className="w-1/2 text-center px-2 sm:px-4 py-3 text-xs uppercase text-white font-bold tracking-wider bg-slate-900/80">
+                Valor
               </th>
             </tr>
           </thead>
           <tbody>
-            {valoresFiltrados.map(([k, vMin, vMax], index) => (
+            {valoresFiltrados.map(([k, valor], index) => (
               <tr key={k} className={`border-b border-slate-700/30 ${index % 2 === 0 ? 'bg-transparent' : 'bg-slate-800/20'}`} style={{height: '80px'}}>
-                <td className="px-4 py-8">
-                  <div className="flex items-center">
-                    <span className={`mr-3 ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>
+                <td className="px-2 sm:px-4 py-7">
+                  <div className="flex items-center justify-start">
+                    <span className={`mr-2 sm:mr-3 ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>
                       {iconesProdutos[k] || (
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                           <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
                         </svg>
                       )}
                     </span>
-                    <span className="text-sm font-medium text-gray-300">
+                    <span className="text-xs sm:text-sm font-medium text-gray-300">
                       {nomesCustomizados[k] || k}
+                      {k === 'VALOR_PD' && (
+                        <>
+                          {temPlanoDiretor ? (
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 inline ml-1" viewBox="0 0 200 200" fill="none">
+                              <path d="M50 110 L90 150 L160 60" stroke="#23d13a" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                            </svg>
+                          ) : (
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 inline ml-1" viewBox="0 0 200 200" fill="none">
+                              <line x1="60" y1="60" x2="140" y2="140" stroke="#d12323" strokeWidth="24" strokeLinecap="round" />
+                              <line x1="140" y1="60" x2="60" y2="140" stroke="#d12323" strokeWidth="24" strokeLinecap="round" />
+                            </svg>
+                          )}
+                          {/* Texto 'Em dia' abaixo do nome, apenas se tem plano diretor */}
+                          {temPlanoDiretor && (
+                            <div className="text-xs text-slate-400 font-medium mt-1">Em dia</div>
+                          )}
+                        </>
+                      )}
+
+                      {k === 'VALOR_PMSB' && (
+                        <>
+                          {temPMSB ? (
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 inline ml-1" viewBox="0 0 200 200" fill="none">
+                              <path d="M50 110 L90 150 L160 60" stroke="#23d13a" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                            </svg>
+                          ) : (
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 inline ml-1" viewBox="0 0 200 200" fill="none">
+                              <line x1="60" y1="60" x2="140" y2="140" stroke="#d12323" strokeWidth="24" strokeLinecap="round" />
+                              <line x1="140" y1="60" x2="60" y2="140" stroke="#d12323" strokeWidth="24" strokeLinecap="round" />
+                            </svg>
+                          )}
+                          {/* Texto 'Em dia' abaixo do nome, apenas se tem PMSB */}
+                          {temPMSB && (
+                            <div className="text-xs text-slate-400 font-medium mt-1">Em dia</div>
+                          )}
+                        </>
+                      )}
                     </span>
                   </div>
                 </td>
-                <td className="px-4 py-8 text-right">
-                  <span className={`text-base font-bold ${index % 2 === 0 ? 'text-sky-300' : 'text-gray-300'}`}>
-                    {formatarValor(vMin?.toString())}
-                  </span>
-                </td>
-                <td className={`px-4 py-8 text-right`}>
-                  <span className={`text-base font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>
-                    {formatarValor(vMax?.toString())}
-                  </span>
+                <td className={`px-2 sm:px-4 py-4 text-right`}>
+                  {k === 'VALOR_REURB' ? (() => {
+                    const valorStr = valor?.toString() || '';
+                    const splitIndex = valorStr.indexOf('(');
+                    const mainValor = splitIndex !== -1 ? valorStr.substring(0, splitIndex).trim() : valorStr;
+                    const detalhe = splitIndex !== -1 ? valorStr.substring(splitIndex).trim() : '';
+                    return (
+                      <div className="flex flex-col items-end">
+                        <span className={`text-sm sm:text-base font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>{mainValor}</span>
+                        {detalhe && (
+                          <span className="text-[10px] sm:text-xs text-slate-400 font-medium mt-1">{detalhe}</span>
+                        )}
+                      </div>
+                    );
+                  })() : (
+                    <span className={`text-base font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>{formatarValor(valor?.toString())}</span>
+                  )}
                 </td>
               </tr>
             ))}
@@ -255,7 +278,7 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
                       <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
                     </svg>
                   </span>
-                  <span className="text-base font-medium text-gray-300">Valor disponível VAAT</span>
+                  <span className="text-base font-medium text-gray-300">VAAT</span>
                 </div>
                 <span className={`text-lg font-bold ${colorClass}`}>
                   {municipioSelecionado.properties?.valor_vaat_formato || "—"}

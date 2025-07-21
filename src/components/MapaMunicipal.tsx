@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import L, { Map as LeafletMap, GeoJSON, Layer, LayerGroup } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet-draw/dist/leaflet.draw.css";
+import "leaflet-draw";
 import { useMapData } from "../contexts/MapDataContext";
 import * as turf from '@turf/turf';
 import polylabel from 'polylabel';
@@ -81,19 +82,9 @@ function popupDadosGerais(p: any) {
     <b>Plano Diretor:</b> ${p.PD_ALTERADA || ""}${p.PD_ANO && p.PD_ANO !== "0" ? ` - ${p.PD_ANO}` : ""}<br>
     <b>Plano Diretor Vencido:</b> ${p.pd_venci || ""}<br>
     <b>REURB:</b> ${p.reurb_exist || ""}${p.REURB_ANO && p.REURB_ANO !== "0" ? ` - ${p.REURB_ANO}` : ""}<br>
-    <b>Política do PMSB:</b> ${p.politica_saneamento_existe || ""}${p.politica_saneamento_ano && p.politica_saneamento_ano !== "0" ? ` - ${p.politica_saneamento_ano}` : ""}<br>
     <b>Plano do PMSB:</b> ${p.plano_saneamento_existe || ""}${p.plano_saneamento_ano && p.plano_saneamento_ano !== "0" ? ` - ${p.plano_saneamento_ano}` : ""}<br>
-    <b>Política Educacional Ambiental:</b> ${p.politica_educambiental_existe || ""}${p.politica_educambiental_ano && p.politica_educambiental_ano !== "0" ? ` - ${p.politica_educambiental_ano}` : ""}<br>
-    <b>Política de Resíduos Sólidos:</b> ${p.politica_residuos_existe || ""}${p.politica_residuos_ano && p.politica_residuos_ano !== "0" ? ` - ${p.politica_residuos_ano}` : ""}<br>
-    <b>Plano de Resíduos Sólidos:</b> ${p.plano_residuos_existe || ""}${p.plano_residuos_ano && p.plano_residuos_ano !== "0" ? ` - ${p.plano_residuos_ano}` : ""}<br>
     <b>Valor do Plano Diretor:</b> ${p.VALOR_PD || ""}<br>
-    <b>Valor do PMSB:</b> ${p.VALOR_PMSB || ""}<br>
-    <b>Valor do REURB:</b> ${p.VALOR_REURB || ""}<br>
-    <b>Valor do Plano Desertificação:</b> ${p.desert || ""}<br>
-    <b>Valor do Plano Decenal Ambiental:</b> ${p.dec_ambiente || ""}<br>
-    <b>Valor do Start Iniciais:</b> ${p.VALOR_START_INICIAIS || ""}<br>
-    <b>Valor do Start Finais:</b> ${p.VALOR_START_FINAIS || ""}<br>
-    <b>Valor do Start Iniciais e Finais:</b> ${p.VALOR_START_INICIAIS_FINAIS || ""}
+    <b>Valor do PMSB:</b> ${p.VALOR_PMSB || ""}
   `;
 }
 
@@ -114,13 +105,7 @@ function popupProdutos(p: any) {
     <b>Município:</b> ${p.municipio || ""}<br>
     <b>Valor do PMSB:</b> ${p.VALOR_PMSB || ""}<br>
     <b>Valor do Plano Diretor:</b> ${p.VALOR_PD || ""}<br>
-    <b>Valor do CTM:</b> ${p.VALOR_CTM || ""}<br>
-    <b>Valor do REURB:</b> ${p.VALOR_REURB || ""}<br>
-    <b>Valor do Plano Decenal Ambiental:</b> ${p.dec_ambiente || ""}<br>
-    <b>Valor do Plano Desertificação:</b> ${p.desert || ""}<br>
-    <b>Valor do Start Iniciais:</b> ${p.VALOR_START_INICIAIS || ""}<br>
-    <b>Valor do Start Finais:</b> ${p.VALOR_START_FINAIS || ""}<br>
-    <b>Valor do Start Iniciais e Finais:</b> ${p.VALOR_START_INICIAIS_FINAIS || ""}
+    <b>Valor do CTM:</b> ${p.VALOR_CTM || ""}
   `;
 }
 
@@ -318,7 +303,6 @@ export default function MapaMunicipal({ municipioSelecionado }: MapaMunicipalPro
         const overlayMaps = {
           "Dados Gerais": layersRef.current.dados,
           "PD - Sem Plano e +20K": layersRef.current.pdsemplano,
-          "Produtos Municipais": layersRef.current.produtos,
           "PD em Vencimento": layersRef.current.pdvencendo,
           "Parceiros": layersRef.current.parceiros,
         };

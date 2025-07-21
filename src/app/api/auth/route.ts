@@ -35,7 +35,7 @@ export async function POST(request: Request) {
       // Criar token JWT
       const token = sign(
         { username: user.username, role: user.role },
-        process.env.JWT_SECRET || 'sua_chave_secreta_aqui',
+        process.env.JWT_SECRET || 'ProjetoNexus_InnOvatis_Plataforma_2025',
         { expiresIn: '1h' }
       );
 

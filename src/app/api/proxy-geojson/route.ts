@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
       "base_municipios.geojson",
       "base_pd_sem_plano.geojson",
       "base_pd_vencendo.geojson", 
-      "base_produtos.geojson",
+
       "parceiros1.json"
     ];
     

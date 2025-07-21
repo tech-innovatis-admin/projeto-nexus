@@ -415,14 +415,14 @@ function MapaPageContent() {
                   </div>
                   
                 {/* Container 2: Produtos Municipais (ocupa toda a coluna direita) */}
-                <div className="bg-[#1e293b] rounded-lg shadow-lg p-0.5 border border-slate-600 animate-fade-in md:col-start-2 md:row-span-2 w-fit">
-                  <div className="bg-[#0f172a] rounded-lg p-2 flex flex-col transition-all duration-300 hover:bg-[#111a2d] hover:shadow-lg border border-slate-700 relative overflow-hidden h-full">
+                <div className="bg-[#1e293b] rounded-lg shadow-lg p-0.5 border border-slate-600 animate-fade-in md:col-start-2 md:row-span-2 w-full">
+                  <div className="bg-[#0f172a] rounded-lg p-0 sm:p-2 flex flex-col transition-all duration-300 hover:bg-[#111a2d] hover:shadow-lg border border-slate-700 relative overflow-hidden h-full">
                     {/* Efeito de brilho no canto superior */}
                     <div className="absolute -top-10 -right-10 w-20 h-20 bg-indigo-500/10 rounded-full blur-xl"></div>
                     
-                    {/* Ajuste para garantir largura automática e centralização */}
-                    <div className="flex flex-col w-auto mx-auto">
-                      <div className="table-fixed w-auto mx-auto overflow-y-auto">
+                    {/* Container com largura total */}
+                    <div className="flex flex-col w-full px-0">
+                      <div className="w-full overflow-y-auto px-0">
                       <InformacoesMunicipio municipioSelecionado={municipioSelecionado} />
                       </div>
                     </div>

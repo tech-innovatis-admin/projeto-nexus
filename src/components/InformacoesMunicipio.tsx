@@ -58,12 +58,30 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
     PROCON_VAA: 'Procon Vai às Aulas',
   };
 
+
   // Verifica se o município possui Plano Diretor conforme PD_ALTERADA === 'sim'
   const temPlanoDiretor = normalizar(municipioSelecionado.properties?.PD_ALTERADA) === 'sim';
+
+  // Pega o ano atual para todas as verificações
+  const anoAtual = new Date().getFullYear();
+
+  // Verifica se o Plano Diretor está vencido (PD_ANO + 10 < ano atual)
+  const pdAno = Number(municipioSelecionado.properties?.PD_ANO);
+  const planoDiretorVencido = temPlanoDiretor && pdAno && (pdAno + 10 < anoAtual);
+
+  // Status final do Plano Diretor
+  const statusPD = temPlanoDiretor ? (planoDiretorVencido ? 'vencido' : 'em_dia') : 'nao_tem';
 
   // Verifica se o município possui PMSB (Sim ou Em elaboração)
   const statusPMSB = normalizar(municipioSelecionado.properties?.plano_saneamento_existe);
   const temPMSB = statusPMSB === 'sim' || statusPMSB === 'em elaboracao';
+  
+  // Verifica se o PMSB está vencido
+  const pmsbAnoStr = String(municipioSelecionado.properties?.plano_saneamento_ano || '');
+  const pmsbAno = !isNaN(Number(pmsbAnoStr)) && 
+                  !['-', 'NA', 'Recusa', ''].includes(pmsbAnoStr.trim()) ? 
+                  Number(pmsbAnoStr) : null;
+  const pmsbVencido = statusPMSB === 'sim' && pmsbAno && (pmsbAno + 10 < anoAtual);
 
   // Ícones para cada produto
   const iconesProdutos: Record<string, React.ReactNode> = {
@@ -109,6 +127,15 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
         <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z" />
       </svg>
     ),
+  };
+
+  const linksProdutos: Record<string, string> = {
+    VALOR_PD: "https://drive.google.com/drive/u/0/folders/1yhMYDt1MxGL1b-k2gNanG2qSM3_LMm3U",
+    VALOR_PMSB: "https://drive.google.com/drive/u/0/folders/1YSQNlu4_5SrA7GE-c7aXXWkEu7GYknyT",
+    VALOR_CTM: "https://drive.google.com/drive/u/0/folders/1Jf4mLWZZzcCTP5fRh0ckx6S9sqsZxWIb",
+    VALOR_REURB: "https://drive.google.com/drive/u/0/folders/1Noi7iCP9hAieSMwtoSNwExj1UdAkazss",
+    VALOR_START_INICIAIS_FINAIS: "https://drive.google.com/drive/u/0/folders/1UMbF1pPA2wDKfDZNC6_Pm5Jl8KswgWNi",
+    PROCON_VAA: "https://drive.google.com/drive/u/0/folders/1W2WZH5Za-Si_VB_lVhsC5bU2akbc59Nj"
   };
 
   // Removendo o objeto não utilizado
@@ -173,16 +200,57 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
   };
 
   return (
-    <div className="grid grid-cols-1 gap-3 w-full">
+    <div className="grid grid-cols-1 gap-3 w-full h-full">
       {/* Produtos em formato de tabela profissional */}
-      <div className="bg-[#0f172a] rounded-lg border border-slate-700/50 shadow-md overflow-hidden w-full">
-        <table className="w-full table-fixed min-w-full">
+      <div className="bg-[#0f172a] rounded-lg border border-slate-700/50 shadow-md overflow-hidden relative w-full h-full p-0">
+        {/* Legenda de status */}
+        <div className="absolute top-2 right-3 z-10">
+          <div className="group relative flex items-center">
+            <button 
+              className="hover:bg-slate-700 rounded-full p-1.5 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 bg-transparent"
+              title="Legenda dos status"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-slate-400" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none" />
+                <rect x="11" y="6.5" width="2" height="7" rx="1" fill="currentColor" />
+                <circle cx="12" cy="17" r="1.2" fill="currentColor" />
+              </svg>
+            </button>
+            <div className="hidden group-hover:block absolute right-0 mt-2 w-64 bg-slate-900/95 backdrop-blur-sm text-white text-xs rounded-lg shadow-lg p-3 z-20">
+              <div className="mb-3 border-b border-slate-700 pb-1.5">
+                <span className="text-sm font-medium text-slate-300">Status dos Produtos</span>
+              </div>
+              <div className="flex items-center mb-2">
+                <svg className="h-4 w-4 mr-2" viewBox="0 0 200 200" fill="none">
+                  <path d="M50 110 L90 150 L160 60" stroke="#23d13a" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <span className="text-slate-300">Produto em dia</span>
+              </div>
+              <div className="flex items-center mb-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2L2 20h20L12 2z" fill="#FFD600"/>
+                  <circle cx="12" cy="16" r="1.5" fill="#222"/>
+                  <rect x="11" y="8" width="2" height="5" rx="1" fill="#222"/>
+                </svg>
+                <span className="text-slate-300">Produto vencido (mais de 10 anos)</span>
+              </div>
+              <div className="flex items-center">
+                <svg className="h-4 w-4 mr-2" viewBox="0 0 200 200" fill="none">
+                  <line x1="60" y1="60" x2="140" y2="140" stroke="#d12323" strokeWidth="24" strokeLinecap="round" />
+                  <line x1="140" y1="60" x2="60" y2="140" stroke="#d12323" strokeWidth="24" strokeLinecap="round" />
+                </svg>
+                <span className="text-slate-300">Produto não existe</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <table className="w-full">
           <thead className="bg-slate-900 border-b border-slate-700/50">
             <tr>
-              <th className="w-1/2 text-center px-2 sm:px-4 py-3 text-xs uppercase text-white font-bold tracking-wider bg-slate-900/80">
+              <th className="text-center px-2 sm:px-3 py-3 text-xs uppercase text-white font-bold tracking-wider bg-slate-900/80">
                 Produto
               </th>
-              <th className="w-1/2 text-center px-2 sm:px-4 py-3 text-xs uppercase text-white font-bold tracking-wider bg-slate-900/80">
+              <th className="text-center px-2 sm:px-3 py-3 text-xs uppercase text-white font-bold tracking-wider bg-slate-900/80">
                 Valor
               </th>
             </tr>
@@ -190,51 +258,89 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
           <tbody>
             {valoresFiltrados.map(([k, valor], index) => (
               <tr key={k} className={`border-b border-slate-700/30 ${index % 2 === 0 ? 'bg-transparent' : 'bg-slate-800/20'}`} style={{height: '80px'}}>
-                <td className="px-2 sm:px-4 py-7">
+                <td className="px-1 sm:px-3 py-7">
                   <div className="flex items-center justify-start">
                     <span className={`mr-2 sm:mr-3 ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>
                       {iconesProdutos[k] || (
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
+                          <path fillRule="evenodd" d="M4 4a2 2 0 002-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
                         </svg>
                       )}
                     </span>
                     <span className="text-xs sm:text-sm font-medium text-gray-300">
-                      {nomesCustomizados[k] || k}
+                      {linksProdutos[k] ? (
+                        <a
+                          href={linksProdutos[k]}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sky-400 hover:text-sky-300 transition-colors"
+                          style={{ textDecoration: 'none' }}
+                        >
+                          {nomesCustomizados[k] || k}
+                        </a>
+                      ) : (
+                        nomesCustomizados[k] || k
+                      )}
+                      {/* Mantém os ícones e textos extras */}
                       {k === 'VALOR_PD' && (
                         <>
                           {temPlanoDiretor ? (
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 inline ml-1" viewBox="0 0 200 200" fill="none">
-                              <path d="M50 110 L90 150 L160 60" stroke="#23d13a" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                            </svg>
+                            planoDiretorVencido ? (
+                              <span title="Plano Diretor vencido">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 inline ml-1" viewBox="0 0 24 24" fill="none">
+                                  <path d="M12 2L2 20h20L12 2z" fill="#FFD600"/>
+                                  <circle cx="12" cy="16" r="1.5" fill="#222"/>
+                                  <rect x="11" y="8" width="2" height="5" rx="1" fill="#222"/>
+                                </svg>
+                              </span>
+                            ) : (
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 inline ml-1" viewBox="0 0 200 200" fill="none">
+                                <path d="M50 110 L90 150 L160 60" stroke="#23d13a" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                              </svg>
+                            )
                           ) : (
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 inline ml-1" viewBox="0 0 200 200" fill="none">
                               <line x1="60" y1="60" x2="140" y2="140" stroke="#d12323" strokeWidth="24" strokeLinecap="round" />
                               <line x1="140" y1="60" x2="60" y2="140" stroke="#d12323" strokeWidth="24" strokeLinecap="round" />
                             </svg>
                           )}
-                          {/* Texto 'Em dia' abaixo do nome, apenas se tem plano diretor */}
-                          {temPlanoDiretor && (
+                          {/* Texto 'Em dia' abaixo do nome, apenas se tem plano diretor e não está vencido */}
+                          {temPlanoDiretor && !planoDiretorVencido && (
                             <div className="text-xs text-slate-400 font-medium mt-1">Em dia</div>
+                          )}
+                          {planoDiretorVencido && (
+                            <div className="text-xs text-slate-400 font-medium mt-1">Vencido</div>
                           )}
                         </>
                       )}
-
                       {k === 'VALOR_PMSB' && (
                         <>
                           {temPMSB ? (
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 inline ml-1" viewBox="0 0 200 200" fill="none">
-                              <path d="M50 110 L90 150 L160 60" stroke="#23d13a" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                            </svg>
+                            pmsbVencido ? (
+                              <span title="PMSB vencido">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 inline ml-1" viewBox="0 0 24 24" fill="none">
+                                  <path d="M12 2L2 20h20L12 2z" fill="#FFD600"/>
+                                  <circle cx="12" cy="16" r="1.5" fill="#222"/>
+                                  <rect x="11" y="8" width="2" height="5" rx="1" fill="#222"/>
+                                </svg>
+                              </span>
+                            ) : (
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 inline ml-1" viewBox="0 0 200 200" fill="none">
+                                <path d="M50 110 L90 150 L160 60" stroke="#23d13a" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                              </svg>
+                            )
                           ) : (
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 inline ml-1" viewBox="0 0 200 200" fill="none">
                               <line x1="60" y1="60" x2="140" y2="140" stroke="#d12323" strokeWidth="24" strokeLinecap="round" />
                               <line x1="140" y1="60" x2="60" y2="140" stroke="#d12323" strokeWidth="24" strokeLinecap="round" />
                             </svg>
                           )}
-                          {/* Texto 'Em dia' abaixo do nome, apenas se tem PMSB */}
-                          {temPMSB && (
+                          {/* Texto 'Em dia' abaixo do nome, apenas se tem PMSB e não está vencido */}
+                          {temPMSB && !pmsbVencido && (
                             <div className="text-xs text-slate-400 font-medium mt-1">Em dia</div>
+                          )}
+                          {pmsbVencido && (
+                            <div className="text-xs text-slate-400 font-medium mt-1">Vencido</div>
                           )}
                         </>
                       )}
@@ -249,9 +355,9 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
                     const detalhe = splitIndex !== -1 ? valorStr.substring(splitIndex).trim() : '';
                     return (
                       <div className="flex flex-col items-end">
-                        <span className={`text-sm sm:text-base font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>{mainValor}</span>
+                        <span className={`text-base font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>{mainValor}</span>
                         {detalhe && (
-                          <span className="text-[10px] sm:text-xs text-slate-400 font-medium mt-1">{detalhe}</span>
+                          <span className="text-xs text-slate-400 font-medium mt-1">{detalhe}</span>
                         )}
                       </div>
                     );
@@ -266,7 +372,7 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
 
         {/* VAAT - Agora após a tabela */}
         {municipioSelecionado.properties?.valor_vaat_formato && (
-          <div className="px-4 py-4 border-t border-slate-700/50 mt-1 bg-slate-800/20">
+          <div className="px-2 sm:px-4 py-4 border-t border-slate-700/50 mt-1 bg-slate-800/20">
             {(() => {
               const isEven = valoresFiltrados.length % 2 === 0; // determina cor
               const colorClass = isEven ? 'text-sky-400' : 'text-white';
@@ -290,4 +396,4 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
       </div>
     </div>
   );
-} 
+}

@@ -39,7 +39,16 @@ export default function LoginPage() {
       if (!response.ok) {
         throw new Error(data.error || 'Erro ao fazer login');
       }
-      router.push('/mapa');
+      
+      if (data.success) {
+        // Espera um momento para o cookie ser definido
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Redireciona para o mapa
+        router.push('/mapa');
+      } else {
+        throw new Error(data.error || 'Erro ao fazer login');
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Erro ao fazer login');
     } finally {

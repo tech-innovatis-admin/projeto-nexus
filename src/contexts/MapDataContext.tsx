@@ -53,7 +53,7 @@ export function MapDataProvider({ children }: { children: React.ReactNode }) {
         const organizedData = {
           dados: files.find((f: any) => f.name === 'base_municipios.geojson')?.data || null,
           pdsemplano: files.find((f: any) => f.name === 'base_pd_sem_plano.geojson')?.data || null,
-          produtos: files.find((f: any) => f.name === 'base_produtos.geojson')?.data || null,
+          produtos: null,
           pdvencendo: files.find((f: any) => f.name === 'base_pd_vencendo.geojson')?.data || null,
           parceiros: files.find((f: any) => f.name === 'parceiros1.json')?.data || null,
         };

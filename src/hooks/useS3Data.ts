@@ -21,10 +21,11 @@ export function useS3Data() {
         const files = await fetchAllGeoJSONFiles();
         
         // Organizar os dados por tipo
+
         const organizedData = {
           dados: files.find(f => f.name === 'base_municipios.geojson')?.data || null,
           pdsemplano: files.find(f => f.name === 'base_pd_sem_plano.geojson')?.data || null,
-          produtos: files.find(f => f.name === 'base_produtos.geojson')?.data || null,
+          produtos: null, // Adiciona a propriedade produtos como null ou conforme necessário
           pdvencendo: files.find(f => f.name === 'base_pd_vencendo.geojson')?.data || null,
           parceiros: files.find(f => f.name === 'parceiros1.json')?.data || null,
         };

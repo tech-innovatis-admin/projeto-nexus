@@ -1,6 +1,7 @@
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { parse } from 'dotenv';
 
+
 // Configuração do cliente S3
 const s3Client = new S3Client({
   region: process.env.AWS_REGION || 'us-east-2',
@@ -38,7 +39,7 @@ export async function downloadS3File(fileName: string): Promise<string> {
   }
 }
 
-async function getFileFromS3(filename: string) {
+export async function getFileFromS3(filename: string) {
   const bucketName = process.env.AWS_S3_BUCKET || 'projetonexusinnovatis';
   try {
     const command = new GetObjectCommand({
@@ -84,7 +85,7 @@ export async function fetchAllGeoJSONFiles() {
   const fileNames = [
     'base_municipios.geojson',
     'base_pd_sem_plano.geojson',
-    'base_produtos.geojson',
+
     'base_pd_vencendo.geojson',
     'parceiros1.json'
   ];

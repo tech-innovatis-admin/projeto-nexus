@@ -1,10 +1,31 @@
 import type { Feature } from "geojson";
+import { useState, useRef, useEffect } from 'react';
 
 interface InformacoesMunicipioProps {
   municipioSelecionado: Feature | null;
 }
 
 export default function InformacoesMunicipio({ municipioSelecionado }: InformacoesMunicipioProps) {
+  // Estado para controlar a visibilidade do popover de status na versão mobile
+  const [showStatusPopover, setShowStatusPopover] = useState(false);
+  // Referência para o timer do popover
+  const popoverTimerRef = useRef<number | null>(null);
+  
+  // Função para mostrar o popover e configurar o timer para escondê-lo após 5 segundos
+  const handleShowStatusPopover = () => {
+    setShowStatusPopover(true);
+    
+    // Limpa qualquer timer existente para evitar múltiplos timers
+    if (popoverTimerRef.current) {
+      window.clearTimeout(popoverTimerRef.current);
+    }
+    
+    // Define novo timer para esconder o popover após 5 segundos
+    popoverTimerRef.current = window.setTimeout(() => {
+      setShowStatusPopover(false);
+    }, 5000);
+  };
+
   if (!municipioSelecionado) {
     return (
       <div className="text-center text-slate-300 py-2">
@@ -21,6 +42,7 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
     'VALOR_REURB',
     'VALOR_START_INICIAIS_FINAIS',
     'PROCON_VAA', // Nova chave para o produto Procon Vai às Aulas
+    'valor_vaat_formato' // VAAT agora como último item da tabela
   ];
 
   // Função utilitária para normalizar strings (remove acentos, espaços extras e converte para minúsculas)
@@ -54,8 +76,8 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
     VALOR_START_INICIAIS_FINAIS: "Start Lab",
     VALOR_START_INICIAIS: "Start anos iniciais",
     VALOR_START_FINAIS: "Start anos finais",
-    // VAAT removido
     PROCON_VAA: 'Procon Vai às Aulas',
+    valor_vaat_formato: 'VAAT',
   };
 
 
@@ -127,6 +149,11 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
         <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z" />
       </svg>
     ),
+    valor_vaat_formato: (
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+        <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+      </svg>
+    ),
   };
 
   const linksProdutos: Record<string, string> = {
@@ -135,7 +162,8 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
     VALOR_CTM: "https://drive.google.com/drive/u/0/folders/1Jf4mLWZZzcCTP5fRh0ckx6S9sqsZxWIb",
     VALOR_REURB: "https://drive.google.com/drive/u/0/folders/1Noi7iCP9hAieSMwtoSNwExj1UdAkazss",
     VALOR_START_INICIAIS_FINAIS: "https://drive.google.com/drive/u/0/folders/1UMbF1pPA2wDKfDZNC6_Pm5Jl8KswgWNi",
-    PROCON_VAA: "https://drive.google.com/drive/u/0/folders/1W2WZH5Za-Si_VB_lVhsC5bU2akbc59Nj"
+    PROCON_VAA: "https://drive.google.com/drive/u/0/folders/1W2WZH5Za-Si_VB_lVhsC5bU2akbc59Nj",
+    valor_vaat_formato: "https://drive.google.com/drive/u/0/folders/1yhMYDt1MxGL1b-k2gNanG2qSM3_LMm3U"
   };
 
   // Removendo o objeto não utilizado
@@ -259,7 +287,7 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
             {valoresFiltrados.map(([k, valor], index) => (
               <tr key={k} className={`border-b border-slate-700/30 ${index % 2 === 0 ? 'bg-transparent' : 'bg-slate-800/20'}`} style={{height: '80px'}}>
                 <td className="px-1 sm:px-3 py-7">
-                  <div className="flex items-center justify-start">
+                  <div className={`flex items-center ${k === 'VALOR_PD' ? 'justify-center' : 'justify-start ml-[calc(50%-5rem)]'} ${k !== 'VALOR_PD' ? 'pl-4' : ''}`}>
                     <span className={`mr-2 sm:mr-3 ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>
                       {iconesProdutos[k] || (
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -267,7 +295,7 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
                         </svg>
                       )}
                     </span>
-                    <span className="text-xs sm:text-sm font-medium text-gray-300">
+                    <span className={`text-xs sm:text-sm font-medium text-gray-300 ${k === 'VALOR_PD' ? 'text-center' : 'text-left'}`}>
                       {linksProdutos[k] ? (
                         <a
                           href={linksProdutos[k]}
@@ -347,14 +375,15 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
                     </span>
                   </div>
                 </td>
-                <td className={`px-2 sm:px-4 py-4 text-right`}>
+                <td className="px-2 sm:px-4 py-4">
+                  <div className={`flex ${k === 'VALOR_PD' ? 'justify-center' : 'justify-start ml-[calc(50%-3.5rem)]'}`}>
                   {k === 'VALOR_REURB' ? (() => {
                     const valorStr = valor?.toString() || '';
                     const splitIndex = valorStr.indexOf('(');
                     const mainValor = splitIndex !== -1 ? valorStr.substring(0, splitIndex).trim() : valorStr;
                     const detalhe = splitIndex !== -1 ? valorStr.substring(splitIndex).trim() : '';
                     return (
-                      <div className="flex flex-col items-end">
+                      <div className="flex flex-col">
                         <span className={`text-base font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>{mainValor}</span>
                         {detalhe && (
                           <span className="text-xs text-slate-400 font-medium mt-1">{detalhe}</span>
@@ -364,35 +393,14 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
                   })() : (
                     <span className={`text-base font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>{formatarValor(valor?.toString())}</span>
                   )}
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
 
-        {/* VAAT - Agora após a tabela */}
-        {municipioSelecionado.properties?.valor_vaat_formato && (
-          <div className="px-2 sm:px-4 py-4 border-t border-slate-700/50 mt-1 bg-slate-800/20">
-            {(() => {
-              const isEven = valoresFiltrados.length % 2 === 0; // determina cor
-              const colorClass = isEven ? 'text-sky-400' : 'text-white';
-              return (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <span className={`${colorClass} mr-3`}>
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-                    </svg>
-                  </span>
-                  <span className="text-base font-medium text-gray-300">VAAT</span>
-                </div>
-                <span className={`text-lg font-bold ${colorClass}`}>
-                  {municipioSelecionado.properties?.valor_vaat_formato || "—"}
-                </span>
-              </div>
-              );})()}
-            </div>
-          )}
+
       </div>
     </div>
   );

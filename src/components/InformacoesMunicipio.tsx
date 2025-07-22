@@ -287,8 +287,8 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
             {valoresFiltrados.map(([k, valor], index) => (
               <tr key={k} className={`border-b border-slate-700/30 ${index % 2 === 0 ? 'bg-transparent' : 'bg-slate-800/20'}`} style={{height: '80px'}}>
                 <td className="px-1 sm:px-3 py-7">
-                  <div className={`flex items-center ${k === 'VALOR_PD' ? 'justify-center' : 'justify-start ml-[calc(50%-5rem)]'} ${k !== 'VALOR_PD' ? 'pl-4' : ''}`}>
-                    <span className={`mr-2 sm:mr-3 ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>
+                  <div className={`flex items-start ${k === 'VALOR_PD' ? 'justify-center' : 'justify-start ml-[calc(50%-5rem)]'} ${k !== 'VALOR_PD' ? 'pl-4' : ''}`}>
+                    <span className={`mr-2 sm:mr-3 mt-[2px] ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>
                       {iconesProdutos[k] || (
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                           <path fillRule="evenodd" d="M4 4a2 2 0 002-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />

@@ -237,6 +237,7 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
             <button 
               className="hover:bg-slate-700 rounded-full p-1.5 transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 bg-transparent"
               title="Legenda dos status"
+              onClick={handleShowStatusPopover}
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-slate-400" viewBox="0 0 24 24" fill="none">
                 <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none" />
@@ -244,7 +245,35 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
                 <circle cx="12" cy="17" r="1.2" fill="currentColor" />
               </svg>
             </button>
-            <div className="hidden group-hover:block absolute right-0 mt-2 w-64 bg-slate-900/95 backdrop-blur-sm text-white text-xs rounded-lg shadow-lg p-3 z-20">
+            {/* Popover para mobile */}
+            <div className={`md:hidden absolute right-0 mt-2 w-64 bg-slate-900/95 backdrop-blur-sm text-white text-xs rounded-lg shadow-lg p-3 z-20 transition-opacity duration-200 ${showStatusPopover ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+              <div className="mb-3 border-b border-slate-700 pb-1.5">
+                <span className="text-sm font-medium text-slate-300">Status dos Produtos</span>
+              </div>
+              <div className="flex items-center mb-2">
+                <svg className="h-4 w-4 mr-2" viewBox="0 0 200 200" fill="none">
+                  <path d="M50 110 L90 150 L160 60" stroke="#23d13a" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                <span className="text-slate-300">Produto em dia</span>
+              </div>
+              <div className="flex items-center mb-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2L2 20h20L12 2z" fill="#FFD600"/>
+                  <circle cx="12" cy="16" r="1.5" fill="#222"/>
+                  <rect x="11" y="8" width="2" height="5" rx="1" fill="#222"/>
+                </svg>
+                <span className="text-slate-300">Produto vencido (mais de 10 anos)</span>
+              </div>
+              <div className="flex items-center">
+                <svg className="h-4 w-4 mr-2" viewBox="0 0 200 200" fill="none">
+                  <line x1="60" y1="60" x2="140" y2="140" stroke="#d12323" strokeWidth="24" strokeLinecap="round" />
+                  <line x1="140" y1="60" x2="60" y2="140" stroke="#d12323" strokeWidth="24" strokeLinecap="round" />
+                </svg>
+                <span className="text-slate-300">Produto não existe</span>
+              </div>
+            </div>
+            {/* Popover para desktop */}
+            <div className="hidden md:group-hover:block absolute right-0 mt-2 w-64 bg-slate-900/95 backdrop-blur-sm text-white text-xs rounded-lg shadow-lg p-3 z-20">
               <div className="mb-3 border-b border-slate-700 pb-1.5">
                 <span className="text-sm font-medium text-slate-300">Status dos Produtos</span>
               </div>

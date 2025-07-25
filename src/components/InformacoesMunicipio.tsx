@@ -163,7 +163,7 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
     VALOR_REURB: "https://drive.google.com/drive/u/0/folders/1Noi7iCP9hAieSMwtoSNwExj1UdAkazss",
     VALOR_START_INICIAIS_FINAIS: "https://drive.google.com/drive/u/0/folders/1UMbF1pPA2wDKfDZNC6_Pm5Jl8KswgWNi",
     PROCON_VAA: "https://drive.google.com/drive/u/0/folders/1W2WZH5Za-Si_VB_lVhsC5bU2akbc59Nj",
-    valor_vaat_formato: "https://drive.google.com/drive/u/0/folders/1yhMYDt1MxGL1b-k2gNanG2qSM3_LMm3U"
+    valor_vaat_formato: "https://drive.google.com/drive/folders/1bmzujp0eHCIN9GkswEgv-i2OJVe2qkG1?hl=pt-br"
   };
 
   // Removendo o objeto não utilizado

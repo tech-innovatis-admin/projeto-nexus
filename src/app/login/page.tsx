@@ -169,10 +169,10 @@ export default function LoginPage() {
 
         {/* Mensagem de ajuda com link para contato */}
         <p className="mt-6 text-center text-sm text-slate-400">
-          Ainda não tem acesso?{" "}
+          Ainda não tem acesso?<br />
           <a 
             href="mailto:victor.eduardo@innovatismc.com?subject=Solicitação%20de%20Acesso%20-%20Nexus&body=Olá,%0A%0AGostaria%20de%20solicitar%20acesso%20à%20plataforma%20Nexus.%0A%0AAtenciosamente,"
-            className="text-sky-400 hover:text-sky-300 transition-colors font-medium"
+            className="text-sky-300 hover:text-sky-300 transition-colors font-medium"
             target="_blank"
             rel="noopener noreferrer"
           >

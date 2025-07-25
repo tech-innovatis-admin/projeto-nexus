@@ -99,8 +99,9 @@ export default function LoginPage() {
 
         {/* Formulário de login */}
         <form onSubmit={handleSubmit} className="space-y-4">
+
           {/* Campo de usuário */}
-          <div className="relative">
+          <div className="relative mb-1">
             <input
               id="username"
               type="text"
@@ -114,7 +115,7 @@ export default function LoginPage() {
           </div>
 
           {/* Campo de senha */}
-          <div className="relative">
+          <div className="relative mb-1">
             <input
               id="password"
               type={showPassword ? "text" : "password"}
@@ -166,9 +167,17 @@ export default function LoginPage() {
           </div>
         </form>
 
-        {/* Mensagem de ajuda */}
+        {/* Mensagem de ajuda com link para contato */}
         <p className="mt-6 text-center text-sm text-slate-400">
-          Ainda não tem acesso? Fale com o administrador.
+          Ainda não tem acesso?{" "}
+          <a 
+            href="mailto:victor.eduardo@innovatismc.com?subject=Solicitação%20de%20Acesso%20-%20Nexus&body=Olá,%0A%0AGostaria%20de%20solicitar%20acesso%20à%20plataforma%20Nexus.%0A%0AAtenciosamente,"
+            className="text-sky-400 hover:text-sky-300 transition-colors font-medium"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Fale com o administrador
+          </a>.
         </p>
       </motion.div>
 

@@ -8,6 +8,7 @@ import InformacoesMunicipio from "../../components/InformacoesMunicipio";
 import { MapDataProvider, useMapData } from "../../contexts/MapDataContext";
 import ExportPDFButton from "@/components/ExportPDFButton";
 import ScrollToTopButton from "@/components/ScrollToTopButton";
+import MiniFooter from "@/components/MiniFooter";
 
 // Importação dinâmica do mapa para evitar problemas de SSR
 const MapaMunicipal = dynamic(() => import("../../components/MapaMunicipal"), { ssr: false });
@@ -495,10 +496,8 @@ function MapaPageContent() {
         </div>
       </main>
 
-      {/* Rodapé */}
-      <footer className="w-full py-0.25 text-center text-sm text-slate-400 opacity-70">
-        &copy; {new Date().getFullYear()} Innovatis MC. Todos os direitos reservados.
-      </footer>
+      {/* Rodapé customizado */}
+      <MiniFooter />
 
       {/* Botão para voltar ao topo (visível apenas em mobile) */}
       <ScrollToTopButton />

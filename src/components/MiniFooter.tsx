@@ -18,14 +18,14 @@ const MiniFooter = () => {
           
           {/* Copyright centralizado */}
           <div className="md:w-1/3 flex justify-center mt-2 md:mt-0">
-            <p className="text-center text-slate-400">
+            <p className="text-center text-gray-400">
               © {currentYear} Innovatis. Todos os direitos reservados.
             </p>
           </div>
           
           {/* Créditos do Data Science à direita */}
           <div className="md:w-1/3 mt-4 md:mt-0 flex justify-center md:justify-end">
-            <p className="text-slate-400">
+            <p className="text-gray-400">
               Powered by Data Science Team - Innovatis MC
             </p>
           </div>

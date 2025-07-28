@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   description: 'NEXUS é uma plataforma de produtos e dados municipais que oferece suporte estratégico à Diretoria de Estratégia e Mercado da Innovatis MC.',
   viewport: 'width=device-width, initial-scale=1',
   icons: {
-    icon: '/logo_innovatis.svg',
+    icon: '/logo_innovatis_preta.svg',
   },
 };
 

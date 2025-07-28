@@ -246,7 +246,7 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
               </svg>
             </button>
             {/* Popover para mobile */}
-            <div className={`md:hidden absolute right-0 mt-2 w-64 bg-slate-900/95 backdrop-blur-sm text-white text-xs rounded-lg shadow-lg p-3 z-20 transition-opacity duration-200 ${showStatusPopover ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+            <div className={`md:hidden absolute right-0 mt-2 w-64 bg-slate-900/70 backdrop-blur-sm text-white text-xs rounded-lg shadow-lg p-3 z-20 transition-opacity duration-200 ${showStatusPopover ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
               <div className="mb-3 border-b border-slate-700 pb-1.5">
                 <span className="text-sm font-medium text-slate-300">Status dos Produtos</span>
               </div>
@@ -273,7 +273,7 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
               </div>
             </div>
             {/* Popover para desktop */}
-            <div className="hidden md:group-hover:block absolute right-0 mt-2 w-64 bg-slate-900/95 backdrop-blur-sm text-white text-xs rounded-lg shadow-lg p-3 z-20">
+            <div className="hidden md:group-hover:block absolute right-0 mt-2 w-64 bg-slate-900/70 backdrop-blur-sm text-white text-xs rounded-lg shadow-lg p-3 z-20">
               <div className="mb-3 border-b border-slate-700 pb-1.5">
                 <span className="text-sm font-medium text-slate-300">Status dos Produtos</span>
               </div>

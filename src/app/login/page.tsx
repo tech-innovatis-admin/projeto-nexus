@@ -19,6 +19,7 @@ export default function LoginPage() {
   const [error, setError] = useState(""); // Estado para mensagens de erro
   const [isLoading, setIsLoading] = useState(false); // Estado para controle de carregamento
   const [showPassword, setShowPassword] = useState(false); // Estado para mostrar/ocultar senha
+  const [isFadingOut, setIsFadingOut] = useState(false); // Estado para fade out
   const router = useRouter(); // Hook de navegação
 
   /**
@@ -43,9 +44,11 @@ export default function LoginPage() {
       if (data.success) {
         // Espera um momento para o cookie ser definido
         await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Redireciona para o mapa
-        router.push('/mapa');
+        // Inicia fade out
+        setIsFadingOut(true);
+        setTimeout(() => {
+          router.push('/mapa');
+        }, 500); // Duração do fade out
       } else {
         throw new Error(data.error || 'Erro ao fazer login');
       }
@@ -76,7 +79,8 @@ export default function LoginPage() {
         className="w-full max-w-sm bg-white/10 backdrop-blur-md shadow-xl shadow-black/20 rounded-xl p-6"
         variants={containerVariants}
         initial="hidden"
-        animate="visible"
+        animate={isFadingOut ? "hidden" : "visible"}
+        transition={{ duration: 0.5 }}
       >
         {/* Cabeçalho com logo e título */}
         <div className="flex flex-col items-center justify-center mb-6">

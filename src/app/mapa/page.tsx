@@ -9,6 +9,7 @@ import { MapDataProvider, useMapData } from "../../contexts/MapDataContext";
 import ExportPDFButton from "@/components/ExportPDFButton";
 import ScrollToTopButton from "@/components/ScrollToTopButton";
 import MiniFooter from "@/components/MiniFooter";
+import Navbar from "@/components/Navbar";
 
 // Importação dinâmica do mapa para evitar problemas de SSR
 const MapaMunicipal = dynamic(() => import("../../components/MapaMunicipal"), { ssr: false });
@@ -193,40 +194,22 @@ function MapaPageContent() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#0f172a] to-[#1e293b] text-white">
-      {/* Cabeçalho */}
-      <header className="w-full py-2 px-6 bg-[#1e293b] text-white shadow-md">
-        <div className="w-full max-w-7xl mx-auto flex flex-col md:grid md:grid-cols-3 items-center gap-2 md:gap-0">
-          {/* Logo e nome no canto esquerdo */}
-          <div className="flex items-center gap-4 justify-self-start">
-            <div className="text-gray-400">
-              <Image
-                src="/logo_innovatis.svg"
-                alt="Logo Innovatis"
-                width={40}
-                height={40}
-                className="object-contain [&>path]:fill-current [&>g]:fill-current"
-                priority
-              />
-            </div>
-            <h1 className="text-white text-lg md:text-xl font-bold tracking-wide">Nexus - Plataforma de Produtos</h1>
-          </div>
-          {/* Espaço vazio à direita para equilíbrio */}
-          <div className="hidden md:block"></div>
-        </div>
-      </header>
-
+      {/* Navbar componentizado - apenas com logo e título */}
+      <Navbar />
+      
       {/* Área de busca e título */}
-      <div className="w-full px-4 py-0.5">
-        <div className="w-full max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          {/* Buscador de município/estado - sempre à esquerda */}
-          <section className="w-full md:w-auto flex flex-col z-10 mb-1 md:mb-0">
-            <form
-              className="flex flex-col md:flex-row gap-3 w-full"
-              onSubmit={handleBuscarMunicipio}
-            >
+      <div className="w-full py-3">
+        <div className="w-full max-w-[1400px] mx-auto px-4">
+          <div className="w-full md:max-w-[1200px] mx-auto">
+            {/* Buscador de município/estado - alinhado com a logo */}
+            <section className="w-full flex flex-col z-10 mb-1 md:mb-0 pl-0">
+              <form
+                className="flex flex-col md:flex-row gap-3"
+                onSubmit={handleBuscarMunicipio}
+              >
               {/* Dropdown de estados */}
               <select
-                className="flex-1 rounded-md bg-[#1e293b] text-white placeholder-slate-400 border border-slate-600 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
+                className="rounded-md bg-[#1e293b] text-white placeholder-slate-400 border border-slate-600 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 w-full md:w-48"
                 value={estadoSelecionado}
                 onChange={(e) => setEstadoSelecionado(e.target.value)}
                 required
@@ -241,7 +224,7 @@ function MapaPageContent() {
               
               {/* Dropdown de municípios */}
               <select
-                className="flex-1 rounded-md bg-[#1e293b] text-white placeholder-slate-400 border border-slate-600 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500"
+                className="rounded-md bg-[#1e293b] text-white placeholder-slate-400 border border-slate-600 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 w-full md:w-56"
                 value={municipioSelecionadoDropdown}
                 onChange={(e) => setMunicipioSelecionadoDropdown(e.target.value)}
                 required
@@ -257,14 +240,17 @@ function MapaPageContent() {
               
               <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
                 <button
-                  className="w-full md:w-auto bg-gray-600 hover:bg-gray-700 text-white font-semibold py-1.5 px-4 rounded-md transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-[#0f172a]"
+                  className="w-full md:w-auto bg-sky-600 hover:bg-sky-700 text-white font-semibold py-1.5 px-4 rounded-md flex items-center gap-2 transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-[#0f172a]"
                   type="submit"
                 >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 104.5 4.5a7.5 7.5 0 0012.15 12.15z" />
+                  </svg>
                   Buscar
                 </button>
-                
+
                 {/* Botão de Exportar PDF - sempre visível */}
-                <ExportPDFButton 
+                <ExportPDFButton
                   city={municipioSelecionado ? {
                     municipio: municipioSelecionado.properties?.nome_municipio || municipioSelecionado.properties?.municipio,
                     nome: municipioSelecionado.properties?.nome_municipio || municipioSelecionado.properties?.municipio,
@@ -273,14 +259,31 @@ function MapaPageContent() {
                     VALOR_CTM: municipioSelecionado.properties?.VALOR_CTM,
                     VALOR_PMSB: municipioSelecionado.properties?.VALOR_PMSB
                   } : null}
+                  className="w-full md:w-auto border border-slate-600 text-white bg-transparent hover:bg-slate-800/30 font-semibold py-1.5 px-4 rounded-md transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-[#0f172a]"
                 />
+
+                {/* Botão de Limpar Seleção */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEstadoSelecionado('');
+                    setMunicipioSelecionadoDropdown('');
+                    setMunicipioSelecionado(null);
+                    setErroBusca(null);
+                  }}
+                  className="w-full md:w-auto border border-slate-600 text-white bg-transparent hover:bg-red-900/30 font-semibold py-1.5 px-4 rounded-md transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-[#0f172a] flex items-center justify-center gap-2"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                  Limpar
+                </button>
               </div>
             </form>
 
             {erroBusca && <span className="text-red-400 mt-1 text-sm">{erroBusca}</span>}
           </section>
-          
-          {/* Heading removido */}
+        </div>
         </div>
       </div>
 

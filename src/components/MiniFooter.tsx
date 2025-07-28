@@ -9,7 +9,7 @@ const MiniFooter = () => {
           <div className="md:w-1/3 flex justify-center md:justify-start">
             <div className="space-x-2 text-slate-400">
               <span>Termo de uso</span>
-              <span className="text-slate-600">|</span>
+              <span className="text-slate-600"> | </span>
               <span>
                 Privacidade e Política
               </span>

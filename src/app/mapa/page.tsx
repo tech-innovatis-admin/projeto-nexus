@@ -210,10 +210,6 @@ function MapaPageContent() {
             </div>
             <h1 className="text-white text-lg md:text-xl font-bold tracking-wide">Nexus - Plataforma de Produtos</h1>
           </div>
-          {/* Texto centralizado */}
-          <div className="flex justify-center mt-1 md:mt-0">
-            <span className="text-xs text-slate-300 text-center">Powered by Data Science Team - Innovatis MC</span>
-          </div>
           {/* Espaço vazio à direita para equilíbrio */}
           <div className="hidden md:block"></div>
         </div>

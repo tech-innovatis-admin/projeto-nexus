@@ -1,17 +1,15 @@
 import { verify } from 'jsonwebtoken';
+import { NextResponse } from 'next/server';
 
 export async function GET(request: Request) {
   try {
     const token = request.headers.get('Authorization')?.replace('Bearer ', '');
 
     if (!token) {
-      return new Response(JSON.stringify({ 
+      return NextResponse.json({
         success: false, 
         error: 'Token não encontrado' 
-      }), {
-        status: 401,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      }, { status: 401 });
     }
 
     // Verifica o token
@@ -20,20 +18,14 @@ export async function GET(request: Request) {
       process.env.JWT_SECRET || 'ProjetoNexus_InnOvatis_Plataforma_2025'
     );
 
-    return new Response(JSON.stringify({ 
+    return NextResponse.json({
       success: true, 
       user: decoded 
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' }
     });
   } catch (error) {
-    return new Response(JSON.stringify({ 
+    return NextResponse.json({
       success: false, 
       error: 'Token inválido' 
-    }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' }
-    });
+    }, { status: 401 });
   }
 }

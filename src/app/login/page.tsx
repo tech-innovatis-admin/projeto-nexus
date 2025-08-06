@@ -171,17 +171,38 @@ export default function LoginPage() {
           </div>
         </form>
 
-        {/* Mensagem de ajuda com link para contato */}
+        {/* Mensagem de ajuda com link para contato - alterna com base no estado de erro */}
         <p className="mt-6 text-center text-sm text-slate-400">
-          Ainda não tem acesso?<br />
-          <a 
-            href="mailto:victor.eduardo@innovatismc.com?subject=Solicitação%20de%20Acesso%20-%20Nexus&body=Olá,%0A%0AGostaria%20de%20solicitar%20acesso%20à%20plataforma%20Nexus.%0A%0AAtenciosamente,"
-            className="text-sky-300 hover:text-sky-300 transition-colors font-medium"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Fale com o administrador
-          </a>.
+          {error ? (
+            <>
+              Esqueceu a senha?<br />
+              <a 
+                href={
+                  "mailto:victor.eduardo@innovatismc.com?subject=Redefinição%20de%20Senha%20-%20Nexus&body=" +
+                  encodeURIComponent(
+                    `Olá,\n\nGostaria de solicitar a redefinição da minha senha para a plataforma Nexus.\n\nMeu usuário é: [SEU_USUÁRIO]\nNova Senha: [NOVA_SENHA]\n\nAtenciosamente,`
+                  )
+                }
+                className="text-sky-300 hover:text-sky-300 transition-colors font-medium"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Fale com o administrador
+              </a>.
+            </>
+          ) : (
+            <>
+              Ainda não tem acesso?<br />
+              <a 
+                href="mailto:victor.eduardo@innovatismc.com?subject=Solicitação%20de%20Acesso%20-%20Nexus&body=Olá,%0A%0AGostaria%20de%20solicitar%20acesso%20à%20plataforma%20Nexus.%0A%0AAtenciosamente,"
+                className="text-sky-300 hover:text-sky-300 transition-colors font-medium"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Fale com o administrador
+              </a>.
+            </>
+          )}
         </p>
       </motion.div>
 

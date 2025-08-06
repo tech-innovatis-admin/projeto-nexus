@@ -26,7 +26,7 @@ const MiniFooter = () => {
           {/* Créditos do Data Science à direita */}
           <div className="md:w-1/3 mt-4 md:mt-0 flex justify-center md:justify-end">
             <p className="text-gray-400">
-              Powered by Data Science Team - Innovatis MC
+              Powered by Data Science Team
             </p>
           </div>
         </div>

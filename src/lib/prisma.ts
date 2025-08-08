@@ -1,10 +1,12 @@
-import { PrismaClient } from '../generated/prisma';
+// Importa PrismaClient do output customizado gerado: src/generated/prisma
+import { PrismaClient } from '@/generated/prisma';
 
-// Evita múltiplas instâncias do Prisma Client em desenvolvimento
-const globalForPrisma = global as unknown as { prisma?: PrismaClient };
+const globalForPrisma = global as any;
 
-export const prisma = 
-  globalForPrisma.prisma ?? 
+export const prisma =
+  globalForPrisma.prisma ??
   new PrismaClient({ log: ['query'] });
 
-if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+if (process.env.NODE_ENV !== 'production') {
+  globalForPrisma.prisma = prisma;
+}

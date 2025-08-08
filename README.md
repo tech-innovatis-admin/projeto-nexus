@@ -31,20 +31,10 @@ O **NEXUS** é uma plataforma web desenvolvida pela *Data Science Team – Innov
   - Municípios com plano diretor a vencer
   - Produtos Innovatis disponíveis
   - Parceiros
-- **Barra de Progresso** durante o carregamento dos arquivos GeoJSON
+- **Barra de Progresso** durante o carregamento dos arquivos GeoJSON (provenientes do S3)
 - **Painel de Informações** detalhadas sobre o município selecionado
-- **Sistema de Autenticação**:
-  - Autenticação segura via JWT (páginas protegidas)
-  - Persistência de dados em PostgreSQL
-  - Botão de encerrar sessão com feedback visual
-  - Redirecionamento automático para tela de login
-- **Interface Responsiva**:
-  - Navbar com logo Innovatis e identificação da plataforma
-  - Botão de encerrar sessão com design institucional
-  - Indicador "Powered by Data Science Team"
-- **Armazenamento de Dados**:
-  - PostgreSQL para dados de usuários e autenticação
-  - AWS S3 para arquivos GeoJSON e recursos estáticos
+- **Autenticação Segura** via JWT (páginas protegidas)
+- **Integração AWS S3** para armazenamento e distribuição dos dados
 - **Animações** com Framer Motion e introdução 3D com React Three Fiber
 
 ---
@@ -54,35 +44,22 @@ O **NEXUS** é uma plataforma web desenvolvida pela *Data Science Team – Innov
 Next.js App Router (15) ─┐
                         ├── Frontend (React 19 + TailwindCSS 4)
                         │   ├── Context API (MapDataContext)
-                        │   ├── Hooks (useS3Data, useAuth)
-                        │   └── Components (MapaMunicipal, LayerControl, Navbar)
+                        │   ├── Hooks (useS3Data, useAuth,…)
+                        │   └── Components (MapaMunicipal, LayerControl,…)
                         │
-                        ├── Backend (API Routes)
-                        │   ├── Autenticação (JWT + PostgreSQL)
-                        │   ├── Proxy para S3 (/api/proxy-geojson/*)
-                        │   └── Testes & Debug (/api/debug, /api/test-s3)
-                        │
-                        └── Database Layer
-                            ├── PostgreSQL (Usuários e Autenticação)
-                            └── AWS S3 (GeoJSON / Recursos Estáticos)
+                        └── Backend (API Routes)
+                            ├── Autenticação (JWT)
+                            ├── Proxy para S3 (/api/proxy-geojson/*)
+                            └── Testes & Debug (/api/debug, /api/test-s3)
+
+AWS S3 ──> GeoJSON / JSON
 ```
 ### Fluxo de Dados
-1. **Autenticação**:
-   - Cliente acessa `/login`
-   - Credenciais são verificadas contra banco PostgreSQL
-   - Token JWT é gerado e armazenado em cookie seguro
-
-2. **Acesso ao Mapa**:
-   - Cliente autenticado acessa `/mapa`
-   - `MapDataContext` solicita `/api/proxy-geojson/files`
-   - API faz *stream* dos arquivos do bucket S3
-   - Estado global atualiza `mapData` e `loadingProgress`
-   - Interface reage à conclusão do carregamento
-
-3. **Encerramento de Sessão**:
-   - Usuário clica em "Encerrar sessão"
-   - API remove cookie de autenticação
-   - Cliente é redirecionado para `/login`
+1. **Cliente** acessa `/mapa`.
+2. `MapDataContext` solicita `/api/proxy-geojson/files`.
+3. API faz *stream* dos arquivos do bucket S3 via `@aws-sdk/client-s3`.
+4. Estado global guarda `mapData`, `loadingProgress` e dispara **barra de carregamento**.
+5. Mapa e Painéis reagem à conclusão (`loading = false`).
 
 ---
 
@@ -108,10 +85,6 @@ src/
 - **Next.js 15** (App Router & API Routes)
 - **React 19**
 - **TypeScript 5**
-- **PostgreSQL**  
-  Banco de dados relacional para autenticação
-- **Prisma ORM**  
-  ORM para interação com PostgreSQL
 - **TailwindCSS 4**  
   Estilização utilitária responsiva
 - **Leaflet 1.9** & **leaflet-draw**  
@@ -133,10 +106,9 @@ src/
    - Node.js 18+
    - Conta AWS com permissões de leitura no bucket
 
-2. **Variáveis de Ambiente** (`.env.local`)
+2. **Variáveis de Ambiente** (`.env.local` ou via S3 `senhas_s3.json`)
    | Chave | Descrição |
    |-------|-----------|
-   | `DATABASE_URL` | URL de conexão PostgreSQL |
    | `AWS_REGION` | Região do bucket |
    | `AWS_ACCESS_KEY_ID` | Chave de acesso |
    | `AWS_SECRET_ACCESS_KEY` | Chave secreta |
@@ -171,20 +143,12 @@ src/
 
 ## Fluxo da Aplicação
 1. Animação 3D de introdução (opcional) → `/`
-2. Tela de **Login** → `/login`
-   - Autenticação via PostgreSQL
-   - Geração de token JWT
-   - Redirecionamento após sucesso
+2. Tela de **Login** (JWT) → `/login`
 3. Página **Mapa** → `/mapa`
-   - Navbar com botão de encerrar sessão
    - Seleção de estado & município
    - Carregamento progressivo (barra de progresso)
    - Exibição do mapa e painel de informações
-4. **Encerramento de Sessão**
-   - Botão com feedback visual
-   - Remoção do token JWT
-   - Redirecionamento para login
-5. Ações futuras: edição de camadas, exportação de relatórios…
+4. Ações futuras: edição de camadas, exportação de relatórios…
 
 ---
 

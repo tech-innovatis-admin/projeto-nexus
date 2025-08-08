@@ -6,8 +6,7 @@ import "leaflet/dist/leaflet.css";
 import Image from "next/image";
 import InformacoesMunicipio from "../../components/InformacoesMunicipio";
 import { MapDataProvider, useMapData } from "../../contexts/MapDataContext";
-import ExportMenu from "@/components/ExportMenu";
-import ExportAdvancedModal from "@/components/ExportAdvancedModal";
+import ExportPDFButton from "@/components/ExportPDFButton";
 import ScrollToTopButton from "@/components/ScrollToTopButton";
 import MiniFooter from "@/components/MiniFooter";
 import Navbar from "@/components/Navbar";
@@ -65,7 +64,6 @@ function MapaPageContent() {
   const [municipios, setMunicipios] = useState<string[]>([]);
   const [estadoSelecionado, setEstadoSelecionado] = useState<string>("");
   const [municipioSelecionadoDropdown, setMunicipioSelecionadoDropdown] = useState<string>("");
-  const [advancedModalOpen, setAdvancedModalOpen] = useState<boolean>(false);
   const dadosRef = useRef<HTMLDivElement>(null);
   
   // Extrair estados únicos do GeoJSON quando os dados forem carregados
@@ -242,17 +240,17 @@ function MapaPageContent() {
               
               <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
                 <button
-                  className="w-full md:w-auto bg-sky-600 hover:bg-sky-700 text-white font-semibold py-1.5 px-4 rounded-md flex items-center justify-center md:justify-start gap-2 transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-[#0f172a]"
+                  className="w-full md:w-auto bg-sky-600 hover:bg-sky-700 text-white font-semibold py-1.5 px-4 rounded-md flex items-center gap-2 transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-[#0f172a]"
                   type="submit"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 104.5 4.5a7.5 7.5 0 0012.15 12.15z" />
                   </svg>
-                  <span>Buscar</span>
+                  Buscar
                 </button>
 
-                {/* Botão de Exportar - novo componente */}
-                <ExportMenu
+                {/* Botão de Exportar PDF - sempre visível */}
+                <ExportPDFButton
                   city={municipioSelecionado ? {
                     municipio: municipioSelecionado.properties?.nome_municipio || municipioSelecionado.properties?.municipio,
                     nome: municipioSelecionado.properties?.nome_municipio || municipioSelecionado.properties?.municipio,
@@ -261,7 +259,6 @@ function MapaPageContent() {
                     VALOR_CTM: municipioSelecionado.properties?.VALOR_CTM,
                     VALOR_PMSB: municipioSelecionado.properties?.VALOR_PMSB
                   } : null}
-                  onOpenAdvanced={() => setAdvancedModalOpen(true)}
                   className="w-full md:w-auto border border-slate-600 text-white bg-transparent hover:bg-slate-800/30 font-semibold py-1.5 px-4 rounded-md transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-[#0f172a]"
                 />
 
@@ -503,13 +500,6 @@ function MapaPageContent() {
 
       {/* Botão para voltar ao topo (visível apenas em mobile) */}
       <ScrollToTopButton />
-
-      {/* Modal de exportação avançada */}
-      <ExportAdvancedModal
-        isOpen={advancedModalOpen}
-        onClose={() => setAdvancedModalOpen(false)}
-        mapData={mapData}
-      />
     </div>
   );
 }

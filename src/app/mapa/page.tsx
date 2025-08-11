@@ -210,35 +210,57 @@ function MapaPageContent() {
                 onSubmit={handleBuscarMunicipio}
               >
               {/* Dropdown de estados */}
-              <select
-                className="rounded-md bg-[#1e293b] text-white placeholder-slate-400 border border-slate-600 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 w-full md:w-48"
-                value={estadoSelecionado}
-                onChange={(e) => setEstadoSelecionado(e.target.value)}
-                required
-              >
-                <option value="">Selecione o estado</option>
-                {estados.map((estado) => (
-                  <option key={estado} value={estado}>
-                    {estado}
-                  </option>
-                ))}
-              </select>
+              <div className="relative w-full md:w-48">
+                <select
+                  className="appearance-none rounded-md bg-[#1e293b] text-white placeholder-slate-400 border border-slate-600 px-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 w-full"
+                  value={estadoSelecionado}
+                  onChange={(e) => setEstadoSelecionado(e.target.value)}
+                  required
+                >
+                  <option value="">Selecione o estado</option>
+                  {estados.map((estado) => (
+                    <option key={estado} value={estado}>
+                      {estado}
+                    </option>
+                  ))}
+                </select>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4 text-slate-300 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.939l3.71-3.71a.75.75 0 111.06 1.061l-4.24 4.24a.75.75 0 01-1.06 0l-4.24-4.24a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                </svg>
+              </div>
               
               {/* Dropdown de municípios */}
-              <select
-                className="rounded-md bg-[#1e293b] text-white placeholder-slate-400 border border-slate-600 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 w-full md:w-56"
-                value={municipioSelecionadoDropdown}
-                onChange={(e) => setMunicipioSelecionadoDropdown(e.target.value)}
-                required
-                disabled={!estadoSelecionado}
-              >
-                <option value="">Selecione o município</option>
-                {municipios.map((municipio) => (
-                  <option key={municipio} value={municipio}>
-                    {municipio}
-                  </option>
-                ))}
-              </select>
+              <div className="relative w-full md:w-56">
+                <select
+                  className="appearance-none rounded-md bg-[#1e293b] text-white placeholder-slate-400 border border-slate-600 px-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 w-full disabled:opacity-60"
+                  value={municipioSelecionadoDropdown}
+                  onChange={(e) => setMunicipioSelecionadoDropdown(e.target.value)}
+                  required
+                  disabled={!estadoSelecionado}
+                >
+                  <option value="">Selecione o município</option>
+                  {municipios.map((municipio) => (
+                    <option key={municipio} value={municipio}>
+                      {municipio}
+                    </option>
+                  ))}
+                </select>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4 text-slate-300 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.939l3.71-3.71a.75.75 0 111.06 1.061l-4.24 4.24a.75.75 0 01-1.06 0l-4.24-4.24a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                </svg>
+              </div>
               
               <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
                 {/* Botão de Exportar com menu e opção avançada */}

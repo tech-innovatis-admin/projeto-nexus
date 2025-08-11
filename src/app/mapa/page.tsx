@@ -6,10 +6,11 @@ import "leaflet/dist/leaflet.css";
 import Image from "next/image";
 import InformacoesMunicipio from "../../components/InformacoesMunicipio";
 import { MapDataProvider, useMapData } from "../../contexts/MapDataContext";
-import ExportPDFButton from "@/components/ExportPDFButton";
 import ScrollToTopButton from "@/components/ScrollToTopButton";
 import MiniFooter from "@/components/MiniFooter";
 import Navbar from "@/components/Navbar";
+import ExportMenu from "@/components/ExportMenu";
+import ExportAdvancedModal from "@/components/ExportAdvancedModal";
 
 // Importação dinâmica do mapa para evitar problemas de SSR
 const MapaMunicipal = dynamic(() => import("../../components/MapaMunicipal"), { ssr: false });
@@ -64,6 +65,7 @@ function MapaPageContent() {
   const [municipios, setMunicipios] = useState<string[]>([]);
   const [estadoSelecionado, setEstadoSelecionado] = useState<string>("");
   const [municipioSelecionadoDropdown, setMunicipioSelecionadoDropdown] = useState<string>("");
+  const [advancedModalOpen, setAdvancedModalOpen] = useState<boolean>(false);
   const dadosRef = useRef<HTMLDivElement>(null);
   
   // Extrair estados únicos do GeoJSON quando os dados forem carregados
@@ -239,6 +241,20 @@ function MapaPageContent() {
               </select>
               
               <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
+                {/* Botão de Exportar com menu e opção avançada */}
+                <ExportMenu
+                  city={municipioSelecionado ? {
+                    municipio: municipioSelecionado.properties?.nome_municipio || municipioSelecionado.properties?.municipio,
+                    nome: municipioSelecionado.properties?.nome_municipio || municipioSelecionado.properties?.municipio,
+                    name_state: municipioSelecionado.properties?.name_state,
+                    VALOR_PD: municipioSelecionado.properties?.VALOR_PD,
+                    VALOR_CTM: municipioSelecionado.properties?.VALOR_CTM,
+                    VALOR_PMSB: municipioSelecionado.properties?.VALOR_PMSB
+                  } : null}
+                  className="w-full md:w-auto"
+                  onOpenAdvanced={() => setAdvancedModalOpen(true)}
+                />
+
                 <button
                   className="w-full md:w-auto bg-sky-600 hover:bg-sky-700 text-white font-semibold py-1.5 px-4 rounded-md flex items-center gap-2 transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-[#0f172a]"
                   type="submit"
@@ -248,19 +264,6 @@ function MapaPageContent() {
                   </svg>
                   Buscar
                 </button>
-
-                {/* Botão de Exportar PDF - sempre visível */}
-                <ExportPDFButton
-                  city={municipioSelecionado ? {
-                    municipio: municipioSelecionado.properties?.nome_municipio || municipioSelecionado.properties?.municipio,
-                    nome: municipioSelecionado.properties?.nome_municipio || municipioSelecionado.properties?.municipio,
-                    name_state: municipioSelecionado.properties?.name_state,
-                    VALOR_PD: municipioSelecionado.properties?.VALOR_PD,
-                    VALOR_CTM: municipioSelecionado.properties?.VALOR_CTM,
-                    VALOR_PMSB: municipioSelecionado.properties?.VALOR_PMSB
-                  } : null}
-                  className="w-full md:w-auto border border-slate-600 text-white bg-transparent hover:bg-slate-800/30 font-semibold py-1.5 px-4 rounded-md transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-[#0f172a]"
-                />
 
                 {/* Botão de Limpar Seleção */}
                 <button
@@ -500,6 +503,13 @@ function MapaPageContent() {
 
       {/* Botão para voltar ao topo (visível apenas em mobile) */}
       <ScrollToTopButton />
+
+      {/* Modal de exportação avançada */}
+      <ExportAdvancedModal
+        isOpen={advancedModalOpen}
+        onClose={() => setAdvancedModalOpen(false)}
+        mapData={mapData}
+      />
     </div>
   );
 }

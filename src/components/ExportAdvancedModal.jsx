@@ -25,8 +25,6 @@ function ExportAdvancedModal({ isOpen, onClose, mapData }) {
     { id: 'VALOR_PMSB', label: 'PMSB - Valor', checked: false },
     { id: 'plano_saneamento_ano', label: 'PMSB - ANO', checked: false },
     { id: 'VALOR_CTM', label: 'CTM - Valor', checked: false },
-    { id: 'partido', label: 'Partido', checked: false },
-    { id: 'mandato_inicio', label: 'Início do Mandato', checked: false },
     { id: 'valor_vaat_formato', label: 'VAAT', checked: false }
   ];
 

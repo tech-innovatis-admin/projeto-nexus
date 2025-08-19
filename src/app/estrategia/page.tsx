@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import Navbar from '@/components/Navbar';
 import Sidebar from '@/components/Sidebar';
 import MiniFooter from '@/components/MiniFooter';
@@ -12,6 +12,30 @@ import dynamic from 'next/dynamic';
 const DynamicMapLibreMock = dynamic(() => import('@/components/MapLibreMock'), {
   ssr: false
 });
+
+// Componente para contagem animada de valores
+function AnimatedCurrency({ targetValue, selectedPolo }: { targetValue: number; selectedPolo: string }) {
+  const count = useMotionValue(0);
+  const rounded = useTransform(count, (latest) => Math.round(latest));
+  const displayValue = useTransform(rounded, (latest) => {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(latest);
+  });
+
+  useEffect(() => {
+    const controls = animate(count, targetValue, {
+      duration: 1.5, // 1.5 segundos para a animação
+      ease: "easeOut"
+    });
+    return controls.stop;
+  }, [count, targetValue, selectedPolo]); // Reexecuta quando o polo muda
+
+  return <motion.span>{displayValue}</motion.span>;
+}
 
 export default function EstrategiaPage() {
   const [selectedMetric, setSelectedMetric] = useState('overview');
@@ -78,23 +102,15 @@ export default function EstrategiaPage() {
     {
       id: 'valor_polo',
       title: 'Valor do Polo',
-      icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-        </svg>
-      ),
-      value: formatCurrency(currentPoloData.valorTotal),
+
+      value: currentPoloData.valorTotal, // Passamos o valor numérico para a animação
       subtitle: selectedPolo === 'ALL' ? 'Todos os Polos' : selectedPolo,
       description: 'Somatório do valor disponível no polo e vizinhança'
     },
     {
       id: 'municipios_polo',
       title: 'Municípios do Polo',
-      icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-        </svg>
-      ),
+
       value: currentPoloData.totalMunicipios.toString(),
       subtitle: selectedPolo === 'ALL' ? 'Municípios Totais' : 'Municípios no Polo',
       description: selectedPolo === 'ALL' ? 'Total de municípios em todos os polos' : 'Municípios que fazem parte deste polo'
@@ -102,11 +118,7 @@ export default function EstrategiaPage() {
     {
       id: 'reservado',
       title: 'Em Desenvolvimento',
-      icon: (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-        </svg>
-      ),
+
       value: '--',
       subtitle: 'Funcionalidade Futura',
       description: 'Este card está reservado para desenvolvimento futuro'
@@ -176,7 +188,7 @@ export default function EstrategiaPage() {
 
           {/* Conteúdo scrollável */}
           <div className="flex-1 overflow-y-auto p-6">
-            <div className="max-w-7xl mx-auto space-y-8">
+            <div className="max-w-7xl mx-auto space-y-4">
               
               {/* Seção de Filtros */}
               <motion.section
@@ -253,7 +265,7 @@ export default function EstrategiaPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.2 }}
-                className="mt-8"
+                className="mt-2"
               >
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {metrics.map((metric, index) => (
@@ -272,27 +284,30 @@ export default function EstrategiaPage() {
                         setSelectedMetric(metric.id);
                       }}
                     >
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="text-sky-400 group-hover:text-sky-300 transition-colors">
-                          {metric.icon}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {metric.id === 'municipios_polo' && (
-                            <svg 
-                              xmlns="http://www.w3.org/2000/svg" 
-                              className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${showMunicipiosList ? 'rotate-180' : ''}`} 
-                              fill="none" 
-                              viewBox="0 0 24 24" 
-                              stroke="currentColor"
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                          )}
-                          <div className={`w-2 h-2 rounded-full ${selectedMetric === metric.id ? 'bg-sky-400' : 'bg-slate-600'}`}></div>
-                        </div>
+                      <div className="flex items-center justify-end mb-4">
+                        {metric.id === 'municipios_polo' && (
+                          <svg 
+                            xmlns="http://www.w3.org/2000/svg" 
+                            className={`h-4 w-4 text-slate-400 transition-transform duration-200 ${showMunicipiosList ? 'rotate-180' : ''}`} 
+                            fill="none" 
+                            viewBox="0 0 24 24" 
+                            stroke="currentColor"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        )}
                       </div>
                       <div className="space-y-2">
-                        <p className="text-2xl font-bold text-white">{metric.value}</p>
+                        <p className="text-2xl font-bold text-white">
+                          {metric.id === 'valor_polo' ? (
+                            <AnimatedCurrency 
+                              targetValue={metric.value as number} 
+                              selectedPolo={selectedPolo}
+                            />
+                          ) : (
+                            metric.value
+                          )}
+                        </p>
                         <p className="text-sm font-medium text-slate-300">{metric.subtitle}</p>
                         <p className="text-xs text-slate-500">{metric.description}</p>
                         
@@ -324,7 +339,7 @@ export default function EstrategiaPage() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: 0.5 }}
-                  className="mt-8"
+                  className="mt-2"
                 >
                   <DynamicMapLibreMock
                     uf={selectedUF}

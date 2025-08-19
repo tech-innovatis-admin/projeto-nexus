@@ -30,35 +30,29 @@ export function MapDataProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [municipioSelecionado, setMunicipioSelecionado] = useState<Feature | null>(null);
 
-  const loadData = async () => {
-    try {
+  // Cache local com TTL (30 dias) + SWR em background
+  const CACHE_KEY = 'mapData_cache_v1';
+  const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dias
+
+  // Função que busca da API, organiza e grava no estado + cache
+  const fetchAndStore = async (showProgress: boolean) => {
+    if (showProgress) {
       setLoading(true);
-      setLoadingProgress(10); // Iniciando carregamento
-      
-      // Usar a API para buscar os dados em vez de acessar o S3 diretamente
-      setLoadingProgress(20);
+      setLoadingProgress(10);
+    }
+    try {
+      if (showProgress) setLoadingProgress(20);
+      // Não usar { cache: 'no-store' } aqui para permitir cache HTTP quando aplicável
       const response = await fetch('/api/proxy-geojson/files');
-      
       if (!response.ok) {
         throw new Error(`Erro na API: ${response.status} ${response.statusText}`);
       }
-      
-      setLoadingProgress(40);
+      if (showProgress) setLoadingProgress(40);
+
       const files = await response.json();
-      setLoadingProgress(60);
-      
-      // Simular um pouco de tempo de processamento para a barra de progresso ser visível
-      setTimeout(() => {
-        setLoadingProgress(80);
-        
-        const organizedData = {
-          dados: files.find((f: any) => f.name === 'base_municipios.geojson')?.data || null,
-          pdsemplano: files.find((f: any) => f.name === 'base_pd_sem_plano.geojson')?.data || null,
-          produtos: null,
-          pdvencendo: files.find((f: any) => f.name === 'base_pd_vencendo.geojson')?.data || null,
-          parceiros: files.find((f: any) => f.name === 'parceiros1.json')?.data || null,
-          pistas: files.find((f: any) => f.name === 'pistas_s3.csv')?.data || null,
-        };
+      if (showProgress) setLoadingProgress(60);
+
+      const applyResult = (organizedData: MapData) => {
         try {
           console.log('[MapData] dados.features:', organizedData.dados?.features?.length ?? 0,
             '| pdsemplano:', organizedData.pdsemplano?.features?.length ?? 0,
@@ -69,17 +63,74 @@ export function MapDataProvider({ children }: { children: React.ReactNode }) {
             console.log('[MapData] exemplo de pista:', organizedData.pistas[0]);
           }
         } catch {}
-  
-        setLoadingProgress(100);
+
         setMapData(organizedData);
         setError(null);
-        
-        // Pequeno atraso para mostrar o 100% completo antes de esconder a barra
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem(CACHE_KEY, JSON.stringify({ timestamp: Date.now(), data: organizedData }));
+          } catch {}
+        }
+      };
+
+      // Opcional: pequena simulação para barra de progresso quando visível
+      if (showProgress) {
         setTimeout(() => {
-          setLoading(false);
-        }, 300);
-      }, 500);
-      
+          setLoadingProgress(80);
+          const organizedData: MapData = {
+            dados: files.find((f: any) => f.name === 'base_municipios.geojson')?.data || null,
+            pdsemplano: files.find((f: any) => f.name === 'base_pd_sem_plano.geojson')?.data || null,
+            produtos: null,
+            pdvencendo: files.find((f: any) => f.name === 'base_pd_vencendo.geojson')?.data || null,
+            parceiros: files.find((f: any) => f.name === 'parceiros1.json')?.data || null,
+            pistas: files.find((f: any) => f.name === 'pistas_s3.csv')?.data || null,
+          };
+          setLoadingProgress(100);
+          applyResult(organizedData);
+          setTimeout(() => setLoading(false), 300);
+        }, 500);
+      } else {
+        const organizedData: MapData = {
+          dados: files.find((f: any) => f.name === 'base_municipios.geojson')?.data || null,
+          pdsemplano: files.find((f: any) => f.name === 'base_pd_sem_plano.geojson')?.data || null,
+          produtos: null,
+          pdvencendo: files.find((f: any) => f.name === 'base_pd_vencendo.geojson')?.data || null,
+          parceiros: files.find((f: any) => f.name === 'parceiros1.json')?.data || null,
+          pistas: files.find((f: any) => f.name === 'pistas_s3.csv')?.data || null,
+        };
+        applyResult(organizedData);
+        // Não tocar no loading quando SWR em background
+      }
+    } catch (err) {
+      console.error('Erro ao carregar dados:', err);
+      setError(err instanceof Error ? err.message : 'Erro ao carregar dados');
+      setLoading(false);
+    }
+  };
+
+  const loadData = async () => {
+    try {
+      // 1) Tenta servir do cache (stale-while-revalidate)
+      if (typeof window !== 'undefined') {
+        try {
+          const raw = localStorage.getItem(CACHE_KEY);
+          if (raw) {
+            const cached = JSON.parse(raw) as { timestamp: number; data: MapData };
+            const isFresh = Date.now() - cached.timestamp < CACHE_TTL_MS;
+            if (cached.data) {
+              setMapData(cached.data);
+              setError(null);
+              setLoading(false);
+              // 2) Revalida em background se o cache estiver fresco ou velho
+              void fetchAndStore(false);
+              return;
+            }
+          }
+        } catch {}
+      }
+
+      // 3) Sem cache válido → carregamento completo com barra de progresso
+      await fetchAndStore(true);
     } catch (err) {
       console.error('Erro ao carregar dados:', err);
       setError(err instanceof Error ? err.message : 'Erro ao carregar dados');
@@ -94,7 +145,8 @@ export function MapDataProvider({ children }: { children: React.ReactNode }) {
   }, [mapData]);
 
   const refreshData = async () => {
-    await loadData();
+    // Força uma revalidação com feedback de progresso
+    await fetchAndStore(true);
   };
 
   return (

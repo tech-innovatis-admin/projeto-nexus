@@ -109,6 +109,42 @@ export async function fetchAllGeoJSONFiles() {
   }
 }
 
+// Função para buscar e parsear o CSV de pistas
+export async function fetchPistasData() {
+  try {
+    const csvContent = await getFileFromS3('pistas_s3.csv');
+    if (typeof csvContent !== 'string') {
+      return [] as any[];
+    }
+
+    const lines = csvContent.split(/\r?\n/).filter(l => l.trim().length > 0);
+    if (lines.length === 0) return [] as any[];
+
+    const headerLine = lines[0];
+    // Detecta delimitador: prioriza ';' se houver mais que ','
+    const delimiter = (headerLine.split(';').length - 1) >= (headerLine.split(',').length - 1) ? ';' : ',';
+    const rawHeaders = headerLine.split(delimiter).map(h => h.trim());
+    const headers = rawHeaders.map(h => h.replace(/^"|"$/g, ''));
+
+    const records: any[] = [];
+    for (let i = 1; i < lines.length; i++) {
+      const rawRow = lines[i].split(delimiter);
+      if (rawRow.length !== headers.length) continue;
+      const obj: any = {};
+      headers.forEach((h, idx) => {
+        const v = (rawRow[idx] ?? '').trim().replace(/^"|"$/g, '');
+        obj[h] = v;
+      });
+      // Mantém chaves originais (ex.: 'codigo', 'codigo_pista', 'nome_pista', 'tipo_pista')
+      records.push(obj);
+    }
+    return records;
+  } catch (error) {
+    console.error('Erro ao carregar/parsear pistas_s3.csv:', error);
+    return [] as any[];
+  }
+}
+
 // Função para buscar arquivo de configuração
 export async function fetchEnvConfig() {
   try {

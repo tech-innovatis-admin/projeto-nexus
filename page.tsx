@@ -1,12 +1,11 @@
 "use client";
 import dynamic from "next/dynamic";
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { createPortal } from "react-dom";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { Feature, FeatureCollection } from "geojson";
 import "leaflet/dist/leaflet.css";
 import Image from "next/image";
 import InformacoesMunicipio from "../../components/InformacoesMunicipio";
-import { useMapData } from "../../contexts/MapDataContext";
+import { MapDataProvider, useMapData } from "../../contexts/MapDataContext";
 import ScrollToTopButton from "@/components/ScrollToTopButton";
 import MiniFooter from "@/components/MiniFooter";
 import Navbar from "@/components/Navbar";
@@ -57,79 +56,6 @@ function LoadingProgressBar({ progress }: { progress: number }) {
   );
 }
 
-// Componente de tooltip com portal
-interface PortalTooltipProps {
-  isVisible: boolean;
-  anchorRef: React.RefObject<HTMLElement | null>;
-  children: React.ReactNode;
-}
-
-function PortalTooltip({ isVisible, anchorRef, children }: PortalTooltipProps) {
-  const [position, setPosition] = useState({ top: 0, left: 0 });
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (isVisible && anchorRef.current) {
-      const updatePosition = () => {
-        const rect = anchorRef.current!.getBoundingClientRect();
-        const scrollY = window.scrollY;
-        const scrollX = window.scrollX;
-        
-        // Largura estimada do tooltip (320px = max-w-80)
-        const tooltipMaxWidth = 280;
-        const screenWidth = window.innerWidth;
-        const spaceOnRight = screenWidth - rect.right;
-        const spaceOnLeft = rect.left;
-        
-        // Verifica se há espaço suficiente à direita (incluindo margem de segurança)
-        const shouldShowOnLeft = spaceOnRight < (tooltipMaxWidth + 20);
-        
-        let left: number;
-        if (shouldShowOnLeft && spaceOnLeft > tooltipMaxWidth) {
-          // Posiciona à esquerda do ícone
-          left = rect.left + scrollX - tooltipMaxWidth - 8;
-        } else {
-          // Posiciona à direita do ícone (comportamento padrão)
-          left = rect.right + scrollX + 8;
-        }
-        
-        setPosition({
-          top: rect.top + scrollY + rect.height / 2 - 10, // Centraliza verticalmente
-          left: left
-        });
-      };
-
-      updatePosition();
-      window.addEventListener('scroll', updatePosition);
-      window.addEventListener('resize', updatePosition);
-
-      return () => {
-        window.removeEventListener('scroll', updatePosition);
-        window.removeEventListener('resize', updatePosition);
-      };
-    }
-  }, [isVisible, anchorRef]);
-
-  if (!mounted || !isVisible) return null;
-
-  return createPortal(
-    <div
-      className="absolute z-[9999] w-max max-w-80 bg-slate-900/95 text-white text-xs rounded-md border border-slate-700 shadow-xl p-3 pointer-events-none"
-      style={{
-        top: position.top,
-        left: position.left,
-      }}
-    >
-      {children}
-    </div>,
-    document.body
-  );
-}
-
 // Componente principal que usa o contexto
 function MapaPageContent() {
   const { municipioSelecionado, setMunicipioSelecionado, loading, loadingProgress, mapData } = useMapData();
@@ -141,71 +67,7 @@ function MapaPageContent() {
   const [estadoSelecionado, setEstadoSelecionado] = useState<string>("");
   const [municipioSelecionadoDropdown, setMunicipioSelecionadoDropdown] = useState<string>("");
   const [advancedModalOpen, setAdvancedModalOpen] = useState<boolean>(false);
-  const [tooltipVisible, setTooltipVisible] = useState<boolean>(false);
   const dadosRef = useRef<HTMLDivElement>(null);
-  const planeIconRef = useRef<HTMLDivElement>(null);
-  
-  // Fechar tooltip ao clicar fora ou pressionar ESC (melhor UX no mobile/desktop)
-  useEffect(() => {
-    const handleGlobalClick = (e: MouseEvent | TouchEvent) => {
-      if (!tooltipVisible) return;
-      const target = e.target as Node | null;
-      if (planeIconRef.current && target && planeIconRef.current.contains(target)) return;
-      setTooltipVisible(false);
-    };
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setTooltipVisible(false);
-    };
-    document.addEventListener('mousedown', handleGlobalClick);
-    document.addEventListener('touchstart', handleGlobalClick, { passive: true });
-    document.addEventListener('keydown', handleKey);
-    return () => {
-      document.removeEventListener('mousedown', handleGlobalClick);
-      document.removeEventListener('touchstart', handleGlobalClick as any);
-      document.removeEventListener('keydown', handleKey);
-    };
-  }, [tooltipVisible]);
-  
-  // Pistas de voo do município selecionado (match por code_muni)
-  const pistasDoMunicipio = useMemo(() => {
-    try {
-      if (!mapData?.pistas || !municipioSelecionado?.properties) return [] as any[];
-      const raw = (municipioSelecionado as any).properties?.code_muni;
-      const codeMuni = String(raw ?? '').trim();
-      const norm = (v: any) => String(v ?? '').replace(/\D+/g, '');
-      const codeKey = norm(codeMuni);
-      if (!codeKey) return [] as any[];
-      const list = (mapData.pistas as any[]).filter((p: any) => norm(p['codigo']) === codeKey);
-      if (typeof window !== 'undefined') {
-        console.log('[Pistas] code_muni selecionado:', codeMuni, '=> norm:', codeKey, '| pistasTotal:', (mapData.pistas as any[]).length, '| encontradas:', list.length);
-        if (list.length > 0) console.log('[Pistas] exemplo:', list[0]);
-      }
-      return list;
-    } catch (e) {
-      console.warn('[Pistas] erro ao calcular pistasDoMunicipio:', e);
-      return [] as any[];
-    }
-  }, [mapData, municipioSelecionado]);
-
-  // Frequência de códigos no CSV para depuração/uso futuro
-  const frequenciaPistasPorCodigo = useMemo(() => {
-    const freq: Record<string, number> = {};
-    try {
-      if (!Array.isArray(mapData?.pistas)) return freq;
-      const norm = (v: any) => String(v ?? '').replace(/\D+/g, '');
-      for (const p of mapData!.pistas as any[]) {
-        const key = norm(p['codigo']);
-        if (!key) continue;
-        freq[key] = (freq[key] || 0) + 1;
-      }
-      if (typeof window !== 'undefined') {
-        console.log('[Pistas] frequência por codigo (top 5):', Object.entries(freq).slice(0, 5));
-      }
-    } catch (e) {
-      console.warn('[Pistas] erro ao montar frequência:', e);
-    }
-    return freq;
-  }, [mapData]);
   
   // Extrair estados únicos do GeoJSON quando os dados forem carregados
   useEffect(() => {
@@ -337,17 +199,19 @@ function MapaPageContent() {
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#0f172a] to-[#1e293b] text-white">
       {/* Navbar componentizado - apenas com logo e título */}
       <Navbar />
-
-      {/* sidebar */}
+      
+      {/* Layout principal com Sidebar */}
       <div className="flex flex-1">
+        {/* Sidebar */}
         <Sidebar />
+        
         {/* Conteúdo principal */}
         <div className="flex-1 flex flex-col overflow-hidden">
-      
-      {/* Área de busca e título */}
-      <div className="w-full py-3 border-b border-slate-700/50">
-        <div className="w-full max-w-[1400px] mx-auto px-4">
-          <div className="w-full md:max-w-[1200px] mx-auto">
+          
+          {/* Área de busca e título */}
+          <div className="w-full py-3 border-b border-slate-700/50">
+            <div className="w-full max-w-[1400px] mx-auto px-4">
+              <div className="w-full md:max-w-[1200px] mx-auto">
             {/* Buscador de município/estado - alinhado com a logo */}
             <section className="w-full flex flex-col z-10 mb-1 md:mb-0 pl-0">
               <form
@@ -451,38 +315,38 @@ function MapaPageContent() {
               </div>
             </form>
 
-            {erroBusca && <span className="text-red-400 mt-1 text-sm">{erroBusca}</span>}
-          </section>
-        </div>
-        </div>
-      </div>
-
-      {/* Barra de progresso - com margens adequadas */}
-      {loading && <div className="mt-4 px-2">
-        <LoadingProgressBar progress={loadingProgress} />
-      </div>}
-
-      {/* Título centralizado (visível apenas durante o carregamento) */}
-      {loading && (
-        <div className="flex justify-center mt-8 mb-6">
-          <div className="text-center">
-            <h2 className="text-lg font-bold text-gray-300">Informações e Mapa Interativo</h2>
-            <p className="text-xs text-slate-300 mt-1">Visualização detalhada do município</p>
+                {erroBusca && <span className="text-red-400 mt-1 text-sm">{erroBusca}</span>}
+              </section>
+            </div>
+            </div>
           </div>
-        </div>
-      )}
 
-      {/* Conteúdo principal com visualização lado a lado */}
-      <main className="flex-1 w-full flex flex-col items-center justify-center gap-1 p-0.5 md:p-0.5">
-        <div className="w-full max-w-[1400px] mx-auto px-4" ref={dadosRef}>
+          {/* Barra de progresso - com margens adequadas */}
+          {loading && <div className="mt-4 px-2">
+            <LoadingProgressBar progress={loadingProgress} />
+          </div>}
+
+          {/* Título centralizado (visível apenas durante o carregamento) */}
+          {loading && (
+            <div className="flex justify-center mt-8 mb-6">
+              <div className="text-center">
+                <h2 className="text-lg font-bold text-gray-300">Informações e Mapa Interativo</h2>
+                <p className="text-xs text-slate-300 mt-1">Visualização detalhada do município</p>
+              </div>
+            </div>
+          )}
+
+          {/* Conteúdo principal com visualização lado a lado */}
+          <main className="flex-1 w-full flex flex-col items-center justify-center gap-1 p-0.5 md:p-0.5 overflow-y-auto">
+            <div className="w-full max-w-[1400px] mx-auto px-4" ref={dadosRef}>
           {/* Dashboard com informações administrativas */}
           {municipioSelecionado ? (
             <>
               {/* Grid para organizar os containers lado a lado */}
-              <div className="grid grid-cols-1 md:grid-cols-[55fr_45fr] auto-rows-auto gap-1.5 md:max-w-[1200px] mx-auto overflow-visible">
+              <div className="grid grid-cols-1 md:grid-cols-[55fr_45fr] auto-rows-auto gap-1.5 md:max-w-[1200px] mx-auto">
                 {/* Container 1: Município e Gestão (linha 1, coluna 1) */}
                 <div className="bg-[#1e293b] rounded-lg shadow-lg p-0.5 border border-slate-600 animate-fade-in md:col-start-1 md:row-start-1">
-                  <div className="bg-[#0f172a] rounded-lg p-2 flex flex-col transition-all duration-300 hover:bg-[#111a2d] hover:shadow-lg border border-slate-700 relative overflow-visible max-h-[320px] h-full">
+                  <div className="bg-[#0f172a] rounded-lg p-2 flex flex-col transition-all duration-300 hover:bg-[#111a2d] hover:shadow-lg border border-slate-700 relative overflow-hidden max-h-[320px] h-full">
                     {/* Efeito de brilho no canto superior */}
                     <div className="absolute -top-10 -right-10 w-20 h-20 bg-blue-500/10 rounded-full blur-xl"></div>
                     
@@ -492,46 +356,7 @@ function MapaPageContent() {
                           <path fillRule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clipRule="evenodd" />
                         </svg>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-base text-sky-300 font-bold tracking-wide">Município e Gestão</h3>
-                        {pistasDoMunicipio.length > 0 && (
-                          <div 
-                            ref={planeIconRef}
-                            className="ml-2 cursor-pointer select-none"
-                            role="button"
-                            tabIndex={0}
-                            aria-label="Pistas de voo"
-                            aria-haspopup="dialog"
-                            aria-expanded={tooltipVisible}
-                            onMouseEnter={() => setTooltipVisible(true)}
-                            onMouseLeave={() => setTooltipVisible(false)}
-                            onClick={() => setTooltipVisible(v => !v)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                setTooltipVisible(v => !v);
-                              }
-                            }}
-                          >
-                            {/* Ícone tipo lucide (aviação) */}
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              viewBox="0 0 24 24"
-                              width="18"
-                              height="18"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              className="lucide lucide-plane text-slate-300 hover:text-slate-200 transition-colors"
-                            >
-                              <path d="M2 22h20" />
-                              <path d="M9.5 12.5 3 10l1-2 8 2 5-5 3 1-5 5 2 8-2 1-2.5-6.5-3.5 3.5v3l-2 1v-4l3.5-3.5Z" />
-                            </svg>
-                          </div>
-                        )}
-                      </div>
+                      <h3 className="text-base text-sky-300 font-bold tracking-wide">Município e Gestão</h3>
                     </div>
                     
                     {/* Informações em duas colunas com ícones */}
@@ -696,11 +521,12 @@ function MapaPageContent() {
                   Selecione um estado e município acima para visualizar informações detalhadas.
                 </p>
               </div>
+              </div>
+            )}
             </div>
-          )}
+          </main>
+
         </div>
-      </main>
-      </div>
       </div>
 
       {/* Rodapé customizado */}
@@ -715,30 +541,14 @@ function MapaPageContent() {
         onClose={() => setAdvancedModalOpen(false)}
         mapData={mapData}
       />
-
-      {/* Tooltip das pistas de voo via portal */}
-      <PortalTooltip
-        isVisible={tooltipVisible}
-        anchorRef={planeIconRef}
-      >
-        <div className="font-semibold text-sky-300 mb-1 whitespace-nowrap">Pistas de voo</div>
-        <ul className="space-y-1 max-h-60 overflow-auto pr-1">
-          {pistasDoMunicipio.map((p: any, idx: number) => (
-            <li key={idx} className="text-slate-200 whitespace-nowrap">
-              <span className="text-slate-400">{String(p['codigo_pista'] ?? '').trim()}</span>
-              {` - `}
-              <span className="font-medium">{String(p['nome_pista'] ?? '').trim()}</span>
-              {p['tipo_pista'] ? (
-                <span className="text-slate-400"> {` (${String(p['tipo_pista']).trim()})`}</span>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      </PortalTooltip>
     </div>
   );
 }
 
 export default function MapaPage() {
-  return <MapaPageContent />;
-}
+  return (
+    <MapDataProvider>
+      <MapaPageContent />
+    </MapDataProvider>
+  );
+} 

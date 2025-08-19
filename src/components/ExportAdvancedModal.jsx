@@ -58,7 +58,8 @@ function ExportAdvancedModal({ isOpen, onClose, mapData }) {
         name: feature.properties?.nome_municipio || feature.properties?.municipio,
         state: feature.properties?.name_state,
         data: feature.properties
-      })).filter(item => item.name && item.state);
+      })).filter(item => item.name && item.state)
+        .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }));
       
       setAllMunicipalities(municipalities);
 
@@ -213,19 +214,19 @@ function ExportAdvancedModal({ isOpen, onClose, mapData }) {
       setSelectedStates(prev => prev.filter(s => s !== state));
       // Remover municípios do estado desmarcado
       setSelectedMunicipalities(prev => 
-        prev.filter(municipality => {
-          const municipalityData = allMunicipalities.find(m => m.name === municipality);
-          return municipalityData?.state !== state;
+        prev.filter(municipalityKey => {
+          const [name, state_from_key] = municipalityKey.split('|');
+          return state_from_key !== state;
         })
       );
     }
   };
 
-  const handleMunicipalityChange = (municipality, checked) => {
+  const handleMunicipalityChange = (municipalityKey, checked) => {
     if (checked) {
-      setSelectedMunicipalities(prev => [...prev, municipality]);
+      setSelectedMunicipalities(prev => [...prev, municipalityKey]);
     } else {
-      setSelectedMunicipalities(prev => prev.filter(m => m !== municipality));
+      setSelectedMunicipalities(prev => prev.filter(m => m !== municipalityKey));
     }
   };
 
@@ -242,8 +243,8 @@ function ExportAdvancedModal({ isOpen, onClose, mapData }) {
   };
 
   const handleSelectAllMunicipalities = () => {
-    const municipalityNames = filteredMunicipalities.map(m => m.name);
-    setSelectedMunicipalities(municipalityNames);
+    const municipalityKeys = filteredMunicipalities.map(m => `${m.name}|${m.state}`);
+    setSelectedMunicipalities(municipalityKeys);
   };
 
   const handleSelectAllColumns = () => {
@@ -410,9 +411,12 @@ function ExportAdvancedModal({ isOpen, onClose, mapData }) {
       let dataToExport = [];
 
       if (selectedMunicipalities.length > 0) {
-        // Exportar municípios específicos
+        // Exportar municípios específicos (usando chave única estado|município)
         dataToExport = allMunicipalities
-          .filter(municipality => selectedMunicipalities.includes(municipality.name))
+          .filter(municipality => {
+            const municipalityKey = `${municipality.name}|${municipality.state}`;
+            return selectedMunicipalities.includes(municipalityKey);
+          })
           .map(municipality => municipality.data);
       } else if (selectedStates.length > 0) {
         // Exportar todos os municípios dos estados selecionados
@@ -569,17 +573,20 @@ function ExportAdvancedModal({ isOpen, onClose, mapData }) {
               </div>
               <div className="border border-gray-200 rounded-lg p-3 max-h-64 overflow-y-auto">
                 {filteredMunicipalities.length > 0 ? (
-                  filteredMunicipalities.map(municipality => (
-                    <label key={`${municipality.name}-${municipality.state}`} className="flex items-center py-1">
-                      <input
-                        type="checkbox"
-                        checked={selectedMunicipalities.includes(municipality.name)}
-                        onChange={(e) => handleMunicipalityChange(municipality.name, e.target.checked)}
-                        className="rounded border-gray-300 mr-3"
-                      />
-                      <span className="text-sm text-gray-700">{municipality.name} - {municipality.state}</span>
-                    </label>
-                  ))
+                  filteredMunicipalities.map(municipality => {
+                    const municipalityKey = `${municipality.name}|${municipality.state}`;
+                    return (
+                      <label key={`${municipality.name}-${municipality.state}`} className="flex items-center py-1">
+                        <input
+                          type="checkbox"
+                          checked={selectedMunicipalities.includes(municipalityKey)}
+                          onChange={(e) => handleMunicipalityChange(municipalityKey, e.target.checked)}
+                          className="rounded border-gray-300 mr-3"
+                        />
+                        <span className="text-sm text-gray-700">{municipality.name} - {municipality.state}</span>
+                      </label>
+                    );
+                  })
                 ) : (
                   <p className="text-sm text-gray-500 text-center py-4">
                     {selectedStates.length === 0 ? 'Selecione um estado primeiro' : 'Nenhum município encontrado'}

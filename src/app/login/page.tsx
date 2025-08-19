@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation"; // Hook para navegação
 import { motion } from "framer-motion"; // Biblioteca de animações
 import Image from "next/image"; // Importação do componente Image
 import { FaEye, FaEyeSlash } from 'react-icons/fa'; // Ícones para mostrar/ocultar senha
+import { useUser } from "@/contexts/UserContext"; // Hook para dados do usuário
 
 export default function LoginPage() {
   // Estados para controle do formulário
@@ -21,6 +22,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false); // Estado para mostrar/ocultar senha
   const [isFadingOut, setIsFadingOut] = useState(false); // Estado para fade out
   const router = useRouter(); // Hook de navegação
+  const { setUser } = useUser(); // Hook para definir dados do usuário
 
   /**
    * Manipula o envio do formulário de login
@@ -42,6 +44,11 @@ export default function LoginPage() {
       }
       
       if (data.success) {
+        // Define os dados do usuário no contexto
+        if (data.user) {
+          setUser(data.user);
+        }
+        
         // Espera um momento para o cookie ser definido
         await new Promise(resolve => setTimeout(resolve, 100));
         // Inicia fade out

@@ -27,8 +27,8 @@ export async function POST(request: Request) {
     // Busca o usuário no Postgres por e-mail OU username.
     // Usamos $queryRaw para conseguir ler a coluna platforms mesmo que não esteja no schema Prisma.
     const rows = await prisma.$queryRaw<
-      { id: number; email: string | null; username: string | null; hash: string; role: string | null; platforms: unknown; }[]
-    >`SELECT id, email, username, hash, role, platforms
+      { id: number; email: string | null; username: string | null; hash: string; role: string | null; platforms: unknown; name: string | null; cargo: string | null; photo: string | null; }[]
+    >`SELECT id, email, username, hash, role, platforms, name, cargo, photo
       FROM "users"
       WHERE email ILIKE ${identifier} OR username ILIKE ${identifier}
       LIMIT 1`;
@@ -94,7 +94,18 @@ export async function POST(request: Request) {
       maxAge: 3600 // 1 hora
     });
 
-    return new Response(JSON.stringify({ success: true, role: dbUser.role }), {
+    return new Response(JSON.stringify({ 
+      success: true, 
+      user: {
+        id: dbUser.id,
+        username: dbUser.username,
+        email: dbUser.email,
+        role: dbUser.role,
+        name: dbUser.name,
+        cargo: dbUser.cargo,
+        photo: dbUser.photo
+      }
+    }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });

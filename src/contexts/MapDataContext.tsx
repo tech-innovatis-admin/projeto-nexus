@@ -8,6 +8,7 @@ interface MapData {
   produtos: any;
   pdvencendo: any;
   parceiros: any;
+  pistas: any[] | null;
 }
 
 interface MapDataContextType {
@@ -56,7 +57,18 @@ export function MapDataProvider({ children }: { children: React.ReactNode }) {
           produtos: null,
           pdvencendo: files.find((f: any) => f.name === 'base_pd_vencendo.geojson')?.data || null,
           parceiros: files.find((f: any) => f.name === 'parceiros1.json')?.data || null,
+          pistas: files.find((f: any) => f.name === 'pistas_s3.csv')?.data || null,
         };
+        try {
+          console.log('[MapData] dados.features:', organizedData.dados?.features?.length ?? 0,
+            '| pdsemplano:', organizedData.pdsemplano?.features?.length ?? 0,
+            '| pdvencendo:', organizedData.pdvencendo?.features?.length ?? 0,
+            '| parceiros:', Array.isArray(organizedData.parceiros) ? organizedData.parceiros.length : 0,
+            '| pistas:', Array.isArray(organizedData.pistas) ? organizedData.pistas.length : 0);
+          if (Array.isArray(organizedData.pistas) && organizedData.pistas.length > 0) {
+            console.log('[MapData] exemplo de pista:', organizedData.pistas[0]);
+          }
+        } catch {}
   
         setLoadingProgress(100);
         setMapData(organizedData);
@@ -76,8 +88,10 @@ export function MapDataProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
+    // Evita recarregar se os dados já estiverem presentes (em navegações entre páginas)
+    if (mapData) return;
     loadData();
-  }, []);
+  }, [mapData]);
 
   const refreshData = async () => {
     await loadData();

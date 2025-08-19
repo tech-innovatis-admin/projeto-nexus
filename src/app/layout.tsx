@@ -9,6 +9,9 @@ import type { Metadata } from "next";
 import "./globals.css";
 // Componente 3D da NEXUS
 import Nexus3D from "../components/Nexus3D";
+// Contexto do usuário
+import { UserProvider } from "../contexts/UserContext";
+import { MapDataProvider } from "../contexts/MapDataContext";
 
 // Metadados da aplicação (SEO e configurações da página)
 export const metadata: Metadata = {
@@ -34,7 +37,11 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
       <body className="antialiased">
-        {children}
+        <UserProvider>
+          <MapDataProvider>
+            {children}
+          </MapDataProvider>
+        </UserProvider>
       </body>
     </html>
   )

@@ -305,7 +305,7 @@ export default function MapLibreMock({ uf = 'ALL', polo = 'ALL', minValue, maxVa
   }, [uf, polo, minValue, maxValue]);
 
   return (
-    <div className="relative w-full h-[520px] rounded-xl overflow-hidden border border-slate-700/50 bg-[#0f172a] shadow-2xl">
+    <div className="relative w-full h-[350px] rounded-xl overflow-hidden border border-slate-700/50 bg-[#0f172a] shadow-2xl">
       {/* Loading overlay */}
       {isLoading && (
         <div className="absolute inset-0 bg-[#0f172a] flex items-center justify-center z-10">

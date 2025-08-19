@@ -167,9 +167,9 @@ export default function EstrategiaPage() {
         <Sidebar />
         
         {/* Conteúdo principal */}
-        <main className="flex-1 flex flex-col overflow-hidden">
+        <main className="flex-1 flex flex-col overflow-hidden max-h-screen">
           {/* Header da página */}
-          <div className="p-6 border-b border-slate-700/50">
+          <div className="p-4 border-b border-slate-700/50">
             <div className="max-w-7xl mx-auto">
               <motion.div
                 initial={{ opacity: 0, y: -20 }}
@@ -187,8 +187,8 @@ export default function EstrategiaPage() {
           </div>
 
           {/* Conteúdo scrollável */}
-          <div className="flex-1 overflow-y-auto p-6">
-            <div className="max-w-7xl mx-auto space-y-4">
+          <div className="flex-1 overflow-y-auto p-4">
+            <div className="max-w-7xl mx-auto space-y-3">
               
               {/* Seção de Filtros */}
               <motion.section

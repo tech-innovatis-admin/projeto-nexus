@@ -33,9 +33,12 @@ interface MapFiltersProps {
   polo?: string; // ex.: 'Polo 1' ou 'ALL'
   minValue?: number;
   maxValue?: number;
+  onRunwayClick?: (runway: any, bbox: [number, number, number, number], map: Map) => void;
+  /** callback disparado quando o mapa está pronto */
+  onMapReady?: (map: Map) => void;
 }
 
-export default function MapLibreMock({ uf = 'ALL', polo = 'ALL', minValue, maxValue }: MapFiltersProps) {
+export default function MapLibreMock({ uf = 'ALL', polo = 'ALL', minValue, maxValue, onRunwayClick, onMapReady }: MapFiltersProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Map | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -100,6 +103,40 @@ export default function MapLibreMock({ uf = 'ALL', polo = 'ALL', minValue, maxVa
     } as GeoJSON.FeatureCollection;
   }, []);
 
+  // Mock de pistas (runways) como LineString
+  const runways = useMemo(() => {
+    // Criamos algumas linhas simples perto dos aeródromos
+    const lines = [
+      [
+        [-34.90, -7.12],
+        [-34.88, -7.11]
+      ],
+      [
+        [-35.32, -7.24],
+        [-35.30, -7.23]
+      ],
+      [
+        [-36.00, -7.01],
+        [-35.98, -7.00]
+      ]
+    ] as LngLat[][];
+    return {
+      type: 'FeatureCollection',
+      features: lines.map((coords, idx) => ({
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: coords },
+        properties: {
+          id: `runway-${idx+1}`,
+          name: `Pista ${idx+1}`,
+          length: 1200 + idx * 150, // metros mock
+          surface: idx % 2 === 0 ? 'Asfalto' : 'Concreto'
+        }
+      }))
+    } as GeoJSON.FeatureCollection;
+  }, []);
+
+  
+
   // Bounding box dos polígonos de polos (para gerar pontos aleatórios dentro desta área)
   const polosBbox = useMemo(() => {
     const coords = (polos.features as any[]).map((f: any) => (f.geometry as any).coordinates);
@@ -140,7 +177,7 @@ export default function MapLibreMock({ uf = 'ALL', polo = 'ALL', minValue, maxVa
       container: containerRef.current,
       style: mapStyle,
       center: [-36.0, -7.1],
-      zoom: 7,
+      zoom: 6.5, // Zoom inicial mais aberto
       pitch: 0,
       bearing: 0
     });
@@ -151,7 +188,7 @@ export default function MapLibreMock({ uf = 'ALL', polo = 'ALL', minValue, maxVa
 
     mapRef.current = map;
 
-    map.on("load", () => {
+  map.on("load", () => {
       setIsLoading(false);
       
       // Ajuste de aparência do raster para ficar mais claro e legível
@@ -172,6 +209,13 @@ export default function MapLibreMock({ uf = 'ALL', polo = 'ALL', minValue, maxVa
         map.addSource("polos", {
           type: "geojson",
           data: polos
+        });
+      }
+
+      if (!map.getSource('runways')) {
+        map.addSource('runways', {
+          type: 'geojson',
+          data: runways
         });
       }
 
@@ -211,8 +255,45 @@ export default function MapLibreMock({ uf = 'ALL', polo = 'ALL', minValue, maxVa
         });
       }
 
-      // Interações melhoradas com popups customizados
+  // Interações melhoradas com popups customizados
       map.on("click", "aerodromes-points", (e) => {
+      // Camada de pistas (linhas)
+      if (!map.getLayer('runways-line')) {
+        map.addLayer({
+          id: 'runways-line',
+          type: 'line',
+            source: 'runways',
+            layout: {
+              'line-cap': 'round',
+              'line-join': 'round'
+            },
+            paint: {
+              'line-width': 4,
+              'line-color': '#10b981', // emerald-500
+              'line-opacity': 0.85
+            }
+        });
+      }
+
+      // Hover cursor
+      map.on('mouseenter', 'runways-line', () => {
+        map.getCanvas().style.cursor = 'pointer';
+      });
+      map.on('mouseleave', 'runways-line', () => {
+        map.getCanvas().style.cursor = '';
+      });
+
+      // Clique em pista
+      map.on('click', 'runways-line', (e) => {
+        const feature = e.features?.[0];
+        if (!feature) return;
+        const geom: any = feature.geometry;
+        const lineCoords: any = geom.coordinates;
+        const bbox = computeBbox(lineCoords as any);
+        if (onRunwayClick) {
+          onRunwayClick(feature.properties, bbox, map);
+        }
+      });
         const feature = e.features?.[0];
         if (!feature) return;
         const coords = (feature.geometry as any).coordinates as LngLat;
@@ -260,17 +341,22 @@ export default function MapLibreMock({ uf = 'ALL', polo = 'ALL', minValue, maxVa
       const maxX = Math.max(bboxA[2], bboxP[2]);
       const maxY = Math.max(bboxA[3], bboxP[3]);
 
-      map.fitBounds([
-        [minX, minY],
-        [maxX, maxY]
-      ], { padding: 40, duration: 600 });
+  map.fitBounds([
+        [minX - 0.8, minY - 0.8], // Expandimos a área visível adicionando margem
+        [maxX + 0.5, maxY + 0.5]
+      ], { 
+        padding: { top: 50, bottom: 50, left: 50, right: 50 }, 
+        duration: 600 
+      });
+
+  if (onMapReady) onMapReady(map);
     });
 
     return () => {
       map.remove();
       mapRef.current = null;
     };
-  }, [aerodromes, polos, mapStyle]);
+  }, [aerodromes, polos, runways, mapStyle]);
 
   // Aplica filtros nas camadas quando props mudarem
   useEffect(() => {
@@ -305,7 +391,7 @@ export default function MapLibreMock({ uf = 'ALL', polo = 'ALL', minValue, maxVa
   }, [uf, polo, minValue, maxValue]);
 
   return (
-    <div className="relative w-full h-[350px] rounded-xl overflow-hidden border border-slate-700/50 bg-[#0f172a] shadow-2xl">
+    <div className="relative w-full h-[450px] rounded-xl overflow-hidden border border-slate-700/50 bg-[#0f172a] shadow-2xl">
       {/* Loading overlay */}
       {isLoading && (
         <div className="absolute inset-0 bg-[#0f172a] flex items-center justify-center z-10">
@@ -318,36 +404,6 @@ export default function MapLibreMock({ uf = 'ALL', polo = 'ALL', minValue, maxVa
 
       {/* Mapa */}
       <div ref={containerRef} className="w-full h-full" />
-
-      {/* Legenda */}
-      {showLegend && !isLoading && (
-        <div className="absolute top-4 left-4 bg-[#1e293b]/95 backdrop-blur-sm rounded-lg p-4 border border-slate-700/50 shadow-lg">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-white text-sm font-semibold">Legenda</h3>
-            <button
-              onClick={() => setShowLegend(false)}
-              className="text-slate-400 hover:text-white transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          <div className="space-y-3">
-            <div className="flex items-center gap-3">
-              <div className="w-4 h-4 rounded-full bg-amber-500 border-2 border-white"></div>
-              <span className="text-slate-300 text-xs">Aeródromos (5)</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-4 h-4 rounded-sm bg-sky-500 border border-sky-400"></div>
-              <span className="text-slate-300 text-xs">Polos Estratégicos (5)</span>
-            </div>
-          </div>
-          <div className="mt-3 pt-3 border-t border-slate-600">
-            <p className="text-slate-500 text-xs">Dados fictícios para demonstração</p>
-          </div>
-        </div>
-      )}
 
       {/* Botão para mostrar legenda quando oculta */}
       {!showLegend && !isLoading && (

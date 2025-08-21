@@ -362,7 +362,7 @@ export default function EstrategiaPage() {
                     
                     {/* Botão de Buscar */}
                     <div className="flex flex-col justify-end">
-                      <label className="text-slate-300 text-xs mb-0.5 text-center font-bold opacity-0">BUSCAR</label>
+                      <label className="text-slate-300 text-xs mb-0.5 text-center font-bold opacity-0">Buscar</label>
                       <button
                         onClick={() => {
                           setAppliedUF(selectedUF);

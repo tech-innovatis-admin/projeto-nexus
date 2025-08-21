@@ -80,12 +80,12 @@ export default function Sidebar({ className = '' }: SidebarProps) {
         {/* Conteúdo principal do sidebar */}
         <div className="p-3">
           {/* Seção do usuário */}
-          <div className="flex items-center gap-2 mb-6">
+          <div className="flex items-center gap-3 mb-6">
             {user?.photo ? (
               <img 
                 src={user.photo.startsWith('data:image') ? user.photo : `data:image/jpeg;base64,${user.photo}`}
                 alt="Foto de perfil"
-                className="w-12 h-12 rounded-[20px] object-cover"
+                className="w-16 h-16 rounded-[24px] object-cover"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
                   target.style.display = 'none';
@@ -94,8 +94,8 @@ export default function Sidebar({ className = '' }: SidebarProps) {
               />
             ) : null}
             {/* Fallback para quando a imagem não carregar ou não existir */}
-            <div className={`${user?.photo ? 'hidden' : 'flex'} w-12 h-12 rounded-[20px] bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center`}>
-              <span className="text-white text-sm font-bold">
+            <div className={`${user?.photo ? 'hidden' : 'flex'} w-16 h-16 rounded-[24px] bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center`}>
+              <span className="text-white text-lg font-bold">
                 {user?.name ? user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'US'}
               </span>
             </div>
@@ -107,10 +107,10 @@ export default function Sidebar({ className = '' }: SidebarProps) {
                 overflow-hidden whitespace-nowrap
               `}
             >
-              <span className="text-white text-sm font-medium">
-                {user?.name || user?.name || 'Usuário'}
+              <span className="text-white text-base font-semibold">
+                {user?.name || 'Usuário'}
               </span>
-              <span className="text-gray-400 text-xs">
+              <span className="text-gray-400 text-sm">
                 {user?.cargo || 'Colaborador'}
               </span>
             </div>

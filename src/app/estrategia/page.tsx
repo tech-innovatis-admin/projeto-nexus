@@ -8,6 +8,7 @@ import MiniFooter from '@/components/MiniFooter';
 import ScrollToTopButton from '@/components/ScrollToTopButton';
 import dynamic from 'next/dynamic';
 import { AnimatePresence } from 'framer-motion';
+import styles from './page.module.css';
 
 // Tipagem dos dados dos polos
 interface MunicipioRanking {
@@ -346,7 +347,7 @@ export default function EstrategiaPage() {
                           value={minValor}
                           onChange={(e) => setMinValor(e.target.value === '' ? '' : Number(e.target.value))}
                           placeholder="Mínimo"
-                          className="bg-[#0f172a] text-slate-200 border border-slate-700/50 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-colors"
+                          className={`bg-[#0f172a] text-slate-200 border border-slate-700/50 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-colors ${styles['input-number']}`}
                         />
                         <input
                           type="number"
@@ -355,7 +356,7 @@ export default function EstrategiaPage() {
                           value={maxValor}
                           onChange={(e) => setMaxValor(e.target.value === '' ? '' : Number(e.target.value))}
                           placeholder="Máximo"
-                          className="bg-[#0f172a] text-slate-200 border border-slate-700/50 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-colors"
+                          className={`bg-[#0f172a] text-slate-200 border border-slate-700/50 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-colors ${styles['input-number']}`}
                         />
                       </div>
                     </div>

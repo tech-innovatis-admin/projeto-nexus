@@ -255,27 +255,25 @@ export default function MapLibreMock({ uf = 'ALL', polo = 'ALL', minValue, maxVa
         });
       }
 
-  // Interações melhoradas com popups customizados
-      map.on("click", "aerodromes-points", (e) => {
       // Camada de pistas (linhas)
       if (!map.getLayer('runways-line')) {
         map.addLayer({
           id: 'runways-line',
           type: 'line',
-            source: 'runways',
-            layout: {
-              'line-cap': 'round',
-              'line-join': 'round'
-            },
-            paint: {
-              'line-width': 4,
-              'line-color': '#10b981', // emerald-500
-              'line-opacity': 0.85
-            }
+          source: 'runways',
+          layout: {
+            'line-cap': 'round',
+            'line-join': 'round'
+          },
+          paint: {
+            'line-width': 4,
+            'line-color': '#10b981', // emerald-500
+            'line-opacity': 0.85
+          }
         });
       }
 
-      // Hover cursor
+      // Hover cursor para pistas
       map.on('mouseenter', 'runways-line', () => {
         map.getCanvas().style.cursor = 'pointer';
       });
@@ -294,6 +292,9 @@ export default function MapLibreMock({ uf = 'ALL', polo = 'ALL', minValue, maxVa
           onRunwayClick(feature.properties, bbox, map);
         }
       });
+
+      // Interações melhoradas com popups customizados para aeródromos
+      map.on("click", "aerodromes-points", (e) => {
         const feature = e.features?.[0];
         if (!feature) return;
         const coords = (feature.geometry as any).coordinates as LngLat;

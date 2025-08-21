@@ -102,11 +102,18 @@ export default function EstrategiaPage() {
   const [selectedMetric, setSelectedMetric] = useState('overview');
   const [showMunicipiosList, setShowMunicipiosList] = useState(false);
   const [isCardFlipped, setIsCardFlipped] = useState(false);
-  // Filtros (mock)
+  
+  // Filtros selecionados (não aplicados ainda)
   const [selectedUF, setSelectedUF] = useState<string>('ALL');
   const [selectedPolo, setSelectedPolo] = useState<string>('ALL');
   const [minValor, setMinValor] = useState<number | ''>('');
   const [maxValor, setMaxValor] = useState<number | ''>('');
+  
+  // Filtros aplicados (após clicar em buscar)
+  const [appliedUF, setAppliedUF] = useState<string>('ALL');
+  const [appliedPolo, setAppliedPolo] = useState<string>('ALL');
+  const [appliedMinValor, setAppliedMinValor] = useState<number | ''>('');
+  const [appliedMaxValor, setAppliedMaxValor] = useState<number | ''>('');
 
   // Dados mock dos polos para demonstração
   const polosData: PolosData = {
@@ -183,13 +190,13 @@ export default function EstrategiaPage() {
   };
 
   // Dados dinâmicos dos cards baseados no polo selecionado
-  const currentPoloData = polosData[selectedPolo] || polosData['ALL'];
+  const currentPoloData = polosData[appliedPolo] || polosData['ALL'];
 
   // Reset da lista de municípios quando o polo mudar
   useEffect(() => {
     setShowMunicipiosList(false);
     setIsCardFlipped(false);
-  }, [selectedPolo]);
+  }, [appliedPolo]);
 
   // Handler para eventos de teclado nos cards
   const handleCardKeyDown = (event: KeyboardEvent<HTMLDivElement>, metricId: string) => {
@@ -208,7 +215,7 @@ export default function EstrategiaPage() {
       title: 'Valor do Polo',
 
       value: currentPoloData.valorTotal, // Passamos o valor numérico para a animação
-      subtitle: selectedPolo === 'ALL' ? 'Todos os Polos' : selectedPolo,
+      subtitle: appliedPolo === 'ALL' ? 'Todos os Polos' : appliedPolo,
       description: 'Valor total potencial...'
     },
     {
@@ -223,8 +230,8 @@ export default function EstrategiaPage() {
       title: 'Municípios do Polo',
 
       value: currentPoloData.totalMunicipios.toString(),
-      subtitle: selectedPolo === 'ALL' ? 'Municípios Totais' : 'Municípios no Polo',
-      description: selectedPolo === 'ALL' ? '• Clique para ver lista de municípios' : 'Municípios que fazem parte deste polo • Clique para ver lista'
+      subtitle: appliedPolo === 'ALL' ? 'Municípios Totais' : 'Municípios no Polo',
+      description: appliedPolo === 'ALL' ? '• Clique para ver lista de municípios' : 'Municípios que fazem parte deste polo • Clique para ver lista'
     }
   ];
 
@@ -233,7 +240,7 @@ export default function EstrategiaPage() {
   const [isRunwayOpen, setIsRunwayOpen] = useState(false);
 
   // Largura alvo do painel
-  const PANEL_WIDTH = 415; // px
+  const PANEL_WIDTH = 420; // px
 
   const handleRunwayClick = (runway: any, bbox: [number, number, number, number], mapInstance: any) => {
     setSelectedRunway(runway);
@@ -277,7 +284,7 @@ export default function EstrategiaPage() {
                 transition={{ duration: 0.5 }}
               >
                 <h1 className="text-3xl font-bold text-white mb-2">
-                  Análise Estratégica de <span className="text-blue-500">Produtos</span>
+                  Análise Estratégica de <span className="text-sky-400">Produtos</span>
                 </h1>
               </motion.div>
             </div>
@@ -294,7 +301,7 @@ export default function EstrategiaPage() {
                 transition={{ duration: 0.5, delay: 0.1 }}
               >
                 <div className="bg-[#1e293b] border border-slate-700/50 rounded-lg p-3">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                     {/* UF */}
                     <div className="flex flex-col">
                       <label className="text-slate-300 text-xs mb-0.5 text-center font-bold">ESTADO</label>
@@ -339,7 +346,7 @@ export default function EstrategiaPage() {
                           value={minValor}
                           onChange={(e) => setMinValor(e.target.value === '' ? '' : Number(e.target.value))}
                           placeholder="Mínimo"
-                          className="bg-[#0f172a] text-slate-200 border border-slate-700/50 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-colors"
+                          className="bg-[#0f172a] text-red-200 border border-slate-700/50 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-colors"
                         />
                         <input
                           type="number"
@@ -351,7 +358,27 @@ export default function EstrategiaPage() {
                           className="bg-[#0f172a] text-slate-200 border border-slate-700/50 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-colors"
                         />
                       </div>
-
+                    </div>
+                    
+                    {/* Botão de Buscar */}
+                    <div className="flex flex-col justify-end">
+                      <label className="text-slate-300 text-xs mb-0.5 text-center font-bold opacity-0">BUSCAR</label>
+                      <button
+                        onClick={() => {
+                          setAppliedUF(selectedUF);
+                          setAppliedPolo(selectedPolo);
+                          setAppliedMinValor(minValor);
+                          setAppliedMaxValor(maxValor);
+                        }}
+                        className="bg-sky-600 hover:bg-sky-700 text-white px-4 py-1.5 rounded-md font-medium transition-colors duration-200 flex items-center justify-center gap-2 h-[38px]"
+                      >
+                        <span>
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 104.5 4.5a7.5 7.5 0 0012.15 12.15z" />
+                          </svg>
+                        </span>
+                        <span>Buscar</span>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -362,9 +389,9 @@ export default function EstrategiaPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.2 }}
-                className="mt-2"
+                className="mt-2 mb-2"
               >
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                   {metrics.map((metric, index) => (
                     <Fragment key={metric.id}>
                       {metric.id === 'municipios_polo' ? (
@@ -417,7 +444,7 @@ export default function EstrategiaPage() {
                                   />
                                 </p>
                                 <div className="flex flex-col items-start leading-tight">
-                                  <span className="text-slate-200 text-xl md:text-2xl font-semibold">
+                                  <span className="text-sky-400 text-xl md:text-2xl font-semibold">
                                     {currentPoloData.totalMunicipios === 1 ? 'Município' : 'Municípios'}
                                   </span>
                                   <span className="text-slate-400 text-base md:text-lg">No Polo</span>
@@ -528,7 +555,7 @@ export default function EstrategiaPage() {
                                   <p className="font-extrabold text-emerald-400 text-5xl">
                                     <AnimatedCurrency
                                       targetValue={metric.value as number}
-                                      selectedPolo={selectedPolo}
+                                      selectedPolo={appliedPolo}
                                     />
                                   </p>
                                 </div>
@@ -541,7 +568,7 @@ export default function EstrategiaPage() {
                                     {metric.id === 'municipios_polo' ? (
                                       <AnimatedNumber
                                         targetValue={currentPoloData.totalMunicipios}
-                                        selectedPolo={selectedPolo}
+                                        selectedPolo={appliedPolo}
                                       />
                                     ) : (
                                       metric.value
@@ -567,7 +594,7 @@ export default function EstrategiaPage() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: 0.5 }}
-                  className="mt-2"
+                  className="mt-2 mb-2"
                 >
                   {/* Desktop / md+ */}
                   <div className="hidden md:block">
@@ -575,14 +602,14 @@ export default function EstrategiaPage() {
                       className="grid w-full rounded-xl overflow-hidden"
                       animate={{ gridTemplateColumns: isRunwayOpen ? `1fr ${PANEL_WIDTH}px` : '1fr 0px' }}
                       transition={{ type: 'spring', stiffness: 120, damping: 20 }}
-                      style={{ gap: isRunwayOpen ? '16px' : '0px' }}
+                      style={{ gap: isRunwayOpen ? '10px' : '0px' }}
                     >
                       <div className="h-[450px]">
                         <DynamicMapLibreMock
-                          uf={selectedUF}
-                          polo={selectedPolo}
-                          minValue={minValor === '' ? undefined : minValor}
-                          maxValue={maxValor === '' ? undefined : maxValor}
+                          uf={appliedUF}
+                          polo={appliedPolo}
+                          minValue={appliedMinValor === '' ? undefined : appliedMinValor}
+                          maxValue={appliedMaxValor === '' ? undefined : appliedMaxValor}
                           onRunwayClick={handleRunwayClick}
                         />
                       </div>
@@ -630,10 +657,10 @@ export default function EstrategiaPage() {
                   <div className="md:hidden">
                     <div className="h-[415px] relative">
                       <DynamicMapLibreMock
-                        uf={selectedUF}
-                        polo={selectedPolo}
-                        minValue={minValor === '' ? undefined : minValor}
-                        maxValue={maxValor === '' ? undefined : maxValor}
+                        uf={appliedUF}
+                        polo={appliedPolo}
+                        minValue={appliedMinValor === '' ? undefined : appliedMinValor}
+                        maxValue={appliedMaxValor === '' ? undefined : appliedMaxValor}
                         onRunwayClick={handleRunwayClick}
                       />
                       <AnimatePresence>

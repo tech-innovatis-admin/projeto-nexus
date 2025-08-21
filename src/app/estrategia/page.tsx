@@ -346,7 +346,7 @@ export default function EstrategiaPage() {
                           value={minValor}
                           onChange={(e) => setMinValor(e.target.value === '' ? '' : Number(e.target.value))}
                           placeholder="Mínimo"
-                          className="bg-[#0f172a] text-red-200 border border-slate-700/50 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-colors"
+                          className="bg-[#0f172a] text-slate-200 border border-slate-700/50 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-colors"
                         />
                         <input
                           type="number"

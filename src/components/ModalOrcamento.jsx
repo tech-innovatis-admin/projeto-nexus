@@ -201,6 +201,9 @@ function ModalOrcamento({ isOpen, onClose, mapData }) {
                   ))}
                 </div>
               </div>
+              <p className="text-xs text-gray-500 text-center mt-2 px-3">
+                {selectedStates.length} de {allStates.length} selecionados
+              </p>
             </div>
 
             {/* Municípios */}
@@ -244,6 +247,9 @@ function ModalOrcamento({ isOpen, onClose, mapData }) {
                   })}
                 </div>
               </div>
+              <p className="text-xs text-gray-500 text-center mt-2 px-3">
+                {selectedMunicipalities.length} de {filteredMunicipalities.length} selecionados
+              </p>
             </div>
           </div>
 

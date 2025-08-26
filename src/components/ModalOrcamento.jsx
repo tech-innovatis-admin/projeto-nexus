@@ -165,9 +165,14 @@ function ModalOrcamento({ isOpen, onClose, mapData }) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Estados */}
             <div className="border border-gray-200 rounded-md">
-              <div className="px-3 py-2 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-                <span className="font-medium text-gray-800">Estados</span>
-                <div className="space-x-2">
+              <div className="px-3 py-2 border-b border-gray-200 bg-gray-50 flex items-center justify-between relative">
+                <div className="absolute inset-x-0 text-center">
+                  <span className="font-medium text-gray-800">Estados</span>
+                </div>
+                <div className="invisible">
+                  <span className="font-medium text-gray-800">Estados</span>
+                </div>
+                <div className="space-x-2 z-10">
                   <button className="text-xs font-semibold text-sky-600 hover:text-sky-900 px-2 py-1 rounded border border-sky-200 hover:bg-sky-50 transition-colors min-w-[50px] inline-block" onClick={() => setSelectedStates([...allStates])}>Todos</button>
                   <button className="text-xs font-semibold text-sky-600 hover:text-sky-900 px-2 py-1 rounded border border-sky-200 hover:bg-sky-50 transition-colors min-w-[50px] inline-block" onClick={() => setSelectedStates([])}>Nenhum</button>
                 </div>
@@ -200,9 +205,14 @@ function ModalOrcamento({ isOpen, onClose, mapData }) {
 
             {/* Municípios */}
             <div className="border border-gray-200 rounded-md">
-              <div className="px-3 py-2 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-                <span className="font-medium text-gray-800">Municípios</span>
-                <div className="space-x-2">
+              <div className="px-3 py-2 border-b border-gray-200 bg-gray-50 flex items-center justify-between relative">
+                <div className="absolute inset-x-0 text-center">
+                  <span className="font-medium text-gray-800">Municípios</span>
+                </div>
+                <div className="invisible">
+                  <span className="font-medium text-gray-800">Municípios</span>
+                </div>
+                <div className="space-x-2 z-10">
                   <button className="text-xs font-semibold text-sky-600 hover:text-sky-900 px-2 py-1 rounded border border-sky-200 hover:bg-sky-50 transition-colors min-w-[50px] inline-block" onClick={() => setSelectedMunicipalities(filteredMunicipalities.map(m => municipalityKey(m)))}>Todos</button>
                   <button className="text-xs font-semibold text-sky-600 hover:text-sky-900 px-2 py-1 rounded border border-sky-200 hover:bg-sky-50 transition-colors min-w-[50px] inline-block" onClick={() => setSelectedMunicipalities([])}>Nenhum</button>
                 </div>

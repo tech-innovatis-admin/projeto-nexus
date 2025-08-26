@@ -864,9 +864,9 @@ function ExportAdvancedModal({ isOpen, onClose, mapData }) {
                 value={exportFileName}
                 onChange={(e) => setExportFileName(e.target.value)}
                 placeholder="ex.: minha_exportacao"
-                className="w-full max-w-sm text-sm border rounded px-3 py-2 text-gray-700"
+                className="w-full max-w-sm text-sm border border-gray-300 rounded px-3 py-2 text-gray-700"
               />
-              <span className="text-xs text-gray-500">.xlsx</span>
+              <span className="text-xs text-gray-700">.xlsx</span>
             </div>
           </div>
         </div>

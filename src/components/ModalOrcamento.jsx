@@ -267,11 +267,11 @@ function ModalOrcamento({ isOpen, onClose, mapData }) {
             <div className="flex items-center gap-4">
               <label className="text-black flex items-center gap-2 text-sm">
                 <input type="radio" name="mode" value="merged" checked={mode === 'merged'} onChange={() => setMode('merged')} />
-                <span>PDF único (mesclado)</span>
+                <span>PDF</span>
               </label>
               <label className="text-black flex items-center gap-2 text-sm">
                 <input type="radio" name="mode" value="zip" checked={mode === 'zip'} onChange={() => setMode('zip')} />
-                <span>ZIP (múltiplos PDFs)</span>
+                <span>ZIP</span>
               </label>
             </div>
 

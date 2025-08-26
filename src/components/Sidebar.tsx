@@ -9,7 +9,16 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ className = '' }: SidebarProps) {
-  const [isOpen, setIsOpen] = useState(false);
+  // Usar localStorage para persistir o estado do sidebar entre navegações
+  const [isOpen, setIsOpen] = useState(() => {
+    // Verificar se estamos no cliente antes de acessar localStorage
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('sidebarOpen');
+      return saved === 'true';
+    }
+    return false;
+  });
+  
   const router = useRouter();
   const pathname = usePathname();
   const { user, setUser } = useUser();
@@ -40,11 +49,17 @@ export default function Sidebar({ className = '' }: SidebarProps) {
       handleLogout();
       return;
     }
+    // Apenas navega para a rota, sem alterar o estado do sidebar
     router.push(path);
   };
 
   const toggleSidebar = () => {
-    setIsOpen(!isOpen);
+    const newState = !isOpen;
+    setIsOpen(newState);
+    // Salvar o estado no localStorage para persistir entre navegações
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('sidebarOpen', String(newState));
+    }
   };
 
   const handleLogout = async () => {

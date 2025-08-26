@@ -420,6 +420,7 @@ function MapaPageContent() {
                   } : null}
                   className="w-full md:w-auto"
                   onOpenAdvanced={() => setAdvancedModalOpen(true)}
+                  mapData={mapData}
                 />
 
                 <button

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, KeyboardEvent, Fragment } from 'react';
+import { useState, useEffect, useMemo, KeyboardEvent, Fragment } from 'react';
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import Navbar from '@/components/Navbar';
 import Sidebar from '@/components/Sidebar';
@@ -8,34 +8,38 @@ import MiniFooter from '@/components/MiniFooter';
 import ScrollToTopButton from '@/components/ScrollToTopButton';
 import dynamic from 'next/dynamic';
 import { AnimatePresence } from 'framer-motion';
+import { fetchGeoJSONWithCache } from '@/utils/cacheGeojson';
 import styles from './page.module.css';
+// Evita SSR para o mapa (MapLibre), prevenindo avisos de hidratação
+const MapLibrePolygons = dynamic(() => import('@/components/MapLibrePolygons'), { ssr: false });
 
-// Tipagem dos dados dos polos
+// Tipagens para as duas bases reais
+interface PoloValoresProps {
+  codigo_origem: string;
+  municipio_origem: string;
+  soma_valor_total_destino: number;
+  valor_total_origem: number;
+  UF_origem?: string;
+  UF?: string; // UF normalizada usada no mapa
+  // Geometria do município polo (Polygon/MultiPolygon) vinda do GeoJSON (feature.geometry ou properties.geom)
+  geom?: any;
+}
+
+interface PeriferiaProps {
+  codigo_origem: string;
+  municipio_destino: string;
+  valor_total_destino: number;
+  UF?: string; // UF herdada do polo de origem (para colorização)
+  // Geometria do município periférico (Polygon/MultiPolygon) vinda do GeoJSON (feature.geometry ou properties.geom)
+  geom?: any;
+}
+
 interface MunicipioRanking {
   nome: string;
   valor: number;
 }
 
-interface PoloData {
-  valorTotal: number;
-  municipios: string[];
-  totalMunicipios: number;
-  topMunicipios: MunicipioRanking[];
-}
-
-interface PolosData {
-  [key: string]: PoloData;
-}
-
-// MapLibre não funciona no SSR; carregar dinamicamente apenas no cliente
-const DynamicMapLibreMock = dynamic(() => import('@/components/MapLibreMock'), {
-  ssr: false,
-  loading: () => (
-    <div className="h-64 rounded-lg border border-slate-700/50 bg-slate-800/30 animate-pulse flex items-center justify-center">
-      <div className="text-slate-400 text-sm">Carregando mapa...</div>
-    </div>
-  )
-});
+// MapLibre não funciona no SSR; o componente MapLibrePolygons é client-only (este arquivo já é "use client")
 
 // Componente para contagem animada de valores
 function AnimatedCurrency({ targetValue, selectedPolo }: { targetValue: number; selectedPolo: string }) {
@@ -116,69 +120,89 @@ export default function EstrategiaPage() {
   const [appliedMinValor, setAppliedMinValor] = useState<number | ''>('');
   const [appliedMaxValor, setAppliedMaxValor] = useState<number | ''>('');
 
-  // Dados mock dos polos para demonstração
-  const polosData: PolosData = {
-    'ALL': {
-      valorTotal: 15750000,
-      municipios: ['Polo 1: 8 municípios', 'Polo 2: 12 municípios', 'Polo 3: 6 municípios', 'Polo 4: 10 municípios', 'Polo 5: 9 municípios'],
-      totalMunicipios: 45,
-      topMunicipios: [
-        { nome: 'Araçatuba', valor: 3000000 },
-        { nome: 'João Pessoa', valor: 2000000 },
-        { nome: 'Alagoinha', valor: 1000000 }
-      ]
-    },
-    'Polo 1': {
-      valorTotal: 3200000,
-      municipios: ['Município A', 'Município B', 'Município C', 'Município D', 'Município E', 'Município F', 'Município G', 'Município H'],
-      totalMunicipios: 8,
-      topMunicipios: [
-        { nome: 'Araçatuba', valor: 1200000 },
-        { nome: 'Santos', valor: 1000000 },
-        { nome: 'Bauru', valor: 800000 }
-      ]
-    },
-    'Polo 2': {
-      valorTotal: 4100000,
-      municipios: ['Município I', 'Município J', 'Município K', 'Município L', 'Município M', 'Município N', 'Município O', 'Município P', 'Município Q', 'Município R', 'Município S', 'Município T'],
-      totalMunicipios: 12,
-      topMunicipios: [
-        { nome: 'João Pessoa', valor: 1500000 },
-        { nome: 'Campina Grande', valor: 1200000 },
-        { nome: 'Bayeux', valor: 900000 }
-      ]
-    },
-    'Polo 3': {
-      valorTotal: 2800000,
-      municipios: ['Município U', 'Município V', 'Município W', 'Município X', 'Município Y', 'Município Z'],
-      totalMunicipios: 6,
-      topMunicipios: [
-        { nome: 'Recife', valor: 1100000 },
-        { nome: 'Olinda', valor: 850000 },
-        { nome: 'Jaboatão', valor: 700000 }
-      ]
-    },
-    'Polo 4': {
-      valorTotal: 3500000,
-      municipios: ['Município AA', 'Município BB', 'Município CC', 'Município DD', 'Município EE', 'Município FF', 'Município GG', 'Município HH', 'Município II', 'Município JJ'],
-      totalMunicipios: 10,
-      topMunicipios: [
-        { nome: 'Fortaleza', valor: 1300000 },
-        { nome: 'Caucaia', valor: 1100000 },
-        { nome: 'Maracanaú', valor: 950000 }
-      ]
-    },
-    'Polo 5': {
-      valorTotal: 2150000,
-      municipios: ['Município KK', 'Município LL', 'Município MM', 'Município NN', 'Município OO', 'Município PP', 'Município QQ', 'Município RR', 'Município SS'],
-      totalMunicipios: 9,
-      topMunicipios: [
-        { nome: 'Alagoinha', valor: 800000 },
-        { nome: 'Guarabira', valor: 650000 },
-        { nome: 'Esperança', valor: 500000 }
-      ]
-    }
+  // Estado dos dados reais carregados de /public/data
+  const [polosValores, setPolosValores] = useState<PoloValoresProps[]>([]);
+  const [periferia, setPeriferia] = useState<PeriferiaProps[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
+  const [errorData, setErrorData] = useState<string | null>(null);
+
+  // Normalizador de números pt-BR (aceita number ou string "1.234,56")
+  const parsePtBrNumber = (v: unknown): number => {
+    if (typeof v === 'number') return v;
+    if (typeof v !== 'string') return 0;
+    const clean = v
+      .replace(/\s+/g, '')
+      .replace(/^R\$\s?/, '')
+      .replace(/\./g, '')
+      .replace(/,/g, '.');
+    const n = Number(clean);
+    return Number.isFinite(n) ? n : 0;
   };
+
+  // Carregar as duas bases do /public/data
+  useEffect(() => {
+    let isMounted = true;
+    (async () => {
+      try {
+        setLoadingData(true);
+        setErrorData(null);
+
+        const [valoresResp, periferiaResp] = await Promise.all([
+          fetchGeoJSONWithCache('/data/base_polo_valores.geojson', 'geo:polo_valores', 24 * 60 * 60 * 1000),
+          fetchGeoJSONWithCache('/data/base_polo_periferia.geojson', 'geo:polo_periferia', 24 * 60 * 60 * 1000),
+        ]);
+
+        if (!valoresResp.data || !periferiaResp.data) {
+          throw new Error('Falha ao carregar dados dos caches/servidor');
+        }
+
+        const valoresJson = valoresResp.data;
+        const periferiaJson = periferiaResp.data;
+
+        const valores: PoloValoresProps[] = Array.isArray(valoresJson?.features)
+          ? valoresJson.features.map((f: any) => ({
+              codigo_origem: String(f?.properties?.codigo_origem ?? ''),
+              municipio_origem: String(f?.properties?.municipio_origem ?? ''),
+              soma_valor_total_destino: parsePtBrNumber(f?.properties?.soma_valor_total_destino),
+              valor_total_origem: parsePtBrNumber(f?.properties?.valor_total_origem),
+              UF_origem: String(f?.properties?.UF_origem ?? ''),
+              UF: String(f?.properties?.UF_origem ?? ''), // normaliza para UF
+              // Preserve a geometria (prioriza feature.geometry; fallback para properties.geom)
+              geom: f?.geometry ?? f?.properties?.geom ?? null,
+            }))
+          : [];
+
+        const peri: PeriferiaProps[] = Array.isArray(periferiaJson?.features)
+          ? periferiaJson.features.map((f: any) => ({
+              codigo_origem: String(f?.properties?.codigo_origem ?? ''),
+              municipio_destino: String(f?.properties?.municipio_destino ?? ''),
+              valor_total_destino: parsePtBrNumber(f?.properties?.valor_total_destino),
+              ...(f?.properties?.codigo_destino ? { codigo_destino: String(f.properties.codigo_destino) } : {}),
+              // Preserve a geometria
+              geom: f?.geometry ?? f?.properties?.geom ?? null,
+            }))
+          : [];
+
+        // Enriquecer UF nas periferias herdando do polo (via codigo_origem)
+        const ufByCodigo = new Map(valores.map(v => [v.codigo_origem, String(v.UF || v.UF_origem || '').toUpperCase()]));
+        const valoresEnriched = valores.map(v => ({ ...v, UF: String(v.UF || v.UF_origem || '').toUpperCase() }));
+        const periEnriched = peri.map(v => ({ ...v, UF: ufByCodigo.get(v.codigo_origem) || '' }));
+
+        if (isMounted) {
+          setPolosValores(valoresEnriched);
+          setPeriferia(periEnriched);
+          setLoadingData(false);
+        }
+      } catch (err: any) {
+        console.error('Erro ao carregar bases públicas:', err);
+        if (isMounted) {
+          setErrorData(err?.message || 'Erro ao carregar dados');
+          setLoadingData(false);
+        }
+      }
+    })();
+    return () => { isMounted = false; };
+  }, []);
 
   // Função para formatar valores monetários
   const formatCurrency = (value: number) => {
@@ -190,14 +214,146 @@ export default function EstrategiaPage() {
     }).format(value);
   };
 
-  // Dados dinâmicos dos cards baseados no polo selecionado
-  const currentPoloData = polosData[appliedPolo] || polosData['ALL'];
+  // Opções de polo vindas da base real (todas)
+  const poloOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const opts = polosValores
+      .filter(p => {
+        if (!p.codigo_origem) return false;
+        if (seen.has(p.codigo_origem)) return false;
+        seen.add(p.codigo_origem);
+        return true;
+      })
+      .map(p => ({ value: p.codigo_origem, label: p.municipio_origem }));
+    // Ordena alfabeticamente pelo label
+    return opts.sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+  }, [polosValores]);
 
-  // Reset da lista de municípios quando o polo mudar
+  // Opções filtradas por UF selecionada (para o select de POLO)
+  const filteredPoloOptions = useMemo(() => {
+    if (selectedUF === 'ALL') return poloOptions;
+    const seen = new Set<string>();
+    const opts = polosValores
+      .filter(p => p.UF_origem === selectedUF)
+      .filter(p => {
+        if (!p.codigo_origem) return false;
+        if (seen.has(p.codigo_origem)) return false;
+        seen.add(p.codigo_origem);
+        return true;
+      })
+      .map(p => ({ value: p.codigo_origem, label: p.municipio_origem }));
+    return opts.sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
+  }, [selectedUF, polosValores, poloOptions]);
+
+  // Resetar polo selecionado caso UF mude e o polo atual não exista mais
+  useEffect(() => {
+    if (selectedPolo === 'ALL') return;
+    const exists = filteredPoloOptions.some(o => o.value === selectedPolo);
+    if (!exists) setSelectedPolo('ALL');
+  }, [selectedUF, filteredPoloOptions, selectedPolo]);
+
+  // GeoJSON minimal para o mapa (com geometria e apenas campos usados no mapa/popup)
+  const polosFCForMap = useMemo(() => {
+    const features = polosValores
+      .filter(p => !!p.geom)
+      .map(p => ({
+        type: 'Feature' as const,
+        geometry: p.geom,
+        properties: {
+          codigo_origem: p.codigo_origem,
+          municipio_origem: p.municipio_origem,
+          UF: String(p.UF || p.UF_origem || '').toUpperCase(),
+          UF_origem: p.UF_origem || '',
+          soma_valor_total_destino: p.soma_valor_total_destino,
+          valor_total_origem: p.valor_total_origem,
+        }
+      }));
+    return { type: 'FeatureCollection' as const, features };
+  }, [polosValores]);
+
+  const periferiasFCForMap = useMemo(() => {
+    const features = periferia
+      .filter(p => !!p.geom)
+      .map(p => ({
+        type: 'Feature' as const,
+        geometry: p.geom,
+        properties: {
+          codigo_origem: p.codigo_origem,
+          municipio_destino: p.municipio_destino,
+          UF: p.UF || '',
+          valor_total_destino: p.valor_total_destino,
+          // codigo_destino pode não existir na tipagem atual; manter se vier na base original
+        } as any
+      }));
+    return { type: 'FeatureCollection' as const, features };
+  }, [periferia]);
+
+  // Cálculos derivados para cards com base no polo/UF aplicado
+  const derived = useMemo(() => {
+    // Determinar modo: Polo específico, UF específica, ou Todos
+    const isPoloMode = appliedPolo !== 'ALL';
+    const isUFMode = !isPoloMode && appliedUF !== 'ALL';
+    const isAllMode = !isPoloMode && !isUFMode;
+
+    let valoresFiltrados: PoloValoresProps[];
+    let periferiaFiltrada: PeriferiaProps[];
+    let poloLabel: string;
+
+    if (isPoloMode) {
+      // Modo Polo específico (comportamento atual)
+      valoresFiltrados = polosValores.filter(v => v.codigo_origem === appliedPolo);
+      periferiaFiltrada = periferia.filter(p => p.codigo_origem === appliedPolo);
+      poloLabel = poloOptions.find(o => o.value === appliedPolo)?.label || appliedPolo;
+    } else if (isUFMode) {
+      // Modo UF específica (novo comportamento)
+      valoresFiltrados = polosValores.filter(v => v.UF === appliedUF);
+      const codigosPolosUF = new Set(valoresFiltrados.map(v => v.codigo_origem));
+      periferiaFiltrada = periferia.filter(p => codigosPolosUF.has(p.codigo_origem));
+      poloLabel = `Todos os Polos - ${appliedUF}`;
+    } else {
+      // Modo Todos (comportamento atual)
+      valoresFiltrados = polosValores;
+      periferiaFiltrada = periferia;
+      poloLabel = 'Todos os Polos';
+    }
+
+    // Card 1: soma(soma_valor_total_destino + valor_total_origem)
+    const valorPolo = valoresFiltrados.reduce((acc, v) => acc + (v.soma_valor_total_destino + v.valor_total_origem), 0);
+
+    // Card 2: top 3 municípios por valor_total_destino (consolidado por município)
+    const municipioValues = new Map<string, number>();
+    periferiaFiltrada.forEach(p => {
+      if (p.municipio_destino) {
+        const current = municipioValues.get(p.municipio_destino) || 0;
+        municipioValues.set(p.municipio_destino, current + p.valor_total_destino);
+      }
+    });
+
+    const top3: MunicipioRanking[] = Array.from(municipioValues.entries())
+      .map(([nome, valor]) => ({ nome, valor }))
+      .sort((a, b) => b.valor - a.valor)
+      .slice(0, 3);
+
+    // Card 3 (flip): lista e total de municípios (destinos) únicos
+    const municipiosSet = new Set(periferiaFiltrada.map(p => p.municipio_destino).filter(Boolean));
+    const municipiosList = Array.from(municipiosSet).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+    return {
+      valorPolo,
+      top3,
+      municipiosList,
+      totalMunicipios: municipiosList.length,
+      poloLabel,
+      isUFMode,
+      isPoloMode
+    };
+  }, [appliedPolo, appliedUF, polosValores, periferia, poloOptions]);
+
+  // Reset da lista de municípios quando o polo ou UF mudar
   useEffect(() => {
     setShowMunicipiosList(false);
     setIsCardFlipped(false);
-  }, [appliedPolo]);
+  }, [appliedPolo, appliedUF]);
 
   // Handler para eventos de teclado nos cards
   const handleCardKeyDown = (event: KeyboardEvent<HTMLDivElement>, metricId: string) => {
@@ -214,25 +370,31 @@ export default function EstrategiaPage() {
     {
       id: 'valor_polo',
       title: 'Valor do Polo',
-
-      value: currentPoloData.valorTotal, // Passamos o valor numérico para a animação
-      subtitle: appliedPolo === 'ALL' ? 'Todos os Polos' : appliedPolo,
-      description: 'Valor total potencial...'
+      value: derived.valorPolo, // valor numérico real calculado
+      subtitle: derived.poloLabel,
+      description: 'Soma de Polo + Periferia'
     },
     {
       id: 'top_municipios',
       title: 'Top 3 Municípios',
       value: 'ranking',
       subtitle: 'Maior Potencial',
-      description: 'Municípios com maior potencial de conversão'
+      description: 'Municipios com maior valor_total_destino'
     },
     {
       id: 'municipios_polo',
       title: 'Municípios do Polo',
-
-      value: currentPoloData.totalMunicipios.toString(),
-      subtitle: appliedPolo === 'ALL' ? 'Municípios Totais' : 'Municípios no Polo',
-      description: appliedPolo === 'ALL' ? '• Clique para ver lista de municípios' : 'Municípios que fazem parte deste polo • Clique para ver lista'
+      value: derived.totalMunicipios.toString(),
+      subtitle: derived.isUFMode 
+        ? `Municípios na UF ${appliedUF}` 
+        : appliedPolo === 'ALL' 
+          ? 'Municípios Totais' 
+          : 'Municípios no Polo',
+      description: derived.isUFMode
+        ? '• Clique para ver lista de municípios da UF'
+        : appliedPolo === 'ALL' 
+          ? '• Clique para ver lista de municípios' 
+          : 'Municípios que fazem parte deste polo • Clique para ver lista'
     }
   ];
 
@@ -294,6 +456,17 @@ export default function EstrategiaPage() {
           {/* Conteúdo scrollável */}
           <div className="flex-1 overflow-y-auto p-4">
             <div className="max-w-7xl mx-auto space-y-3">
+              {/* Loading/Error states for data */}
+              {loadingData && (
+                <div className="bg-[#1e293b] border border-slate-700/50 rounded-lg p-3 text-slate-300 text-sm">
+                  Carregando dados dos polos...
+                </div>
+              )}
+              {errorData && (
+                <div className="bg-red-900/30 border border-red-700/50 rounded-lg p-3 text-red-200 text-sm">
+                  {errorData}
+                </div>
+              )}
               
               {/* Seção de Filtros */}
               <motion.section
@@ -329,9 +502,8 @@ export default function EstrategiaPage() {
                         className="bg-[#0f172a] text-slate-200 border border-slate-700/50 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-colors"
                       >
                         <option value="ALL">Todos os Polos</option>
-                        {/* Opções mock coerentes com o MapLibreMock (Polo 1...Polo 5) */}
-                        {[1,2,3,4,5].map(n => (
-                          <option key={n} value={`Polo ${n}`}>{`Polo ${n}`}</option>
+                        {filteredPoloOptions.map(opt => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
                         ))}
                       </select>
                     </div>
@@ -392,7 +564,7 @@ export default function EstrategiaPage() {
                 transition={{ duration: 0.5, delay: 0.2 }}
                 className="mt-2 mb-2"
               >
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 ${loadingData ? 'opacity-60 pointer-events-none' : ''}`}>
                   {metrics.map((metric, index) => (
                     <Fragment key={metric.id}>
                       {metric.id === 'municipios_polo' ? (
@@ -439,14 +611,14 @@ export default function EstrategiaPage() {
                             <div className="absolute inset-0 flex items-center justify-center">
                               <div className="flex items-center gap-4">
                                 <p className="text-white font-extrabold leading-none text-7xl md:text-8xl">
-                                  <AnimatedNumber
-                                    targetValue={currentPoloData.totalMunicipios}
-                                    selectedPolo={selectedPolo}
-                                  />
+                                    <AnimatedNumber
+                                      targetValue={derived.totalMunicipios}
+                                      selectedPolo={selectedPolo}
+                                    />
                                 </p>
                                 <div className="flex flex-col items-start leading-tight">
                                   <span className="text-sky-400 text-xl md:text-2xl font-semibold">
-                                    {currentPoloData.totalMunicipios === 1 ? 'Município' : 'Municípios'}
+                                    {derived.totalMunicipios === 1 ? 'Município' : 'Municípios'}
                                   </span>
                                   <span className="text-slate-400 text-base md:text-lg">No Polo</span>
                                 </div>
@@ -475,11 +647,12 @@ export default function EstrategiaPage() {
                               </button>
                             </div>
                             <div className="flex-1">
-                              <div className="grid grid-cols-3 md:grid-cols-4 gap-2 h-full content-start">
-                                {currentPoloData.municipios.map((municipio, idx) => (
+                              <div className="grid grid-cols-2 gap-2 h-full content-start">
+                                {derived.municipiosList.slice(0, 10).map((municipio, idx) => (
                                   <div 
-                                    key={idx} 
-                                    className="text-xs text-slate-300 py-1.5 px-3 whitespace-nowrap leading-tight bg-slate-800/60 rounded-md border border-slate-700/30 text-center hover:bg-slate-700/60 transition-colors"
+                                    key={idx}
+                                    className="text-xs text-slate-300 py-1 px-2 max-w-[120px] overflow-hidden text-ellipsis whitespace-nowrap leading-tight bg-slate-800/60 rounded-md border border-slate-700/30 text-center hover:bg-slate-700/60 transition-colors"
+                                    title={municipio}
                                   >
                                     {municipio}
                                   </div>
@@ -515,7 +688,7 @@ export default function EstrategiaPage() {
                               <p className="text-xs text-slate-400">{metric.description}</p>
                             </div>
                             <div className="flex-1 flex flex-col justify-center space-y-2">
-                              {currentPoloData.topMunicipios.map((municipio, idx) => (
+                              {derived.top3.map((municipio, idx) => (
                                 <div key={idx} className="flex items-center justify-between py-1.5 px-2 rounded-md bg-slate-800/30 border border-slate-700/20 hover:bg-slate-700/30 transition-colors">
                                   <div className="flex items-center gap-3">
                                     <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
@@ -568,7 +741,7 @@ export default function EstrategiaPage() {
                                   <p className={`font-bold text-white ${metric.id === 'municipios_polo' ? 'text-5xl' : 'text-2xl'}`}>
                                     {metric.id === 'municipios_polo' ? (
                                       <AnimatedNumber
-                                        targetValue={currentPoloData.totalMunicipios}
+                                        targetValue={derived.totalMunicipios}
                                         selectedPolo={appliedPolo}
                                       />
                                     ) : (
@@ -606,12 +779,11 @@ export default function EstrategiaPage() {
                       style={{ gap: isRunwayOpen ? '10px' : '0px' }}
                     >
                       <div className="h-[450px]">
-                        <DynamicMapLibreMock
-                          uf={appliedUF}
-                          polo={appliedPolo}
-                          minValue={appliedMinValor === '' ? undefined : appliedMinValor}
-                          maxValue={appliedMaxValor === '' ? undefined : appliedMaxValor}
-                          onRunwayClick={handleRunwayClick}
+                        <MapLibrePolygons
+                          polos={polosFCForMap as any}
+                          periferias={periferiasFCForMap as any}
+                          appliedPolo={appliedPolo}
+                          appliedUF={appliedUF}
                         />
                       </div>
                       <AnimatePresence initial={false}>
@@ -657,12 +829,11 @@ export default function EstrategiaPage() {
                   {/* Mobile */}
                   <div className="md:hidden">
                     <div className="h-[415px] relative">
-                      <DynamicMapLibreMock
-                        uf={appliedUF}
-                        polo={appliedPolo}
-                        minValue={appliedMinValor === '' ? undefined : appliedMinValor}
-                        maxValue={appliedMaxValor === '' ? undefined : appliedMaxValor}
-                        onRunwayClick={handleRunwayClick}
+                      <MapLibrePolygons
+                        polos={polosFCForMap as any}
+                        periferias={periferiasFCForMap as any}
+                        appliedPolo={appliedPolo}
+                        appliedUF={appliedUF}
                       />
                       <AnimatePresence>
                         {isRunwayOpen && (

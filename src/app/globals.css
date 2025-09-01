@@ -319,3 +319,42 @@ button {
 .pin-animation img {
   animation: pinDrop 0.8s ease-out forwards;
 }
+
+/* Estilos para popup do MapLibre */
+.maplibregl-popup.nexus-popup .maplibregl-popup-content {
+  background: #0f172a;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-family: 'Poppins', sans-serif;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  min-width: 200px;
+}
+
+.maplibregl-popup.nexus-popup .maplibregl-popup-tip {
+  border-top-color: #0f172a;
+}
+
+.nexus-popup-content {
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.nexus-popup-title {
+  font-weight: 600;
+  font-size: 16px;
+  color: #ffffff;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #374151;
+  padding-bottom: 6px;
+}
+
+.nexus-popup-line {
+  margin: 4px 0;
+  color: #cbd5e1;
+}
+
+.nexus-popup-line:last-child {
+  margin-bottom: 0;
+}

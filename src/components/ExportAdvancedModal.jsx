@@ -41,7 +41,8 @@ function ExportAdvancedModal({ isOpen, onClose, mapData }) {
     { id: 'VALOR_PMSB', label: 'PMSB - Valor', checked: false },
     { id: 'plano_saneamento_ano', label: 'PMSB - ANO', checked: false },
     { id: 'VALOR_CTM', label: 'CTM - Valor', checked: false },
-    { id: 'valor_vaat_formato', label: 'VAAT', checked: false }
+  { id: 'valor_vaat_formato', label: 'VAAT', checked: false },
+  { id: 'tem_pista', label: 'Tem pista', checked: false }
   ];
 
   // Extrair estados e municípios dos dados
@@ -185,6 +186,7 @@ function ExportAdvancedModal({ isOpen, onClose, mapData }) {
         return { type: 'multi', values: [] }; // '1º mandato', '2º mandato'
       case 'PD_ALTERADA':
       case 'plano_saneamento_existe':
+  case 'tem_pista':
         return { ...boolean };
       case 'VALOR_PD':
       case 'VALOR_PMSB':
@@ -371,7 +373,8 @@ function ExportAdvancedModal({ isOpen, onClose, mapData }) {
           break;
         }
         case 'PD_ALTERADA':
-        case 'plano_saneamento_existe': {
+  case 'plano_saneamento_existe':
+  case 'tem_pista': {
           if (filter.value !== 'Sim' && filter.value !== 'Não') break;
           const normalized = (() => {
             const v = (value ?? '').toString().toLowerCase();
@@ -436,7 +439,15 @@ function ExportAdvancedModal({ isOpen, onClose, mapData }) {
         const filteredRow = {};
         selectedColumns.forEach(columnId => {
           const columnConfig = availableColumns.find(col => col.id === columnId);
-          filteredRow[columnConfig?.label || columnId] = row[columnId] || '';
+          const label = columnConfig?.label || columnId;
+          let value = row[columnId] || '';
+          if (columnId === 'tem_pista') {
+            const v = (row[columnId] ?? '').toString().toLowerCase();
+            if (v === 'sim' || v === 'true' || v === '1') value = 'Sim';
+            else if (v === 'não' || v === 'nao' || v === 'false' || v === '0') value = 'Não';
+            else value = '';
+          }
+          filteredRow[label] = value;
         });
         return filteredRow;
       });
@@ -836,6 +847,7 @@ function ExportAdvancedModal({ isOpen, onClose, mapData }) {
                 if (colId === 'mandato') return renderMultiSelect(colId, 'Mandato', ['1º mandato', '2º mandato']);
                 if (colId === 'PD_ALTERADA') return renderBoolean(colId, 'Plano Diretor');
                 if (colId === 'plano_saneamento_existe') return renderBoolean(colId, 'PMSB');
+                if (colId === 'tem_pista') return renderBoolean(colId, 'Tem pista');
                 if (colId === 'VALOR_PD') return renderMultiSelect(colId, 'Plano Diretor - Valor', priceOptions.VALOR_PD || ['Personalizado']);
                 if (colId === 'VALOR_PMSB') return renderMultiSelect(colId, 'PMSB - Valor', priceOptions.VALOR_PMSB || ['Personalizado']);
                 if (colId === 'VALOR_CTM') return renderMultiSelect(colId, 'CTM - Valor', priceOptions.VALOR_CTM || ['Personalizado']);

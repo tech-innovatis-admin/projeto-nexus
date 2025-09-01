@@ -103,7 +103,7 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
   const pmsbAno = !isNaN(Number(pmsbAnoStr)) && 
                   !['-', 'NA', 'Recusa', ''].includes(pmsbAnoStr.trim()) ? 
                   Number(pmsbAnoStr) : null;
-  const pmsbVencido = statusPMSB === 'sim' && pmsbAno && (pmsbAno + 10 < anoAtual);
+  const pmsbVencido = statusPMSB === 'sim' && pmsbAno && (pmsbAno + 4 < anoAtual);
 
   // Ícones para cada produto
   const iconesProdutos: Record<string, React.ReactNode> = {

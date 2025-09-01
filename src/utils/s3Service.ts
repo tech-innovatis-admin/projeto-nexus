@@ -156,3 +156,29 @@ export async function fetchEnvConfig() {
     return null;
   }
 } 
+
+// Função para buscar os arquivos usados pela página /estrategia
+export async function fetchEstrategiaData() {
+  const fileNames = [
+    'base_polo_valores.geojson',
+    'base_polo_periferia.geojson'
+  ];
+
+  try {
+    console.log('Iniciando download dos arquivos de estratégia...');
+    const files = await Promise.all(
+      fileNames.map(async (fileName) => {
+        const data = await getFileFromS3(fileName);
+        return {
+          name: fileName,
+          data
+        };
+      })
+    );
+    console.log('Download dos arquivos de estratégia concluído com sucesso');
+    return files;
+  } catch (error) {
+    console.error('Erro ao baixar arquivos de estratégia do S3:', error);
+    throw error;
+  }
+}

@@ -288,72 +288,69 @@ export default function EstrategiaPage() {
     return { type: 'FeatureCollection' as const, features };
   }, [periferia]);
 
-  // Cálculos derivados para cards com base no polo/UF aplicado
+  // Cálculos derivados para cards com base no polo aplicado
   const derived = useMemo(() => {
-    // Determinar modo: Polo específico, UF específica, ou Todos
-    const isPoloMode = appliedPolo !== 'ALL';
-    const isUFMode = !isPoloMode && appliedUF !== 'ALL';
-    const isAllMode = !isPoloMode && !isUFMode;
+    const ufUpper = String(appliedUF || '').toUpperCase();
+    const inUFMode = appliedPolo === 'ALL' && ufUpper !== 'ALL' && ufUpper !== '';
+    const inPoloMode = appliedPolo !== 'ALL';
 
-    let valoresFiltrados: PoloValoresProps[];
-    let periferiaFiltrada: PeriferiaProps[];
-    let poloLabel: string;
-
-    if (isPoloMode) {
-      // Modo Polo específico (comportamento atual)
+    // Filtrar registros conforme modo
+    let valoresFiltrados = polosValores;
+    if (inPoloMode) {
       valoresFiltrados = polosValores.filter(v => v.codigo_origem === appliedPolo);
-      periferiaFiltrada = periferia.filter(p => p.codigo_origem === appliedPolo);
-      poloLabel = poloOptions.find(o => o.value === appliedPolo)?.label || appliedPolo;
-    } else if (isUFMode) {
-      // Modo UF específica (novo comportamento)
-      valoresFiltrados = polosValores.filter(v => v.UF === appliedUF);
-      const codigosPolosUF = new Set(valoresFiltrados.map(v => v.codigo_origem));
-      periferiaFiltrada = periferia.filter(p => codigosPolosUF.has(p.codigo_origem));
-      poloLabel = `Todos os Polos - ${appliedUF}`;
-    } else {
-      // Modo Todos (comportamento atual)
-      valoresFiltrados = polosValores;
-      periferiaFiltrada = periferia;
-      poloLabel = 'Todos os Polos';
+    } else if (inUFMode) {
+      valoresFiltrados = polosValores.filter(v => String(v.UF || v.UF_origem || '').toUpperCase() === ufUpper);
     }
 
     // Card 1: soma(soma_valor_total_destino + valor_total_origem)
     const valorPolo = valoresFiltrados.reduce((acc, v) => acc + (v.soma_valor_total_destino + v.valor_total_origem), 0);
 
-    // Card 2: top 3 municípios por valor_total_destino (consolidado por município)
-    const municipioValues = new Map<string, number>();
-    periferiaFiltrada.forEach(p => {
-      if (p.municipio_destino) {
-        const current = municipioValues.get(p.municipio_destino) || 0;
-        municipioValues.set(p.municipio_destino, current + p.valor_total_destino);
-      }
-    });
+    // Card 2 e 3: periferias filtradas por modo
+    let periferiaFiltrada = periferia;
+    if (inPoloMode) {
+      periferiaFiltrada = periferia.filter(p => p.codigo_origem === appliedPolo);
+    } else if (inUFMode) {
+      periferiaFiltrada = periferia.filter(p => String(p.UF || '').toUpperCase() === ufUpper);
+    }
 
-    const top3: MunicipioRanking[] = Array.from(municipioValues.entries())
+    // Consolidar por município_destino e pegar Top 3
+    const aggMap = new Map<string, number>();
+    for (const p of periferiaFiltrada) {
+      const nome = p.municipio_destino || '';
+      const val = Number(p.valor_total_destino) || 0;
+      if (!nome) continue;
+      aggMap.set(nome, (aggMap.get(nome) || 0) + val);
+    }
+    const top3: MunicipioRanking[] = Array.from(aggMap.entries())
       .map(([nome, valor]) => ({ nome, valor }))
       .sort((a, b) => b.valor - a.valor)
       .slice(0, 3);
 
-    // Card 3 (flip): lista e total de municípios (destinos) únicos
+    // Card 3 (flip): lista e total de municípios (destinos)
     const municipiosSet = new Set(periferiaFiltrada.map(p => p.municipio_destino).filter(Boolean));
     const municipiosList = Array.from(municipiosSet).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+    // Subtítulo com label de contexto
+    const poloLabel = inPoloMode
+      ? (poloOptions.find(o => o.value === appliedPolo)?.label || appliedPolo)
+      : inUFMode
+        ? `UF ${ufUpper}`
+        : 'Todos os Polos';
 
     return {
       valorPolo,
       top3,
       municipiosList,
       totalMunicipios: municipiosList.length,
-      poloLabel,
-      isUFMode,
-      isPoloMode
+      poloLabel
     };
   }, [appliedPolo, appliedUF, polosValores, periferia, poloOptions]);
 
-  // Reset da lista de municípios quando o polo ou UF mudar
+  // Reset da lista de municípios quando o polo mudar
   useEffect(() => {
     setShowMunicipiosList(false);
     setIsCardFlipped(false);
-  }, [appliedPolo, appliedUF]);
+  }, [appliedPolo]);
 
   // Handler para eventos de teclado nos cards
   const handleCardKeyDown = (event: KeyboardEvent<HTMLDivElement>, metricId: string) => {
@@ -385,16 +382,8 @@ export default function EstrategiaPage() {
       id: 'municipios_polo',
       title: 'Municípios do Polo',
       value: derived.totalMunicipios.toString(),
-      subtitle: derived.isUFMode 
-        ? `Municípios na UF ${appliedUF}` 
-        : appliedPolo === 'ALL' 
-          ? 'Municípios Totais' 
-          : 'Municípios no Polo',
-      description: derived.isUFMode
-        ? '• Clique para ver lista de municípios da UF'
-        : appliedPolo === 'ALL' 
-          ? '• Clique para ver lista de municípios' 
-          : 'Municípios que fazem parte deste polo • Clique para ver lista'
+      subtitle: appliedPolo === 'ALL' ? 'Municípios Totais' : 'Municípios no Polo',
+      description: appliedPolo === 'ALL' ? '• Clique para ver lista de municípios' : 'Municípios que fazem parte deste polo • Clique para ver lista'
     }
   ];
 

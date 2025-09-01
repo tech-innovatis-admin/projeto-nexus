@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import maplibregl, { LngLatBoundsLike, Map as MapLibreMap, LngLatBounds } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
@@ -53,6 +53,42 @@ function computeBounds(fc: FC): LngLatBounds | null {
   return has ? bounds : null;
 }
 
+// Função para dissolver/unificar geometrias em um contorno único
+function dissolveGeometries(features: FeatureLike[]): any {
+  if (!features.length) return null;
+  
+  // Coletar todas as coordenadas de contorno
+  const allCoordinates: number[][][] = [];
+  
+  for (const feature of features) {
+    const geom = feature.geometry;
+    if (!geom) continue;
+    
+    if (geom.type === 'Polygon') {
+      // Para Polygon, pegar apenas o anel externo (primeiro array)
+      if (geom.coordinates && geom.coordinates[0]) {
+        allCoordinates.push(geom.coordinates[0]);
+      }
+    } else if (geom.type === 'MultiPolygon') {
+      // Para MultiPolygon, pegar o anel externo de cada polígono
+      for (const polygon of geom.coordinates || []) {
+        if (polygon && polygon[0]) {
+          allCoordinates.push(polygon[0]);
+        }
+      }
+    }
+  }
+  
+  if (!allCoordinates.length) return null;
+  
+  // Simples união: criar um MultiPolygon com todos os anéis externos
+  // (Para uma dissolução mais sofisticada, seria necessário usar uma biblioteca como Turf.js)
+  return {
+    type: 'MultiPolygon',
+    coordinates: allCoordinates.map(coords => [coords])
+  };
+}
+
 export default function MapLibrePolygons({
   polos,
   periferias,
@@ -67,6 +103,9 @@ export default function MapLibrePolygons({
   const mapRef = useRef<MapLibreMap | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
+  // Camadas visíveis: polos deve sempre iniciar ativado (e ficará bloqueado)
+  const [showPolos, setShowPolos] = useState(true);
+  const [showPeriferia, setShowPeriferia] = useState(false);
   
   // Cores para polígonos normais e destacados (selecionados)
   const colors = {
@@ -262,6 +301,30 @@ export default function MapLibrePolygons({
         },
       });
 
+      // Camada para contorno vermelho destacando área total do polo
+      map.addSource('polo-highlight-src', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addLayer({
+        id: 'polo-highlight-line',
+        type: 'line',
+        source: 'polo-highlight-src',
+        paint: {
+          'line-color': '#DC2626', // Vermelho consistente
+          'line-width': 3,
+          'line-opacity': 0.9
+        },
+      });
+
+      // Aplicar visibilidade inicial (polos sempre visível)
+      try {
+        map.setLayoutProperty('polos-fill', 'visibility', showPolos ? 'visible' : 'none');
+        map.setLayoutProperty('polos-line', 'visibility', showPolos ? 'visible' : 'none');
+        map.setLayoutProperty('peri-fill', 'visibility', showPeriferia ? 'visible' : 'none');
+        map.setLayoutProperty('peri-line', 'visibility', showPeriferia ? 'visible' : 'none');
+        map.setLayoutProperty('polo-highlight-line', 'visibility', 'visible'); // Contorno sempre visível quando há dados
+      } catch (e) {
+        // noop
+      }
+
       // Eventos de clique nos polígonos
       map.on('click', 'polos-fill', (e) => {
         if (e.features && e.features.length > 0) {
@@ -336,14 +399,29 @@ export default function MapLibrePolygons({
     };
   }, []);
 
+  // Atualiza visibilidade quando os toggles mudam
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    const setVis = (layerId: string, visible: boolean) => {
+      if (map.getLayer(layerId)) map.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none');
+    };
+    // Aplicar visibilidade conforme estados (polos agora controlável)
+    setVis('polos-fill', showPolos);
+    setVis('polos-line', showPolos);
+
+    // Periferia controlável
+    setVis('peri-fill', showPeriferia);
+    setVis('peri-line', showPeriferia);
+    
+    // Contorno vermelho sempre visível quando há dados (independente dos toggles individuais)
+    setVis('polo-highlight-line', true);
+  }, [showPeriferia, showPolos]);
+
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-
-    // Determinar modo de operação
-    const isPoloMode = appliedPolo !== 'ALL';
-    const isUFMode = !isPoloMode && appliedUF !== 'ALL';
-    const isAllMode = !isPoloMode && !isUFMode;
 
     // Se as features já têm geometria, evite reprocessar
     const polosFC: FC = Array.isArray(polos.features) && polos.features.every(f => !!f.geometry)
@@ -352,82 +430,135 @@ export default function MapLibrePolygons({
     const periFC: FC = Array.isArray(periferias.features) && periferias.features.every(f => !!f.geometry)
       ? (periferias as FC)
       : { type: 'FeatureCollection', features: toGeometryFromPropsGeom(periferias.features) };
+    const ufUpper = String(appliedUF || '').toUpperCase();
+    const inUFMode = appliedPolo === 'ALL' && ufUpper !== 'ALL' && ufUpper !== '';
     
-    // Filtrar dados conforme o modo
-    let filteredPolosFC: FC;
-    let filteredPeriFC: FC;
-
-    if (isUFMode) {
-      // Modo UF: mostrar apenas polos da UF e periferias associadas
-      const polosUF = polosFC.features.filter(f => f.properties?.UF === appliedUF);
-      const codigosPolosUF = new Set(polosUF.map(f => f.properties?.codigo_origem).filter(Boolean));
-      const periferiasUF = periFC.features.filter(f => codigosPolosUF.has(f.properties?.codigo_origem));
-      
-      filteredPolosFC = { type: 'FeatureCollection', features: polosUF };
-      filteredPeriFC = { type: 'FeatureCollection', features: periferiasUF };
-    } else {
-      // Modo Polo ou All: mostrar todos
-      filteredPolosFC = polosFC;
-      filteredPeriFC = periFC;
+    // Mostrar todos os polos; periferias podem ser filtradas em modo UF
+    const periFilteredFC: FC = inUFMode
+      ? { type: 'FeatureCollection', features: periFC.features.filter(f => String(f.properties?.UF || '').toUpperCase() === ufUpper) }
+      : periFC;
+    (map.getSource('polos-src') as any)?.setData(polosFC);
+    (map.getSource('periferia-src') as any)?.setData(periFilteredFC);
+    
+    // Criar contorno vermelho unificado para polo selecionado ou UF
+    let highlightGeometry = null;
+    if (appliedPolo !== 'ALL') {
+      // Modo polo específico - unificar polo + suas periferias
+      const poloFeatures = polosFC.features.filter(f => f.properties?.codigo_origem === appliedPolo);
+      const periferiaFeatures = periFilteredFC.features.filter(f => f.properties?.codigo_origem === appliedPolo);
+      const allFeatures = [...poloFeatures, ...periferiaFeatures];
+      highlightGeometry = dissolveGeometries(allFeatures);
+    } else if (inUFMode) {
+      // Modo UF - unificar todos os polos da UF + suas periferias
+      const polosUFFeatures = polosFC.features.filter(f => String(f.properties?.UF || '').toUpperCase() === ufUpper);
+      const allFeatures = [...polosUFFeatures, ...periFilteredFC.features];
+      highlightGeometry = dissolveGeometries(allFeatures);
     }
     
-    // Atualizar sources
-    (map.getSource('polos-src') as any)?.setData(filteredPolosFC);
-    (map.getSource('periferia-src') as any)?.setData(filteredPeriFC);
+    // Atualizar source do contorno vermelho
+    const highlightFC = highlightGeometry 
+      ? { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: highlightGeometry, properties: {} }] }
+      : { type: 'FeatureCollection', features: [] };
+    (map.getSource('polo-highlight-src') as any)?.setData(highlightFC);
     
-    // Atualiza as propriedades de pintura para destacar conforme o modo
+    // Atualiza as propriedades de pintura para destacar o polo selecionado (apenas opacidade/espessura)
     if (map.isStyleLoaded()) {
-      let poloFillOpacityExpr: any;
-      let poloLineWidthExpr: any;
-      let periFillOpacityExpr: any;
-      let periLineWidthExpr: any;
+      let poloFillOpacityExpr: any = colors.polo.fillOpacity;
+      let poloLineWidthExpr: any = colors.polo.lineWidth;
+      let periFillOpacityExpr: any = colors.periferia.fillOpacity;
+      let periLineWidthExpr: any = colors.periferia.lineWidth;
 
-      if (isPoloMode) {
-        // Modo Polo: destacar polo específico
+      if (appliedPolo !== 'ALL') {
+        // Destaca apenas o polo selecionado
         poloFillOpacityExpr = ['case', ['==', ['get', 'codigo_origem'], appliedPolo], colors.poloHighlighted.fillOpacity, colors.polo.fillOpacity];
         poloLineWidthExpr = ['case', ['==', ['get', 'codigo_origem'], appliedPolo], colors.poloHighlighted.lineWidth, colors.polo.lineWidth];
         periFillOpacityExpr = ['case', ['==', ['get', 'codigo_origem'], appliedPolo], colors.periferiaHighlighted.fillOpacity, colors.periferia.fillOpacity];
         periLineWidthExpr = ['case', ['==', ['get', 'codigo_origem'], appliedPolo], colors.periferiaHighlighted.lineWidth, colors.periferia.lineWidth];
-      } else if (isUFMode) {
-        // Modo UF: destacar todos os polos/periferias da UF (já filtrados)
-        poloFillOpacityExpr = colors.poloHighlighted.fillOpacity;
-        poloLineWidthExpr = colors.poloHighlighted.lineWidth;
+      } else if (inUFMode) {
+        // Destaca todos os polos da UF e atenua o restante; periferias já filtradas
+        const attenuated = 0.15;
+        poloFillOpacityExpr = ['case', ['==', ['get', 'UF'], ufUpper], colors.poloHighlighted.fillOpacity, attenuated];
+        poloLineWidthExpr = ['case', ['==', ['get', 'UF'], ufUpper], colors.poloHighlighted.lineWidth, 0.2];
         periFillOpacityExpr = colors.periferiaHighlighted.fillOpacity;
         periLineWidthExpr = colors.periferiaHighlighted.lineWidth;
+      }
+
+      map.setPaintProperty('polos-fill', 'fill-opacity', poloFillOpacityExpr as any);
+      map.setPaintProperty('polos-line', 'line-width', poloLineWidthExpr as any);
+      map.setPaintProperty('peri-fill', 'fill-opacity', periFillOpacityExpr as any);
+      map.setPaintProperty('peri-line', 'line-width', periLineWidthExpr as any);
+    }
+
+    // Fit bounds: Polo específico => enquadrar polo e suas periferias; UF mode => enquadrar UF; caso contrário, Brasil
+    if (appliedPolo !== 'ALL') {
+      // Modo polo específico - centralizar no polo selecionado e suas periferias
+      const poloSelecionado: FC = { type: 'FeatureCollection', features: polosFC.features.filter(f => f.properties?.codigo_origem === appliedPolo) };
+      const periferiasPolo: FC = { type: 'FeatureCollection', features: periFilteredFC.features.filter(f => f.properties?.codigo_origem === appliedPolo) };
+      
+      const boundsPoloSelecionado = computeBounds(poloSelecionado);
+      const boundsPeriPolo = computeBounds(periferiasPolo);
+      
+      let finalBounds: LngLatBounds | null = null;
+      if (boundsPoloSelecionado && boundsPeriPolo) {
+        finalBounds = boundsPoloSelecionado;
+        finalBounds.extend(boundsPeriPolo as any);
       } else {
-        // Modo All: opacidade normal
-        poloFillOpacityExpr = colors.polo.fillOpacity;
-        poloLineWidthExpr = colors.polo.lineWidth;
-        periFillOpacityExpr = colors.periferia.fillOpacity;
-        periLineWidthExpr = colors.periferia.lineWidth;
+        finalBounds = boundsPoloSelecionado || boundsPeriPolo;
       }
-
-      map.setPaintProperty('polos-fill', 'fill-opacity', poloFillOpacityExpr);
-      map.setPaintProperty('polos-line', 'line-width', poloLineWidthExpr);
-      map.setPaintProperty('peri-fill', 'fill-opacity', periFillOpacityExpr);
-      map.setPaintProperty('peri-line', 'line-width', periLineWidthExpr);
-    }
-
-    // Fit bounds conforme o modo
-    if (isUFMode) {
-      // Modo UF: fit para as feições da UF
-      const combinedFC: FC = {
-        type: 'FeatureCollection',
-        features: [...filteredPolosFC.features, ...filteredPeriFC.features]
-      };
-      const bounds = computeBounds(combinedFC);
-      if (bounds) {
-        map.fitBounds([bounds.getSouthWest().toArray(), bounds.getNorthEast().toArray()], { 
-          padding: 24, 
-          duration: 700 
-        });
+      
+      if (finalBounds) {
+        map.fitBounds(finalBounds, { padding: 50, duration: 700 });
       }
-    } else if (isAllMode) {
-      // Modo All: fit para o Brasil
-      map.fitBounds([[-74, -34], [-34, 5]], { padding: 24, duration: 700 });
+    } else if (inUFMode) {
+      // Modo UF - enquadrar todos os polos da UF
+      const polosUF: FC = { type: 'FeatureCollection', features: polosFC.features.filter(f => String(f.properties?.UF || '').toUpperCase() === ufUpper) };
+      const boundsPolos = computeBounds(polosUF);
+      const boundsPeri = computeBounds(periFilteredFC);
+      let finalBounds: LngLatBounds | null = null;
+      if (boundsPolos && boundsPeri) {
+        finalBounds = boundsPolos;
+        finalBounds.extend(boundsPeri as any);
+      } else {
+        finalBounds = boundsPolos || boundsPeri;
+      }
+      if (finalBounds) {
+        map.fitBounds(finalBounds, { padding: 24, duration: 700 });
+      }
+    } else {
+      // Modo geral - mostrar Brasil inteiro
+      map.fitBounds([[-74, -34], [-34, 5]], { padding: 24, duration: 700 }); // Brasil aprox
     }
-    // Modo Polo: não faz auto-fit (comportamento atual mantido)
   }, [polos, periferias, appliedPolo, appliedUF]);
 
-  return <div ref={containerRef} className="w-full h-full" />;
+  return (
+    <div className="w-full h-full relative">
+      <div ref={containerRef} className="w-full h-full" />
+
+      {/* Layer toggles overlay */}
+  <div className="absolute bottom-3 left-3 z-50">
+        <div className="bg-[#0b1220]/80 text-white rounded-md shadow-md p-2 text-sm">
+          <div className="flex flex-col gap-2">
+            <label className="flex items-center gap-2">
+              <input 
+                type="checkbox" 
+                checked={showPolos} 
+                onChange={(e) => setShowPolos(e.target.checked)} 
+                className="w-4 h-4" 
+              />
+              <span>Polos</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={showPeriferia}
+                onChange={(e) => setShowPeriferia(e.target.checked)}
+                className="w-4 h-4"
+              />
+              <span>Periferia</span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }

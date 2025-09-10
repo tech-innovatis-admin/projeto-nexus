@@ -142,8 +142,24 @@ function MapaPageContent() {
   const [municipioSelecionadoDropdown, setMunicipioSelecionadoDropdown] = useState<string>("");
   const [advancedModalOpen, setAdvancedModalOpen] = useState<boolean>(false);
   const [tooltipVisible, setTooltipVisible] = useState<boolean>(false);
+  const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
   const dadosRef = useRef<HTMLDivElement>(null);
   const planeIconRef = useRef<HTMLDivElement>(null);
+
+  // Atualizar largura da tela para responsividade
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Constantes para calcular automaticamente as alturas dos containers - RESPONSIVAS
+  const alturaMunicipioGestao = windowWidth < 768 ? 200 : 220; // px - menor em mobile
+  const alturaMapa = windowWidth < 768 ? 40 : 45; // vh - menor em mobile
+  const gapContainers = 1; // rem - reduzido
+
+  // Altura total combinada dos containers da esquerda - mais responsiva
+  const alturaTotalContainersEsquerda = `calc(${alturaMunicipioGestao}px + ${gapContainers}rem + ${alturaMapa}vh)`;
   
   // Fechar tooltip ao clicar fora ou pressionar ESC (melhor UX no mobile/desktop)
   useEffect(() => {
@@ -474,25 +490,25 @@ function MapaPageContent() {
       )}
 
       {/* Conteúdo principal com visualização lado a lado */}
-      <main className="flex-1 w-full flex flex-col items-center justify-center gap-1 p-0.5 md:p-0.5">
-        <div className="w-full max-w-[1400px] mx-auto px-4" ref={dadosRef}>
+      <main className="flex-1 w-full flex flex-col items-center justify-center gap-2 lg:gap-1 p-1 lg:p-0.5">
+        <div className="w-full max-w-[1400px] mx-auto px-2 lg:px-4" ref={dadosRef}>
           {/* Dashboard com informações administrativas */}
           {municipioSelecionado ? (
             <>
               {/* Grid para organizar os containers lado a lado */}
-              <div className="grid grid-cols-1 md:grid-cols-[55fr_45fr] auto-rows-auto gap-1.5 md:max-w-[1200px] mx-auto overflow-visible">
+              <div className="grid grid-cols-1 lg:grid-cols-[55fr_45fr] gap-2 lg:gap-3 md:max-w-[1200px] mx-auto overflow-visible lg:overflow-hidden" style={{
+                gridTemplateRows: windowWidth < 1024 ? 'auto 1fr' : `${alturaMunicipioGestao}px ${alturaMapa}vh`
+              }}>
                 {/* Container 1: Município e Gestão (linha 1, coluna 1) */}
-                <div className="bg-[#1e293b] rounded-lg shadow-lg p-0.5 border border-slate-600 animate-fade-in md:col-start-1 md:row-start-1">
-                  <div className="bg-[#0f172a] rounded-lg p-2 flex flex-col transition-all duration-300 hover:bg-[#111a2d] hover:shadow-lg border border-slate-700 relative overflow-visible max-h-[320px] h-full">
+                <div className="bg-[#1e293b] rounded-lg shadow-lg p-0.5 border border-slate-600 animate-fade-in lg:col-start-1 lg:row-start-1" style={{
+                  height: windowWidth < 1024 ? 'auto' : `${alturaMunicipioGestao}px`,
+                  minHeight: windowWidth < 1024 ? '250px' : `${alturaMunicipioGestao}px`
+                }}>
+                  <div className={`bg-[#0f172a] rounded-lg ${windowWidth < 1024 ? 'p-3' : 'p-2'} flex flex-col transition-all duration-300 hover:bg-[#111a2d] hover:shadow-lg border border-slate-700 relative overflow-visible h-full`}>
                     {/* Efeito de brilho no canto superior */}
                     <div className="absolute -top-10 -right-10 w-20 h-20 bg-blue-500/10 rounded-full blur-xl"></div>
                     
                     <div className="flex flex-row items-center justify-center mb-3 gap-3">
-                      <div className="w-10 h-10 rounded-full bg-blue-900/50 flex items-center justify-center shadow-lg">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-sky-400" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z" clipRule="evenodd" />
-                        </svg>
-                      </div>
                       <div className="flex items-center gap-2">
                         <h3 className="text-base text-sky-300 font-bold tracking-wide">Município e Gestão</h3>
                         {pistasDoMunicipio.length > 0 && (
@@ -536,9 +552,9 @@ function MapaPageContent() {
                     </div>
                     
                     {/* Informações em duas colunas com ícones */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1">
+                    <div className={`grid ${windowWidth < 1024 ? 'grid-cols-1 gap-4' : 'grid-cols-1 lg:grid-cols-2 gap-4'} flex-1`}>
                       {/* Coluna esquerda - Gestão */}
-                      <div className="bg-slate-800/30 rounded-lg p-3 backdrop-blur-sm">
+                      <div className={`bg-slate-800/30 rounded-lg ${windowWidth < 1024 ? 'p-4' : 'p-3'} backdrop-blur-sm`}>
                         <div className="text-xs text-sky-400 uppercase tracking-wider mb-2 font-semibold text-center">
                           {municipioSelecionado && municipioSelecionado.properties?.nome_municipio && municipioSelecionado.properties?.name_state
                             ? `${municipioSelecionado.properties.nome_municipio} - ${municipioSelecionado.properties.name_state}`
@@ -581,11 +597,12 @@ function MapaPageContent() {
                         </div>
                       </div>
                       
-                      {/* Coluna direita - Demografia */}
-                      <div className="bg-slate-800/30 rounded-lg p-3 backdrop-blur-sm">
-                        <div className="text-xs text-emerald-400 uppercase tracking-wider mb-2 font-semibold text-center">Demografia</div>
-                        
-                        <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                      {/* Coluna direita - Demografia e Educação */}
+                      <div className={`bg-slate-800/30 rounded-lg ${windowWidth < 1024 ? 'p-4' : 'p-3'} backdrop-blur-sm`}>
+                        <div className="text-xs text-emerald-400 uppercase tracking-wider mb-4 font-semibold text-center">Demografia e Educação</div>
+
+                        {/* Primeira linha - População e Domicílios */}
+                        <div className="grid grid-cols-2 gap-x-6 gap-y-3 mb-6">
                           {/* População */}
                           <div className="flex flex-col items-center">
                             <div className="flex items-center justify-center w-full mb-1">
@@ -600,7 +617,7 @@ function MapaPageContent() {
                               </span>
                             </div>
                           </div>
-                          
+
                           {/* Domicílios */}
                           <div className="flex flex-col items-center">
                             <div className="flex items-center justify-center w-full mb-1">
@@ -616,28 +633,81 @@ function MapaPageContent() {
                             </div>
                           </div>
                         </div>
+
+                        {/* Segunda linha - Dados Educacionais */}
+                        <div className={`grid ${windowWidth < 640 ? 'grid-cols-1 gap-y-4' : 'grid-cols-3 gap-x-4 gap-y-4'}`}>
+                          {/* Fund. 1 */}
+                          <div className="flex flex-col items-center">
+                            <div className="flex items-center justify-center w-full mb-1">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-emerald-400 mr-1.5" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
+                              </svg>
+                              <span className="text-sm text-gray-400">Fund. 1</span>
+                            </div>
+                            <div className="flex items-center justify-center">
+                              <span className="text-sm text-white font-semibold">
+                                {municipioSelecionado.properties?.alunos_iniciais || "N/A"}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Fund. 2 */}
+                          <div className="flex flex-col items-center">
+                            <div className="flex items-center justify-center w-full mb-1">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-emerald-400 mr-1.5" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
+                              </svg>
+                              <span className="text-sm text-gray-400">Fund. 2</span>
+                            </div>
+                            <div className="flex items-center justify-center">
+                              <span className="text-sm text-white font-semibold">
+                                {municipioSelecionado.properties?.alunos_finais || "N/A"}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Médio */}
+                          <div className="flex flex-col items-center">
+                            <div className="flex items-center justify-center w-full mb-1">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-emerald-400 mr-1.5" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />
+                              </svg>
+                              <span className="text-sm text-gray-400">Médio</span>
+                            </div>
+                            <div className="flex items-center justify-center">
+                              <span className="text-sm text-white font-semibold">
+                                {municipioSelecionado.properties?.alunos_medio || "N/A"}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
                         </div>
                       </div>
                     </div>
                   </div>
                   
                 {/* Container 2: Produtos Municipais (ocupa toda a coluna direita) */}
-                <div className="bg-[#1e293b] rounded-lg shadow-lg p-0.5 border border-slate-600 animate-fade-in md:col-start-2 md:row-span-2 w-full">
-                  <div className="bg-[#0f172a] rounded-lg p-0 sm:p-2 flex flex-col transition-all duration-300 hover:bg-[#111a2d] hover:shadow-lg border border-slate-700 relative overflow-hidden h-full">
+                <div className="bg-[#1e293b] rounded-lg shadow-lg p-0.5 border border-slate-600 animate-fade-in lg:col-start-2 lg:row-span-2 w-full" style={{
+                  height: windowWidth < 1024 ? '400px' : alturaTotalContainersEsquerda,
+                  maxHeight: windowWidth < 1024 ? '50vh' : 'none'
+                }}>
+                  <div className="bg-[#0f172a] rounded-lg flex flex-col transition-all duration-300 hover:bg-[#111a2d] hover:shadow-lg border border-slate-700 relative h-full overflow-hidden">
                     {/* Efeito de brilho no canto superior */}
                     <div className="absolute -top-10 -right-10 w-20 h-20 bg-indigo-500/10 rounded-full blur-xl"></div>
                     
-                    {/* Container com largura total */}
-                    <div className="flex flex-col w-full px-0">
-                      <div className="w-full overflow-y-auto px-0">
+                    {/* Container com largura total e altura completa */}
+                    <div className="flex flex-col w-full h-full p-2 md:p-3 overflow-y-auto">
                       <InformacoesMunicipio municipioSelecionado={municipioSelecionado} />
-                      </div>
                     </div>
                   </div>
                 </div>
                 
                 {/* Container 3: Mapa interativo (abaixo do painel de município) */}
-                <div className="h-[50vh] rounded-lg overflow-hidden shadow-lg bg-[#0f172a] border border-slate-600 animate-fade-in md:col-start-1 md:row-start-2">
+                <div className="rounded-lg overflow-hidden shadow-lg bg-[#0f172a] border border-slate-600 animate-fade-in lg:col-start-1 lg:row-start-2" style={{
+                  height: `${alturaMapa}vh`,
+                  minHeight: windowWidth < 1024 ? '250px' : '300px',
+                  maxHeight: windowWidth < 1024 ? '40vh' : 'none'
+                }}>
               {loading ? (
                 <div className="flex flex-col items-center justify-center w-full h-full p-4">
                   <Image 

@@ -38,11 +38,27 @@ function ExportAdvancedModal({ isOpen, onClose, mapData }) {
     { id: 'PD_ANO', label: 'Plano Diretor - Ano', checked: false },
     { id: 'VALOR_PD', label: 'Plano Diretor - Valor', checked: false },
     { id: 'plano_saneamento_existe', label: 'PMSB', checked: false },
-    { id: 'VALOR_PMSB', label: 'PMSB - Valor', checked: false },
+    { id: 'VALOR_PMSB', label: 'Valor - PMSB', checked: false },
     { id: 'plano_saneamento_ano', label: 'PMSB - ANO', checked: false },
-    { id: 'VALOR_CTM', label: 'CTM - Valor', checked: false },
-  { id: 'valor_vaat_formato', label: 'VAAT', checked: false },
-  { id: 'tem_pista', label: 'Tem pista', checked: false }
+    { id: 'VALOR_CTM', label: 'Valor CTM', checked: false },
+    { id: 'valor_reurb_', label: 'Valor REURB', checked: false },
+    { id: 'valor_vaat_formato', label: 'VAAT', checked: false },
+    { id: 'PLHIS', label: 'Valor PLHIS', checked: false },
+    { id: 'VALOR_DESERT_NUM', label: 'ValorPlano de Desertificação', checked: false },
+    { id: 'VALOR_DEC_AMBIENTAL_NUM', label: 'valor Plano Dec. Meio Ambiente', checked: false },
+    { id: 'tem_pista', label: 'Existência de Pista', checked: false },
+    { id: 'alunos_iniciais', label: 'QTD de Alunos - Ensino Fundamental Inicial', checked: false },
+    { id: 'alunos_finais', label: 'QTD de Alunos - Ensino Fundamental Final', checked: false },
+    { id: 'alunos_iniciais_finais', label: 'QTD de Alunos - Fundamental Iniciais + Finais', checked: false },
+    { id: 'alunos_medio', label: 'QTD de Alunos - Ensino Médio', checked: false },
+    { id: 'educagame', label: 'Valor Educame', checked: false },
+    { id: 'valor_start_iniciais_', label: 'Valor Start Lab - Fund 1', checked: false },
+    { id: 'valor_start_finais_', label: 'Valor Start Lab - Fund 2', checked: false },
+    { id: 'valor_start_iniciais_finais_', label: 'Valor Start Lab - Fund 1 e 2', checked: false },
+    { id: 'PVA', label: 'Valor PVA (Procon Vai Ás Aulas)', checked: false },
+    { id: 'LIVRO_FUND_1', label: 'Valor Livros - Fundamental 1', checked: false },
+    { id: 'LIVRO_FUND_2', label: 'Valor Livros - Fundamental 2', checked: false },
+    { id: 'LIVRO_FUND_1_2', label: 'Valor Livros - Fundamental 1 e 2', checked: false }
   ];
 
   // Extrair estados e municípios dos dados
@@ -177,6 +193,22 @@ function ExportAdvancedModal({ isOpen, onClose, mapData }) {
       case 'DOMICILIO_FORMAT':
       case 'PD_ANO':
       case 'valor_vaat_formato':
+      case 'alunos_iniciais':
+      case 'alunos_finais':
+      case 'alunos_iniciais_finais':
+      case 'alunos_medio':
+      case 'PLHIS':
+      case 'VALOR_DESERT_NUM':
+      case 'VALOR_DEC_AMBIENTAL_NUM':
+      case 'educagame':
+      case 'valor_start_iniciais_':
+      case 'valor_start_finais_':
+      case 'valor_start_iniciais_finais_':
+      case 'PVA':
+      case 'LIVRO_FUND_1':
+      case 'LIVRO_FUND_2':
+      case 'LIVRO_FUND_1_2':
+      case 'valor_reurb_':
         return { ...numeric };
       case 'plano_saneamento_ano':
         return { type: 'pmsbAno', mode: 'min', min: '', max: '', includeSemAno: false, selectedMunicipalities: [] };
@@ -322,6 +354,35 @@ function ExportAdvancedModal({ isOpen, onClose, mapData }) {
           break;
         }
         case 'PD_ANO': {
+          const num = toIntFromString(value);
+          if (num === null) return false;
+          const min = filter.min !== '' ? parseInt(filter.min, 10) : null;
+          const max = filter.max !== '' ? parseInt(filter.max, 10) : null;
+          if (filter.mode === 'min' && min !== null && !(num >= min)) return false;
+          if (filter.mode === 'max' && min !== null && !(num <= min)) return false;
+          if (filter.mode === 'equal' && min !== null && !(num === min)) return false;
+          if (filter.mode === 'between' && (min !== null || max !== null)) {
+            if (min !== null && num < min) return false;
+            if (max !== null && num > max) return false;
+          }
+          break;
+        }
+        case 'alunos_iniciais':
+        case 'alunos_finais':
+        case 'alunos_iniciais_finais':
+        case 'alunos_medio':
+        case 'PLHIS':
+        case 'VALOR_DESERT_NUM':
+        case 'VALOR_DEC_AMBIENTAL_NUM':
+        case 'educagame':
+        case 'valor_start_iniciais_':
+        case 'valor_start_finais_':
+        case 'valor_start_iniciais_finais_':
+        case 'PVA':
+        case 'LIVRO_FUND_1':
+        case 'LIVRO_FUND_2':
+        case 'LIVRO_FUND_1_2':
+        case 'valor_reurb_': {
           const num = toIntFromString(value);
           if (num === null) return false;
           const min = filter.min !== '' ? parseInt(filter.min, 10) : null;
@@ -493,6 +554,44 @@ function ExportAdvancedModal({ isOpen, onClose, mapData }) {
       setIsLoading(false);
     }
   };
+
+  // Calcular o número de observações que passarão pelos filtros atuais
+  const observationsCount = useMemo(() => {
+    if (selectedColumns.length === 0) return 0;
+
+    // Replicar o mesmo pipeline de filtragem usado na exportação
+    let dataToFilter = [];
+
+    if (selectedMunicipalities.length > 0) {
+      // Filtrar municípios específicos
+      dataToFilter = allMunicipalities
+        .filter(municipality => {
+          const municipalityKey = `${municipality.name}|${municipality.state}`;
+          return selectedMunicipalities.includes(municipalityKey);
+        })
+        .map(municipality => municipality.data);
+    } else if (selectedStates.length > 0) {
+      // Filtrar todos os municípios dos estados selecionados
+      dataToFilter = allMunicipalities
+        .filter(municipality => selectedStates.includes(municipality.state))
+        .map(municipality => municipality.data);
+    } else {
+      // Usar todos os municípios
+      dataToFilter = allMunicipalities.map(municipality => municipality.data);
+    }
+
+    // Aplicar subfiltros (mesma lógica da exportação)
+    const filteredBySubfilters = dataToFilter.filter(row => rowPassesFilters(row));
+
+    return filteredBySubfilters.length;
+  }, [
+    selectedColumns,
+    selectedMunicipalities,
+    selectedStates,
+    allMunicipalities,
+    columnFilters,
+    rowPassesFilters
+  ]);
 
   if (!isOpen) return null;
 
@@ -842,6 +941,22 @@ function ExportAdvancedModal({ isOpen, onClose, mapData }) {
                 if (colId === 'DOMICILIO_FORMAT') return renderNumeric(colId, 'Domicílios Recenseados', false, 'Valor no formato string (ex.: 44.157). Apenas números são considerados, como "44157".');
                 if (colId === 'valor_vaat_formato') return renderNumeric(colId, 'VAAT (R$)', true, 'Valor no formato BRL (ex.: R$ 582.330,00). Informe números simples.');
                 if (colId === 'PD_ANO') return renderNumeric(colId, 'Plano Diretor - Ano');
+                if (colId === 'alunos_iniciais') return renderNumeric(colId, 'Alunos - Ensino Fundamental Inicial', false, 'Quantidade de alunos no ensino fundamental inicial (ex.: 4785).');
+                if (colId === 'alunos_finais') return renderNumeric(colId, 'Alunos - Ensino Fundamental Final', false, 'Quantidade de alunos no ensino fundamental final (ex.: 3241).');
+                if (colId === 'alunos_iniciais_finais') return renderNumeric(colId, 'Alunos - Fundamental Iniciais + Finais', false, 'Quantidade total de alunos nos anos iniciais e finais do fundamental (ex.: 8026).');
+                if (colId === 'alunos_medio') return renderNumeric(colId, 'Alunos - Ensino Médio', false, 'Quantidade de alunos no ensino médio (ex.: 2156).');
+                if (colId === 'PLHIS') return renderNumeric(colId, 'PLHIS', false, 'Valor do produto PLHIS (ex.: 4785).');
+                if (colId === 'VALOR_DESERT_NUM') return renderNumeric(colId, 'Plano de Desertificação', false, 'Valor do Plano de Desertificação (ex.: 4785).');
+                if (colId === 'VALOR_DEC_AMBIENTAL_NUM') return renderNumeric(colId, 'Plano Dec. Meio Ambiente', false, 'Valor do Plano Dec. Meio Ambiente (ex.: 4785).');
+                if (colId === 'educagame') return renderNumeric(colId, 'Educame', false, 'Valor do produto Educame (ex.: 4785).');
+                if (colId === 'valor_start_iniciais_') return renderNumeric(colId, 'Start Lab - Fund 1', false, 'Valor do Start Lab para Fundamental 1 (ex.: 4785).');
+                if (colId === 'valor_start_finais_') return renderNumeric(colId, 'Start Lab - Fund 2', false, 'Valor do Start Lab para Fundamental 2 (ex.: 4785).');
+                if (colId === 'valor_start_iniciais_finais_') return renderNumeric(colId, 'Start Lab - Fund 1 e 2', false, 'Valor do Start Lab para Fundamental 1 e 2 (ex.: 4785).');
+                if (colId === 'PVA') return renderNumeric(colId, 'PVA (Procon Vai Ás Aulas)', false, 'Valor do produto PVA (ex.: 4785).');
+                if (colId === 'LIVRO_FUND_1') return renderNumeric(colId, 'Livros - Fundamental 1', false, 'Valor do envio de livros do Fundamental 1 (ex.: 4785).');
+                if (colId === 'LIVRO_FUND_2') return renderNumeric(colId, 'Livros - Fundamental 2', false, 'Valor do envio de livros do Fundamental 2 (ex.: 4785).');
+                if (colId === 'LIVRO_FUND_1_2') return renderNumeric(colId, 'Livros - Fundamental 1 e 2', false, 'Valor do envio de livros do Fundamental 1 e 2 (ex.: 4785).');
+                if (colId === 'valor_reurb_') return renderNumeric(colId, 'REURB', false, 'Valor do produto REURB (ex.: 4785).');
                 if (colId === 'plano_saneamento_ano') return renderPmsbAno(colId);
                 if (colId === 'sigla_partido2024') return renderMultiSelect(colId, 'Partido', partyOptions);
                 if (colId === 'mandato') return renderMultiSelect(colId, 'Mandato', ['1º mandato', '2º mandato']);
@@ -864,7 +979,15 @@ function ExportAdvancedModal({ isOpen, onClose, mapData }) {
               <li>• Estados: {selectedStates.length === 0 ? 'Todos' : selectedStates.length}</li>
               <li>• Municípios: {selectedMunicipalities.length === 0 ? 'Todos dos estados selecionados' : selectedMunicipalities.length}</li>
               <li>• Colunas: {selectedColumns.length}</li>
+              <li>• Observações a exportar: {observationsCount.toLocaleString('pt-BR')}</li>
             </ul>
+            {observationsCount === 0 && (
+              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-md">
+                <p className="text-sm text-red-700">
+                  ⚠️ Nenhum município corresponde aos filtros aplicados.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Nome do arquivo */}
@@ -904,7 +1027,8 @@ function ExportAdvancedModal({ isOpen, onClose, mapData }) {
             </button>
             <button
               onClick={handleAdvancedExport}
-              disabled={selectedColumns.length === 0 || isLoading}
+              disabled={selectedColumns.length === 0 || isLoading || observationsCount === 0}
+              title={observationsCount === 0 ? "Não há dados que correspondam aos filtros selecionados." : ""}
               className="px-6 py-2 bg-sky-600 text-white text-sm font-medium rounded-md hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
             >
               {isLoading && (

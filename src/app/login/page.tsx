@@ -30,38 +30,57 @@ export default function LoginPage() {
    */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log(`🔐 [LoginPage] Tentativa de login: ${username}`);
     setIsLoading(true);
     setError("");
+
     try {
+      console.log('📡 [LoginPage] Enviando request para /api/auth...');
       const response = await fetch('/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })
       });
+
+      console.log(`📡 [LoginPage] Response status: ${response.status}`);
       const data = await response.json();
+      console.log('📡 [LoginPage] Response data:', data);
+
       if (!response.ok) {
+        console.error(`❌ [LoginPage] Login falhou - Status: ${response.status}, Error:`, data.error);
         throw new Error(data.error || 'Erro ao fazer login');
       }
-      
+
       if (data.success) {
+        console.log('✅ [LoginPage] Login bem-sucedido!');
+
         // Define os dados do usuário no contexto
         if (data.user) {
+          console.log('👤 [LoginPage] Definindo dados do usuário:', data.user);
           setUser(data.user);
         }
-        
+
         // Espera um momento para o cookie ser definido
+        console.log('⏳ [LoginPage] Aguardando cookie ser definido...');
         await new Promise(resolve => setTimeout(resolve, 100));
+
         // Inicia fade out
+        console.log('🎬 [LoginPage] Iniciando animação de fade out...');
         setIsFadingOut(true);
+
         setTimeout(() => {
+          console.log('🗺️ [LoginPage] Redirecionando para /mapa');
           router.push('/mapa');
         }, 500); // Duração do fade out
       } else {
+        console.error(`❌ [LoginPage] Login falhou - Response success: false`);
         throw new Error(data.error || 'Erro ao fazer login');
       }
     } catch (error) {
+      console.error(`❌ [LoginPage] Erro no login:`, error instanceof Error ? error.message : error);
       setError(error instanceof Error ? error.message : 'Erro ao fazer login');
     } finally {
+      console.log('🔄 [LoginPage] Finalizando tentativa de login');
       setIsLoading(false);
     }
   };
@@ -117,7 +136,15 @@ export default function LoginPage() {
               id="username"
               type="text"
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              onChange={(e) => {
+                setUsername(e.target.value);
+                if (error) setError(""); // Limpa erro ao digitar
+              }}
+              onBlur={() => {
+                if (username.trim()) {
+                  console.log(`👤 [LoginPage] Username inserido: ${username}`);
+                }
+              }}
               required
               className="w-full h-11 pl-4 pr-4 text-sm leading-none bg-slate-800/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition duration-150 ease-in-out"
               placeholder="Usuário"
@@ -131,7 +158,15 @@ export default function LoginPage() {
               id="password"
               type={showPassword ? "text" : "password"}
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                if (error) setError(""); // Limpa erro ao digitar
+              }}
+              onBlur={() => {
+                if (password) {
+                  console.log(`🔑 [LoginPage] Password inserida (${password.length} caracteres)`);
+                }
+              }}
               required
               autoComplete="off"
               data-lpignore="true"
@@ -143,7 +178,11 @@ export default function LoginPage() {
             />
             <button
               type="button"
-              onClick={() => setShowPassword(!showPassword)}
+              onClick={() => {
+                const newState = !showPassword;
+                console.log(`👁️ [LoginPage] Toggle password visibility: ${newState ? 'SHOW' : 'HIDE'}`);
+                setShowPassword(newState);
+              }}
               className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-white focus:outline-none"
               aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
             >
@@ -153,11 +192,14 @@ export default function LoginPage() {
 
           {/* Mensagem de erro com animação */}
           {error && (
-            <motion.p 
+            <motion.p
               className="text-red-400 text-sm text-center"
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ type: "spring", stiffness: 500, damping: 30 }}
+              onAnimationComplete={() => {
+                console.log(`❌ [LoginPage] Mensagem de erro exibida: ${error}`);
+              }}
             >
               {error}
             </motion.p>
@@ -172,6 +214,9 @@ export default function LoginPage() {
               whileHover="hover"
               whileTap="tap"
               disabled={isLoading}
+              onClick={() => {
+                console.log(`🚀 [LoginPage] Formulário submetido - Username: ${username}, Password: ${password.length > 0 ? 'Preenchida' : 'Vazia'}`);
+              }}
             >
               {isLoading ? 'Entrando...' : 'Entrar'}
             </motion.button>
@@ -198,4 +243,7 @@ export default function LoginPage() {
       </footer>
     </div>
   );
+
+  // Log quando a página está totalmente carregada
+  console.log(`✅ [LoginPage] Página renderizada - Loading: ${isLoading}, Username: ${username ? 'Preenchido' : 'Vazio'}, Password: ${password ? 'Preenchida' : 'Vazia'}, Error: ${error ? 'Presente' : 'Ausente'}`);
 } 

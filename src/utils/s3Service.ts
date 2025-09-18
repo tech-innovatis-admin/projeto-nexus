@@ -3,6 +3,9 @@ import { parse } from 'dotenv';
 
 
 // Configuração do cliente S3
+console.log('🔧 S3 Client - Access Key:', process.env.AWS_ACCESS_KEY_ID ? 'OK' : '❌ MISSING');
+console.log('🔧 S3 Client - Secret Key:', process.env.AWS_SECRET_ACCESS_KEY ? 'OK' : '❌ MISSING');
+
 const s3Client = new S3Client({
   region: process.env.AWS_REGION || 'us-east-2',
   credentials: {
@@ -13,34 +16,36 @@ const s3Client = new S3Client({
 
 export async function downloadS3File(fileName: string): Promise<string> {
   const bucketName = process.env.AWS_S3_BUCKET || 'projetonexusinnovatis';
-  console.log(`Iniciando download do arquivo: ${fileName} do bucket ${bucketName}`);
-  
+  console.log(`📥 Downloading ${fileName} from S3...`);
+
   try {
     const command = new GetObjectCommand({
       Bucket: bucketName,
       Key: fileName,
     });
-    
-    console.log(`Enviando comando GetObject para: ${bucketName}/${fileName}`);
+
     const response = await s3Client.send(command);
-    console.log(`Resposta recebida para ${fileName}, processando...`);
 
     if (!response.Body) {
+      console.error(`❌ Empty response for ${fileName}`);
       throw new Error('Corpo da resposta vazio');
     }
 
     const data = await response.Body.transformToString();
-    console.log(`Download de ${fileName} concluído com sucesso.`);
+    console.log(`✅ Downloaded ${fileName} (${data.length} chars)`);
+
     return data;
 
   } catch (error) {
-    console.error(`Erro detalhado ao baixar arquivo ${fileName} do S3:`, error);
+    console.error(`❌ S3 Error for ${fileName}:`, error instanceof Error ? error.message : error);
     throw error;
   }
 }
 
 export async function getFileFromS3(filename: string) {
   const bucketName = process.env.AWS_S3_BUCKET || 'projetonexusinnovatis';
+  console.log(`📥 Getting ${filename} from S3...`);
+
   try {
     const command = new GetObjectCommand({
       Bucket: bucketName,
@@ -49,8 +54,9 @@ export async function getFileFromS3(filename: string) {
 
     const response = await s3Client.send(command);
     const stream = response.Body;
-    
+
     if (!stream) {
+      console.error(`❌ Empty stream for ${filename}`);
       throw new Error('Resposta do S3 não contém dados');
     }
 
@@ -59,23 +65,28 @@ export async function getFileFromS3(filename: string) {
     for await (const chunk of stream as any) {
       chunks.push(chunk);
     }
+
     const buffer = Buffer.concat(chunks);
     const fileContent = buffer.toString('utf-8');
 
     // Se for um arquivo .env, retorna como objeto
     if (filename.endsWith('.env')) {
-      return parse(fileContent);
+      const parsedEnv = parse(fileContent);
+      console.log(`✅ Parsed .env file with ${Object.keys(parsedEnv).length} variables`);
+      return parsedEnv;
     }
 
     // Se for um arquivo JSON ou GeoJSON, retorna o objeto parseado
     if (filename.endsWith('.json') || filename.endsWith('.geojson')) {
-      return JSON.parse(fileContent);
+      const parsedJson = JSON.parse(fileContent);
+      console.log(`✅ Loaded ${filename} (${parsedJson.features?.length || 0} features)`);
+      return parsedJson;
     }
 
-    // Para outros tipos de arquivo, retorna o conteúdo como string
+    console.log(`✅ Loaded ${filename} (${fileContent.length} chars)`);
     return fileContent;
   } catch (error) {
-    console.error(`Erro ao buscar arquivo ${filename} do S3:`, error);
+    console.error(`❌ S3 Error for ${filename}:`, error instanceof Error ? error.message : error);
     throw error;
   }
 }
@@ -85,13 +96,13 @@ export async function fetchAllGeoJSONFiles() {
   const fileNames = [
     'base_municipios.geojson',
     'base_pd_sem_plano.geojson',
-
     'base_pd_vencendo.geojson',
     'parceiros1.json'
   ];
 
+  console.log(`📥 Loading ${fileNames.length} GeoJSON files...`);
+
   try {
-    console.log('Iniciando download de todos os arquivos GeoJSON...');
     const files = await Promise.all(
       fileNames.map(async (fileName) => {
         const data = await getFileFromS3(fileName);
@@ -101,19 +112,24 @@ export async function fetchAllGeoJSONFiles() {
         };
       })
     );
-    console.log('Download de todos os arquivos GeoJSON concluído com sucesso');
+
+    console.log(`✅ All ${files.length} files loaded successfully`);
     return files;
   } catch (error) {
-    console.error('Erro ao buscar arquivos GeoJSON:', error);
+    console.error(`❌ Error loading GeoJSON files:`, error instanceof Error ? error.message : error);
     throw error;
   }
 }
 
 // Função para buscar e parsear o CSV de pistas
 export async function fetchPistasData() {
+  console.log(`📥 Loading pistas CSV...`);
+
   try {
     const csvContent = await getFileFromS3('pistas_s3.csv');
+
     if (typeof csvContent !== 'string') {
+      console.error(`❌ Invalid CSV content type:`, typeof csvContent);
       return [] as any[];
     }
 
@@ -121,8 +137,8 @@ export async function fetchPistasData() {
     if (lines.length === 0) return [] as any[];
 
     const headerLine = lines[0];
-    // Detecta delimitador: prioriza ';' se houver mais que ','
     const delimiter = (headerLine.split(';').length - 1) >= (headerLine.split(',').length - 1) ? ';' : ',';
+
     const rawHeaders = headerLine.split(delimiter).map(h => h.trim());
     const headers = rawHeaders.map(h => h.replace(/^"|"$/g, ''));
 
@@ -130,33 +146,37 @@ export async function fetchPistasData() {
     for (let i = 1; i < lines.length; i++) {
       const rawRow = lines[i].split(delimiter);
       if (rawRow.length !== headers.length) continue;
+
       const obj: any = {};
       headers.forEach((h, idx) => {
         const v = (rawRow[idx] ?? '').trim().replace(/^"|"$/g, '');
         obj[h] = v;
       });
-      // Mantém chaves originais (ex.: 'codigo', 'codigo_pista', 'nome_pista', 'tipo_pista')
+
       records.push(obj);
     }
+
+    console.log(`✅ Loaded ${records.length} pista records from CSV`);
     return records;
   } catch (error) {
-    console.error('Erro ao carregar/parsear pistas_s3.csv:', error);
+    console.error(`❌ Error loading pistas CSV:`, error instanceof Error ? error.message : error);
     return [] as any[];
   }
 }
 
 // Função para buscar arquivo de configuração
 export async function fetchEnvConfig() {
+  console.log(`📥 Loading config file...`);
+
   try {
     const envConfig = await getFileFromS3('senhas_s3.json');
-    console.log('Configurações carregadas do S3:', envConfig);
+    console.log(`✅ Config loaded successfully`);
     return envConfig;
   } catch (error) {
-    console.error('Erro ao carregar configurações do S3:', error);
+    console.error(`❌ Error loading config:`, error instanceof Error ? error.message : error);
     return null;
   }
 } 
-
 // Função para buscar os arquivos usados pela página /estrategia
 export async function fetchEstrategiaData() {
   const fileNames = [
@@ -164,8 +184,9 @@ export async function fetchEstrategiaData() {
     'base_polo_periferia.geojson'
   ];
 
+  console.log(`📥 Loading estrategia data (${fileNames.length} files)...`);
+
   try {
-    console.log('Iniciando download dos arquivos de estratégia...');
     const files = await Promise.all(
       fileNames.map(async (fileName) => {
         const data = await getFileFromS3(fileName);
@@ -175,10 +196,11 @@ export async function fetchEstrategiaData() {
         };
       })
     );
-    console.log('Download dos arquivos de estratégia concluído com sucesso');
+
+    console.log(`✅ All estrategia files loaded successfully`);
     return files;
   } catch (error) {
-    console.error('Erro ao baixar arquivos de estratégia do S3:', error);
+    console.error(`❌ Error loading estrategia data:`, error instanceof Error ? error.message : error);
     throw error;
   }
 }

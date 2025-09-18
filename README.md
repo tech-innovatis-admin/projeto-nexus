@@ -23,111 +23,369 @@ O **NEXUS** é uma plataforma web desenvolvida pela *Data Science Team – Innov
 ---
 
 ## Principais Funcionalidades
-- **Mapa Interativo** com controles de camadas (Leaflet)
-- **Busca por Estado/Município** com autocomplete e normalização de acentos
-- **Visualização de Camadas**:
-  - Municípios (base)
+
+### 🎯 **Sistema de Autenticação**
+- **Login Seguro** com hash bcryptjs e JWT tokens
+- **Controle de Plataformas** (NEXUS, SAEP, etc.)
+- **Middleware de Proteção** para rotas `/mapa` e `/estrategia`
+- **Logout Automático** com limpeza de sessão
+
+### 🗺️ **Mapa Interativo Avançado**
+- **Visualização de Camadas Temáticas**:
+  - Municípios (base demográfica e política)
   - Municípios sem plano diretor
   - Municípios com plano diretor a vencer
-  - Produtos Innovatis disponíveis
-  - Parceiros
-- **Barra de Progresso** durante o carregamento dos arquivos GeoJSON (provenientes do S3)
-- **Painel de Informações** detalhadas sobre o município selecionado
-- **Autenticação Segura** via JWT (páginas protegidas)
-- **Integração AWS S3** para armazenamento e distribuição dos dados
-- **Animações** com Framer Motion e introdução 3D com React Three Fiber
+  - Parceiros institucionais com marcadores customizados
+  - Dados de pistas de voo por município
+- **Controles Interativos**: Zoom, pan, camadas toggleáveis
+- **Destaque Inteligente**: Animações de fade-in/fade-out
+- **Popups Informativos**: Dados demográficos, políticos e produtos
+- **Busca Inteligente**: Autocomplete com normalização de acentos
+
+### 📊 **Módulo Estratégia**
+- **Análise de Polos de Valores** (geojson estratégico)
+- **Dados de Periferia Urbana** para planejamento
+- **Visualização Temática** de conectividade municipal
+- **Integração com Dados Municipais** para insights estratégicos
+
+### 💼 **Gestão Completa de Produtos**
+- **12 Produtos Municipais** com status automático:
+  - Plano Diretor (verificação de vencimento 10 anos)
+  - PMSB (verificação de vencimento 4 anos)
+  - IPTU Legal (CTM)
+  - REURB (Regularização Fundiária)
+  - Start Lab (Educação Fundamental)
+  - Educa Game (Jogos Educativos)
+  - Procon Vai às Aulas (PVA)
+  - VAAT (Valor Anual Aluno/Professor)
+  - Livros Didáticos (Fundamental 1 e 2)
+  - Plano Decenal do Meio Ambiente
+  - PLHIS (Plano Habitacional)
+  - Plano de Desertificação
+- **Links Diretos** para Google Drive por produto
+- **Status Automático**: Em dia / Vencido / Não existe
+- **Valores Monetários** formatados automaticamente
+
+### 📄 **Sistema de Exportação**
+- **Geração de PDFs** de orçamento personalizados
+- **Templates Editáveis** com preenchimento automático
+- **Download Direto** com nomes padronizados
+- **Modal Avançado** de exportação
+
+### ⚡ **Performance e Cache**
+- **Cache Multi-Camadas**: Memória, LocalStorage (30 dias), S3
+- **Carregamento Progressivo** com barra de progresso visual
+- **Revalidação Inteligente** via ETags e Last-Modified
+- **Lazy Loading** de componentes pesados
+- **Otimização de Bundle** automática
+
+### 🎨 **Interface Avançada**
+- **Animação 3D de Introdução** com React Three Fiber
+- **Efeitos de Partículas** interativos ao mouse/touch
+- **Transições Suaves** entre estados da aplicação
+- **Responsividade Completa**: Mobile, tablet e desktop
+- **Tema Escuro** consistente
+- **Tooltips e Popovers** informativos
+- **Ícones Customizados** e FontAwesome
 
 ---
 
 ## Arquitetura
 ```
 Next.js App Router (15) ─┐
-                        ├── Frontend (React 19 + TailwindCSS 4)
-                        │   ├── Context API (MapDataContext)
-                        │   ├── Hooks (useS3Data, useAuth,…)
-                        │   └── Components (MapaMunicipal, LayerControl,…)
+                        ├── Frontend (React 19 + TypeScript 5)
+                        │   ├── Context API (MapDataContext, UserContext)
+                        │   ├── Hooks (useS3Data, useEstrategiaData)
+                        │   ├── Components (MapaMunicipal, InformacoesMunicipio, Nexus3D)
+                        │   └── Utils (s3Service, pdfOrcamento, cacheGeojson)
                         │
-                        └── Backend (API Routes)
-                            ├── Autenticação (JWT)
-                            ├── Proxy para S3 (/api/proxy-geojson/*)
-                            └── Testes & Debug (/api/debug, /api/test-s3)
+                        └── Backend (API Routes + Middleware)
+                            ├── Autenticação (JWT + bcryptjs)
+                            ├── Proxy GeoJSON (/api/proxy-geojson/*)
+                            ├── Estratégia (/api/estrategia/data)
+                            ├── Municípios (/api/municipios/[estado])
+                            ├── Logout (/api/auth/logout)
+                            └── Debug/Teste (/api/debug, /api/test-s3)
 
-AWS S3 ──> GeoJSON / JSON
+PostgreSQL ──> Usuários, Municípios, Acessos (Prisma ORM)
+AWS S3 ──> GeoJSON, JSON, CSV, PDF Templates
 ```
-### Fluxo de Dados
-1. **Cliente** acessa `/mapa`.
-2. `MapDataContext` solicita `/api/proxy-geojson/files`.
-3. API faz *stream* dos arquivos do bucket S3 via `@aws-sdk/client-s3`.
-4. Estado global guarda `mapData`, `loadingProgress` e dispara **barra de carregamento**.
-5. Mapa e Painéis reagem à conclusão (`loading = false`).
+
+### 🗄️ **Banco de Dados (PostgreSQL + Prisma)**
+- **Modelo de Usuários**: Autenticação com plataformas múltiplas
+- **Municípios**: Dados geográficos e administrativos
+- **Controle de Acessos**: Permissões por município e usuário
+- **Sistema de Cache**: Spatial reference system integrado
+
+### ☁️ **Integração AWS S3**
+**Arquivos Principais:**
+- `base_municipios.geojson` - Dados municipais completos
+- `base_pd_sem_plano.geojson` - Municípios sem plano diretor
+- `base_pd_vencendo.geojson` - Planos diretores a vencer
+- `parceiros1.json` - Instituições parceiras
+- `pistas_s3.csv` - Dados de pistas de voo
+- `base_polo_valores.geojson` - Análise estratégica
+- `base_polo_periferia.geojson` - Dados de periferia
+- `senhas_s3.json` - Configurações seguras
+
+### 🔄 **Fluxo de Dados Completo**
+1. **Cliente** acessa aplicação → Animação 3D de introdução
+2. **Login** → Validação JWT + controle de plataformas
+3. **Middleware** verifica autenticação para rotas protegidas
+4. **MapDataContext** carrega dados via `/api/proxy-geojson/files`
+5. **S3 Service** faz download paralelo dos arquivos GeoJSON
+6. **Cache System** armazena dados (memória + localStorage + S3)
+7. **Mapa** renderiza com Leaflet + camadas temáticas
+8. **Busca** filtra municípios com normalização de acentos
+9. **Destaque** calcula centroides e anima transições
+10. **Painel** exibe produtos com status automático
+11. **Export** gera PDFs via template personalizado
 
 ---
 
 ## Estrutura de Pastas
 ```text
 src/
-├── app/              # Páginas & rotas da API (App Router)
-│   ├── api/          # API Routes (auth, proxy-geojson, debug, …)
-│   ├── mapa/         # Página principal do mapa
-│   ├── login/        # Tela de autenticação
-│   └── globals.css   # Estilos globais
+├── app/                    # Páginas & rotas da API (Next.js App Router)
+│   ├── api/               # API Routes
+│   │   ├── auth/          # Sistema de autenticação
+│   │   │   ├── route.ts   # Login POST
+│   │   │   ├── verify/    # Verificação JWT GET
+│   │   │   └── logout/    # Logout POST
+│   │   ├── proxy-geojson/ # Proxy para arquivos S3
+│   │   │   ├── [filename]/ # Rota dinâmica para arquivos
+│   │   │   └── files/     # Lista de arquivos disponíveis
+│   │   ├── estrategia/    # Dados estratégicos
+│   │   ├── municipios/    # Dados por estado
+│   │   └── debug/         # Utilitários de debug
+│   ├── mapa/              # Página principal do mapa
+│   ├── estrategia/        # Módulo estratégico
+│   ├── login/             # Tela de autenticação
+│   ├── layout.tsx         # Layout raiz com providers
+│   ├── globals.css        # Estilos globais Tailwind
+│   └── page.tsx           # Página inicial com animação 3D
 │
-├── components/       # Componentes reutilizáveis (MapaMunicipal, LayerControl, …)
-├── contexts/         # Contextos React (MapDataContext)
-├── hooks/            # Hooks customizados (useS3Data, …)
-├── utils/            # Serviços utilitários (s3Service, authService, envManager)
-└── types/            # Tipagens adicionais (leaflet.d.ts)
+├── components/            # Componentes React reutilizáveis
+│   ├── MapaMunicipal.tsx  # Componente principal do mapa
+│   ├── InformacoesMunicipio.tsx # Painel de produtos
+│   ├── Nexus3D.tsx        # Animação 3D de introdução
+│   ├── Sidebar.tsx        # Navegação lateral
+│   ├── Navbar.tsx         # Cabeçalho da aplicação
+│   ├── ModalOrcamento.jsx # Modal de orçamento
+│   ├── ExportMenu.jsx     # Menu de exportação
+│   └── LayerControl.tsx   # Controles de camadas
+│
+├── contexts/              # Contextos React para estado global
+│   ├── MapDataContext.tsx # Dados do mapa e cache
+│   └── UserContext.tsx    # Estado do usuário autenticado
+│
+├── hooks/                 # Hooks personalizados
+│   ├── useS3Data.ts       # Hook para dados S3
+│   └── useEstrategiaData.ts # Hook para dados estratégicos
+│
+├── utils/                 # Utilitários e serviços
+│   ├── s3Service.ts       # Cliente S3 e cache
+│   ├── pdfOrcamento.ts    # Geração de PDFs
+│   ├── cacheGeojson.ts    # Cache inteligente
+│   ├── authService.ts     # Utilitários de auth
+│   └── passwordUtils.ts   # Utilitários de senha
+│
+├── lib/                   # Configurações de bibliotecas
+│   └── prisma.ts          # Cliente Prisma configurado
+│
+├── types/                 # Tipagens TypeScript
+│   └── leaflet.d.ts       # Extensões para Leaflet
+│
+└── middleware.ts          # Middleware Next.js para proteção
+```
+
+### 📁 **Arquivos de Configuração (Raiz)**
+```
+prisma/
+├── schema.prisma         # Schema do banco PostgreSQL
+public/
+├── template/             # Templates de PDF
+├── municipios.xlsx       # Dados municipais Excel
+└── logos/               # Assets visuais
 ```
 
 ---
 
 ## Tecnologias Utilizadas
+
+### 🎯 **Core Framework**
 - **Next.js 15** (App Router & API Routes)
-- **React 19**
-- **TypeScript 5**
-- **TailwindCSS 4**  
-  Estilização utilitária responsiva
-- **Leaflet 1.9** & **leaflet-draw**  
-  Mapa 2D interativo
-- **Three.js 0.176** & **React Three Fiber**  
-  Animações/introduções 3D
-- **Framer Motion 12**  
-  Transições e gestos
-- **AWS SDK v3** (`@aws-sdk/client-s3`)  
-  Integração com S3 (download e stream de dados)
-- **JWT** (`jsonwebtoken`)  
-  Autenticação de usuários
-- **Zustand** (gerenciamento leve de estado *ad hoc*)
+- **React 19** com TypeScript 5
+- **TailwindCSS 4** - Estilização utilitária responsiva
+- **Node.js 18+** com Turbopack
+
+### 🗺️ **Mapas e Visualização Geoespacial**
+- **Leaflet 1.9** & **leaflet-draw** - Mapa 2D interativo
+- **MapLibre GL** - Motor de renderização de mapas
+- **Turf.js** - Operações geoespaciais avançadas
+- **Polylabel** - Cálculo de centroides de polígonos
+- **GeoJSON** - Formato padrão para dados geográficos
+
+### 🎨 **Interface e Animações**
+- **Three.js 0.176** & **React Three Fiber** - Animações 3D
+- **@react-three/drei** - Utilitários Three.js para React
+- **Framer Motion 12** - Transições e gestos suaves
+- **React Icons** - Biblioteca de ícones
+- **FontAwesome 6** - Ícones vetoriais
+
+### ☁️ **Backend e Banco de Dados**
+- **Prisma ORM** - Cliente PostgreSQL com type safety
+- **PostgreSQL** - Banco de dados relacional
+- **AWS SDK v3** (`@aws-sdk/client-s3`) - Integração S3
+- **bcryptjs** - Hashing seguro de senhas
+- **jsonwebtoken** & **jose** - Tokens JWT
+- **dotenv** - Gerenciamento de variáveis ambiente
+
+### 📄 **Documentos e Dados**
+- **pdf-lib** - Geração e manipulação de PDFs
+- **xlsx** - Leitura de arquivos Excel
+- **file-saver** - Downloads de arquivos
+- **jszip** - Compressão de arquivos
+- **downloadjs** - Utilitários de download
+
+### 🔧 **Utilitários e Desenvolvimento**
+- **ESLint 9** & **Next.js ESLint** - Linting de código
+- **TypeScript 5** - Type safety avançado
+- **Zustand** - Gerenciamento leve de estado
+- **date-fns** - Manipulação de datas (implicado)
+- **polylabel** - Cálculos geométricos
+
+### 📦 **Dependências de Desenvolvimento**
+- **@types/** - TypeScript definitions para todas as libs
+- **eslint-config-next** - Configuração ESLint para Next.js
+- **tailwindcss 4** - Framework CSS utilitário
+- **postcss** - Processamento CSS
 
 ---
 
 ## Configuração do Ambiente
-1. **Pré-requisitos**
-   - Node.js 18+
-   - Conta AWS com permissões de leitura no bucket
 
-2. **Variáveis de Ambiente** (`.env.local` ou via S3 `senhas_s3.json`)
-   | Chave | Descrição |
-   |-------|-----------|
-   | `AWS_REGION` | Região do bucket |
-   | `AWS_ACCESS_KEY_ID` | Chave de acesso |
-   | `AWS_SECRET_ACCESS_KEY` | Chave secreta |
-   | `AWS_S3_BUCKET` | Nome do bucket |
-   | `JWT_SECRET` | Segredo para assinar tokens |
+### 📋 **Pré-requisitos**
+- **Node.js 18+** com npm ou yarn
+- **PostgreSQL** (local ou cloud)
+- **Conta AWS** com permissões de leitura no bucket S3
+- **Git** para controle de versão
 
-> O **`envManager.ts`** pode carregar automaticamente o arquivo `senhas_s3.json` do S3 para popular o `process.env`.
+### 🗄️ **Configuração do Banco de Dados**
+1. **Instalar PostgreSQL** ou usar serviço cloud (RDS, Supabase, etc.)
+2. **Criar banco de dados** para o projeto
+3. **Configurar variáveis** de conexão no `.env.local`
+
+### ☁️ **Configuração AWS S3**
+1. **Criar bucket S3** com os arquivos necessários
+2. **Configurar política IAM** com permissões de leitura
+3. **Gerar access keys** para o usuário IAM
+
+### 🔧 **Variáveis de Ambiente**
+Criar arquivo `.env.local` na raiz do projeto:
+
+```env
+# Banco de Dados PostgreSQL
+DATABASE_URL="postgresql://user:password@localhost:5432/nexus_db"
+
+# AWS S3 Configuration
+AWS_REGION=us-east-2
+AWS_ACCESS_KEY_ID=your_access_key_here
+AWS_SECRET_ACCESS_KEY=your_secret_key_here
+AWS_S3_BUCKET=projetonexusinnovatis
+
+# Autenticação JWT
+JWT_SECRET=your_super_secret_jwt_key_here
+
+# Ambiente (desenvolvimento/produção)
+NODE_ENV=development
+```
+
+### 📁 **Arquivos S3 Necessários**
+O bucket deve conter estes arquivos na raiz:
+- `base_municipios.geojson`
+- `base_pd_sem_plano.geojson`
+- `base_pd_vencendo.geojson`
+- `parceiros1.json`
+- `pistas_s3.csv`
+- `base_polo_valores.geojson`
+- `base_polo_periferia.geojson`
+- `senhas_s3.json` (opcional - configurações adicionais)
+
+### 🚀 **Instalação e Inicialização**
+```bash
+# 1. Clonar repositório
+git clone <repository-url>
+cd projeto-nexus
+
+# 2. Instalar dependências
+npm install
+
+# 3. Configurar banco de dados
+npx prisma generate
+npx prisma db push
+
+# 4. Executar migrações (se houver)
+npx prisma migrate dev
+
+# 5. Iniciar servidor de desenvolvimento
+npm run dev
+```
+
+### 🔍 **Verificação da Instalação**
+- Acesse `http://localhost:3000`
+- Faça login com credenciais válidas
+- Verifique se o mapa carrega corretamente
+- Teste a busca por municípios
+- Confirme exportação de PDFs funcionando
 
 ---
 
 ## Scripts NPM
+
+### 🚀 **Desenvolvimento**
 | Comando | Descrição |
 |---------|-----------|
-| `npm install` | Instala dependências |
-| `npm run dev` | Ambiente de desenvolvimento (Turbopack) |
+| `npm run dev` | Ambiente de desenvolvimento com Turbopack |
 | `npm run dev -- --host 0.0.0.0` | Expor na rede local para testes mobile |
-| `npm run build` | Build de produção |
-| `npm start` | Inicia o servidor Next.js de produção |
-| `npm run lint` | Analisa o código com ESLint |
+| `npm run dev -- --port 3001` | Executar em porta específica |
+
+### 🏗️ **Produção e Build**
+| Comando | Descrição |
+|---------|-----------|
+| `npm run build` | Build otimizado para produção |
+| `npm run start` | Iniciar servidor de produção |
+| `npm run vercel-build` | Build específico para Vercel (com Prisma) |
+
+### 🔧 **Banco de Dados e Prisma**
+| Comando | Descrição |
+|---------|-----------|
+| `npx prisma generate` | Gerar cliente Prisma |
+| `npx prisma db push` | Aplicar schema ao banco (sem migração) |
+| `npx prisma migrate dev` | Criar e aplicar migrações |
+| `npx prisma studio` | Interface gráfica do Prisma |
+| `npx prisma db seed` | Popular banco com dados iniciais |
+
+### 🧹 **Qualidade de Código**
+| Comando | Descrição |
+|---------|-----------|
+| `npm run lint` | Executar ESLint |
+| `npm run lint -- --fix` | Corrigir automaticamente erros ESLint |
+| `npx tsc --noEmit` | Verificar tipos TypeScript |
+
+### 🐛 **Debug e Testes**
+| Comando | Descrição |
+|---------|-----------|
+| `npm run debug` | Ambiente com logs detalhados |
+| `npx next lint --file src/components/ModalOrcamento.jsx` | Lint arquivo específico |
+
+### 📦 **Utilitários**
+| Comando | Descrição |
+|---------|-----------|
+| `npm install` | Instalar todas as dependências |
+| `npm ci` | Instalar dependências de produção (CI/CD) |
+| `npm audit` | Verificar vulnerabilidades de segurança |
+| `npm outdated` | Listar pacotes desatualizados |
 
 ---
 
@@ -142,20 +400,261 @@ src/
 ---
 
 ## Fluxo da Aplicação
-1. Animação 3D de introdução (opcional) → `/`
-2. Tela de **Login** (JWT) → `/login`
-3. Página **Mapa** → `/mapa`
-   - Seleção de estado & município
-   - Carregamento progressivo (barra de progresso)
-   - Exibição do mapa e painel de informações
-4. Ações futuras: edição de camadas, exportação de relatórios…
+
+### 🎬 **Jornada do Usuário**
+
+#### **1. Entrada na Aplicação** (`/`)
+- **Animação 3D** de introdução com Nexus3D
+- **Efeitos visuais** interativos (partículas responsivas)
+- **Transição automática** para tela de boas-vindas
+- **Botão de acesso** ao login
+
+#### **2. Autenticação** (`/login`)
+- **Formulário de login** (username/email + senha)
+- **Validação JWT** com controle de plataformas
+- **Middleware de proteção** para rotas `/mapa` e `/estrategia`
+- **Redirecionamento automático** se já autenticado
+
+#### **3. Dashboard Principal** (`/mapa`)
+- **Carregamento progressivo** dos dados GeoJSON do S3
+- **Barra de progresso** visual em tempo real
+- **Cache inteligente** (memória + localStorage + S3)
+- **Estados de loading** para diferentes componentes
+
+#### **4. Interação com Mapa**
+- **Busca inteligente**: Estado → Município (autocomplete)
+- **Destaque visual** do município selecionado
+- **Cálculo de centroides** para posicionamento do alfinete
+- **Animações de transição** suaves (fade-in/fade-out)
+- **Popups informativos** com dados demográficos
+
+#### **5. Painel de Informações** (`InformacoesMunicipio`)
+- **12 produtos municipais** com status automático
+- **Verificação de vencimento** (PD: 10 anos, PMSB: 4 anos)
+- **Links diretos** para Google Drive
+- **Formatação monetária** inteligente
+- **Ícones visuais** por categoria de produto
+
+#### **6. Sistema de Exportação**
+- **Geração de PDFs** via template personalizado
+- **Preenchimento automático** de dados municipais
+- **Download direto** com nomes padronizados
+- **Modal avançado** com opções de exportação
+
+#### **7. Módulo Estratégia** (`/estrategia`)
+- **Dados de polos de valores** e periferia
+- **Visualização temática** para análise estratégica
+- **Integração com dados municipais**
+- **Dados mock** para desenvolvimento
+
+### 🔄 **Fluxo de Dados Técnicos**
+
+#### **Autenticação e Autorização**
+```
+Login Form → API /auth → JWT Token → Cookie HTTP-only
+                                      → Verificação Plataforma
+                                      → Middleware Protection
+```
+
+#### **Carregamento de Dados**
+```
+MapDataContext → /api/proxy-geojson/files → S3 Parallel Download
+                                               → Cache System (3 layers)
+                                               → State Update → UI Render
+```
+
+#### **Busca e Destaque**
+```
+Estado Selection → Município Filter → GeoJSON Search
+                                       → Turf.js Centroid Calculation
+                                       → Leaflet Marker + Animation
+                                       → Popup + Info Panel Update
+```
+
+#### **Exportação**
+```
+City Data → pdf-lib Template → Fill Form Fields
+                               → Flatten PDF → Download Blob
+```
+
+### 🎯 **Estados da Aplicação**
+- **Loading**: Carregamento inicial dos dados
+- **Ready**: Mapa totalmente carregado e funcional
+- **Error**: Estados de erro com fallback
+- **Transitioning**: Animações entre estados
+- **Authenticated/Unauthenticated**: Controle de acesso
+
+---
+
+## Modelo de Dados
+
+### 🗄️ **Schema Prisma (PostgreSQL)**
+```prisma
+// Usuários e autenticação
+model users {
+  id          Int     @id @default(autoincrement())
+  email       String? @unique
+  username    String? @unique
+  hash        String  // senha hasheada com bcrypt
+  role        String?
+  platforms   String? // controle de acesso por plataforma
+  name        String?
+  cargo       String?
+  photo       String?
+  created_at  DateTime @default(now())
+  updated_at  DateTime @default(now())
+}
+
+// Controle de acessos municipais
+model municipio_acessos {
+  id           Int         @id @default(autoincrement())
+  user_id      Int?
+  municipio_id Int?
+  exclusive    Boolean     @default(false)
+  granted_at   DateTime?   @default(now())
+  valid_until  DateTime?
+  uf           String?
+}
+
+// Dados municipais base
+model municipios {
+  id                Int                 @id @default(autoincrement())
+  municipio         String
+  name_state        String
+  created_at        DateTime            @default(now())
+  updated_at        DateTime            @default(now())
+  municipio_acessos municipio_acessos[]
+}
+```
+
+### 📊 **Dados Geoespaciais**
+- **GeoJSON**: Formato padrão para geometrias municipais
+- **Projeção**: Sistema de coordenadas brasileiro (SIRGAS 2000)
+- **Atributos**: População, domicílios, dados políticos, produtos
+- **Índices**: Otimizados para consultas espaciais
+
+---
+
+## Funcionalidades Avançadas
+
+### 🔍 **Sistema de Busca Inteligente**
+- **Normalização de acentos** automática
+- **Busca fuzzy** com tolerância a erros de digitação
+- **Autocomplete** em tempo real
+- **Filtragem** por estado e município
+
+### 🎨 **Interface Adaptativa**
+- **Responsividade completa**: Mobile (320px) → Desktop (1400px+)
+- **Breakpoints otimizados**: sm, md, lg, xl
+- **Layout fluido** com CSS Grid e Flexbox
+- **Animações performáticas** com CSS transforms
+
+### ⚡ **Performance Otimizada**
+- **Lazy loading** de componentes pesados
+- **Code splitting** automático por rotas
+- **Image optimization** com Next.js Image
+- **Bundle analysis** para otimização
+
+### 🔒 **Segurança Implementada**
+- **JWT tokens** com expiração de 1 hora
+- **Cookies HTTP-only** para tokens
+- **Hashing bcrypt** para senhas
+- **Validação de plataforma** por usuário
+- **Middleware de proteção** de rotas
+
+---
+
+## Troubleshooting
+
+### 🐛 **Problemas Comuns**
+
+#### **Erro de Conexão S3**
+```bash
+# Verificar variáveis de ambiente
+echo $AWS_ACCESS_KEY_ID
+echo $AWS_SECRET_ACCESS_KEY
+
+# Testar conectividade
+npx aws s3 ls s3://your-bucket-name/
+```
+
+#### **Erro de Autenticação**
+```bash
+# Verificar JWT_SECRET
+echo $JWT_SECRET
+
+# Limpar cookies do navegador
+# Developer Tools → Application → Cookies → Delete
+```
+
+#### **Problemas com Mapa**
+```bash
+# Verificar arquivos GeoJSON no S3
+npx aws s3 ls s3://your-bucket-name/ --recursive
+
+# Limpar cache do navegador
+# Ctrl+Shift+R (hard refresh)
+```
+
+#### **Erro de Build**
+```bash
+# Limpar cache do Next.js
+rm -rf .next
+npm run build
+
+# Verificar TypeScript
+npx tsc --noEmit
+```
+
+---
+
+## API Reference
+
+### 🔗 **Endpoints Principais**
+
+#### **Autenticação**
+- `POST /api/auth` - Login de usuário
+- `GET /api/auth/verify` - Verificar token JWT
+- `POST /api/auth/logout` - Logout do usuário
+
+#### **Dados Geoespaciais**
+- `GET /api/geojson` - Dados municipais base
+- `GET /api/municipios/[estado]` - Municípios por estado
+- `GET /api/proxy-geojson/[filename]` - Proxy para arquivos S3
+- `GET /api/estrategia/data` - Dados estratégicos
+
+#### **Utilitários**
+- `GET /api/env` - Variáveis de ambiente
+- `GET /api/debug` - Informações de debug
 
 ---
 
 ## Contribuindo
-1. Faça um *fork* e crie sua *branch*: `git checkout -b minha-feature`
-2. **ESLint** & **TypeScript** devem passar sem erros
-3. Envie o *pull request* descrevendo sua mudança
+
+### 🚀 **Como Contribuir**
+1. **Faça um fork** do repositório
+2. **Crie sua branch**: `git checkout -b feature/nova-funcionalidade`
+3. **Siga os padrões** de código (ESLint + TypeScript)
+4. **Teste suas mudanças** em diferentes dispositivos
+5. **Envie um PR** com descrição detalhada
+
+### 📋 **Padrões de Código**
+- **TypeScript strict mode** habilitado
+- **ESLint** configurado para Next.js
+- **Prettier** para formatação automática
+- **Conventional commits** para mensagens
+
+### 🧪 **Testes**
+```bash
+# Executar linting
+npm run lint
+
+# Verificar tipos
+npx tsc --noEmit
+
+# Build de produção
+npm run build
+```
 
 ---
 
@@ -164,4 +663,11 @@ Distribuído sob a **Licença MIT**. Consulte o arquivo `LICENSE` para mais deta
 
 ---
 
-Desenvolvido pela equipe de Data Science da Innovatis MC
+## Suporte
+- 📧 **Email**: suporte@nexus.innovatis.com.br
+- 📱 **Issues**: GitHub Issues para bugs e solicitações
+- 📚 **Documentação**: Este README e comentários no código
+
+---
+
+**Desenvolvido pela equipe de Data Science da Innovatis MC** 🚀

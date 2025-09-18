@@ -132,6 +132,7 @@ function PortalTooltip({ isVisible, anchorRef, children }: PortalTooltipProps) {
 
 // Componente principal que usa o contexto
 function MapaPageContent() {
+  console.log('🗺️ [MapaPage] Componente montado');
   const { municipioSelecionado, setMunicipioSelecionado, loading, loadingProgress, mapData } = useMapData();
   const [municipio, setMunicipio] = useState<string>("");
   const [estado, setEstado] = useState<string>("");
@@ -186,19 +187,24 @@ function MapaPageContent() {
   const pistasDoMunicipio = useMemo(() => {
     try {
       if (!mapData?.pistas || !municipioSelecionado?.properties) return [] as any[];
+
       const raw = (municipioSelecionado as any).properties?.code_muni;
       const codeMuni = String(raw ?? '').trim();
       const norm = (v: any) => String(v ?? '').replace(/\D+/g, '');
       const codeKey = norm(codeMuni);
+
       if (!codeKey) return [] as any[];
+
       const list = (mapData.pistas as any[]).filter((p: any) => norm(p['codigo']) === codeKey);
-      if (typeof window !== 'undefined') {
-        console.log('[Pistas] code_muni selecionado:', codeMuni, '=> norm:', codeKey, '| pistasTotal:', (mapData.pistas as any[]).length, '| encontradas:', list.length);
-        if (list.length > 0) console.log('[Pistas] exemplo:', list[0]);
+
+      console.log(`✈️ [MapaPage] Pistas para ${municipioSelecionado.properties?.nome_municipio}: ${list.length} encontradas`);
+      if (list.length > 0) {
+        console.log(`✈️ [MapaPage] Primeira pista: ${list[0]['nome_pista']} (${list[0]['codigo_pista']})`);
       }
+
       return list;
     } catch (e) {
-      console.warn('[Pistas] erro ao calcular pistasDoMunicipio:', e);
+      console.error('❌ [MapaPage] Erro ao calcular pistas:', e);
       return [] as any[];
     }
   }, [mapData, municipioSelecionado]);
@@ -231,7 +237,10 @@ function MapaPageContent() {
         .filter(Boolean)
         .sort()
       )];
+      console.log(`📊 [MapaPage] Estados carregados: ${estadosUnicos.length} estados encontrados`);
       setEstados(estadosUnicos as string[]);
+    } else {
+      console.log('📊 [MapaPage] Aguardando dados do mapa...');
     }
   }, [mapData]);
   
@@ -241,24 +250,42 @@ function MapaPageContent() {
       setMunicipios([]);
       return;
     }
-    
+
+    console.log(`🏛️ [MapaPage] Estado selecionado: ${estadoSelecionado}`);
+
     const municipiosDoEstado = mapData.dados.features
       .filter((feature: Feature) => feature.properties?.name_state === estadoSelecionado)
       .map((feature: Feature) => feature.properties?.nome_municipio || feature.properties?.municipio)
       .filter(Boolean)
       .sort();
-    
+
+    console.log(`🏛️ [MapaPage] Municípios encontrados para ${estadoSelecionado}: ${municipiosDoEstado.length}`);
     setMunicipios([...new Set(municipiosDoEstado)] as string[]);
   }, [estadoSelecionado, mapData]);
   
   // Atualizar os campos de texto quando os dropdowns mudarem
   useEffect(() => {
+    if (estadoSelecionado) {
+      console.log(`📍 [MapaPage] Estado selecionado no dropdown: ${estadoSelecionado}`);
+    }
     setEstado(estadoSelecionado);
   }, [estadoSelecionado]);
-  
+
   useEffect(() => {
+    if (municipioSelecionadoDropdown) {
+      console.log(`🏛️ [MapaPage] Município selecionado no dropdown: ${municipioSelecionadoDropdown}`);
+    }
     setMunicipio(municipioSelecionadoDropdown);
   }, [municipioSelecionadoDropdown]);
+
+  // Log quando um município é selecionado (por qualquer método)
+  useEffect(() => {
+    if (municipioSelecionado) {
+      console.log(`🗺️ [MapaPage] Município selecionado: ${municipioSelecionado.properties?.nome_municipio || municipioSelecionado.properties?.municipio} - ${municipioSelecionado.properties?.name_state}`);
+    } else {
+      console.log(`🗺️ [MapaPage] Nenhum município selecionado`);
+    }
+  }, [municipioSelecionado]);
 
   // Busca o município ao clicar em buscar
   function removerAcentos(str: string) {
@@ -266,6 +293,8 @@ function MapaPageContent() {
   }
   function handleBuscarMunicipio(e: React.FormEvent) {
     e.preventDefault();
+    console.log('🔍 [MapaPage] Iniciando busca de município...');
+
     setMunicipioSelecionado(null);
     setErroBusca(null);
     
@@ -273,14 +302,18 @@ function MapaPageContent() {
     
     // Se temos o município selecionado no dropdown, usamos ele diretamente
     if (estadoSelecionado && municipioSelecionadoDropdown) {
-      const municipioEncontrado = mapData.dados.features.find((feature: Feature) => 
-        (feature.properties?.nome_municipio === municipioSelecionadoDropdown || 
-         feature.properties?.municipio === municipioSelecionadoDropdown) && 
+      console.log(`🔍 [MapaPage] Busca por dropdown: ${municipioSelecionadoDropdown} - ${estadoSelecionado}`);
+
+      const municipioEncontrado = mapData.dados.features.find((feature: Feature) =>
+        (feature.properties?.nome_municipio === municipioSelecionadoDropdown ||
+         feature.properties?.municipio === municipioSelecionadoDropdown) &&
         feature.properties?.name_state === estadoSelecionado
       );
-      
+
       if (municipioEncontrado) {
-        // Mescla propriedades de produtos (ex: valor_vaat_formato)
+        console.log(`✅ [MapaPage] Município encontrado: ${municipioEncontrado.properties?.nome_municipio || municipioEncontrado.properties?.municipio}`);
+
+        // Mescla propriedades de produtos
         let municipioFinal = municipioEncontrado;
         if (mapData?.produtos?.features) {
           const prodMatch = mapData.produtos.features.find((f: Feature) => {
@@ -289,6 +322,7 @@ function MapaPageContent() {
             return nome === (municipioEncontrado.properties?.nome_municipio || municipioEncontrado.properties?.municipio) && uf === municipioEncontrado.properties?.name_state;
           });
           if (prodMatch) {
+            console.log(`📦 [MapaPage] Dados de produtos mesclados`);
             municipioFinal = {
               ...municipioEncontrado,
               properties: {
@@ -299,6 +333,8 @@ function MapaPageContent() {
           }
         }
         setMunicipioSelecionado(municipioFinal);
+        console.log(`🗺️ [MapaPage] Município selecionado no mapa`);
+
         // Scroll para os dados no mobile
         setTimeout(() => {
           if (window.innerWidth < 768 && dadosRef.current) {
@@ -306,6 +342,7 @@ function MapaPageContent() {
           }
         }, 200);
       } else {
+        console.error(`❌ [MapaPage] Município não encontrado: ${municipioSelecionadoDropdown} - ${estadoSelecionado}`);
         setErroBusca(`Município "${municipioSelecionadoDropdown}" não encontrado no estado "${estadoSelecionado}".`);
       }
       return;
@@ -314,18 +351,23 @@ function MapaPageContent() {
     // Caso contrário, usamos a busca por texto
     const municipioBuscaNorm = removerAcentos(municipio.toLowerCase());
     const estadoBuscaNorm = removerAcentos(estado.toLowerCase());
-    
+
+    console.log(`🔍 [MapaPage] Busca por texto: "${municipio}" em "${estado}"`);
+    console.log(`🔍 [MapaPage] Termos normalizados: "${municipioBuscaNorm}" / "${estadoBuscaNorm}"`);
+
     const municipioEncontrado = mapData.dados.features.find((feature: Feature) => {
       const nomeMunicipio = feature.properties?.nome_municipio || feature.properties?.municipio || "";
       const nomeEstado = feature.properties?.name_state || "";
-      
+
       return (
         removerAcentos(nomeMunicipio.toLowerCase()).includes(municipioBuscaNorm) &&
         removerAcentos(nomeEstado.toLowerCase()).includes(estadoBuscaNorm)
       );
     });
-    
+
     if (municipioEncontrado) {
+      console.log(`✅ [MapaPage] Município encontrado por texto: ${municipioEncontrado.properties?.nome_municipio || municipioEncontrado.properties?.municipio}`);
+
       let municipioFinal = municipioEncontrado;
       if (mapData?.produtos?.features) {
         const prodMatch = mapData.produtos.features.find((f: Feature) => {
@@ -334,6 +376,7 @@ function MapaPageContent() {
           return nome === (municipioEncontrado.properties?.nome_municipio || municipioEncontrado.properties?.municipio) && uf === municipioEncontrado.properties?.name_state;
         });
         if (prodMatch) {
+          console.log(`📦 [MapaPage] Dados de produtos mesclados (busca por texto)`);
           municipioFinal = {
             ...municipioEncontrado,
             properties: {
@@ -344,7 +387,9 @@ function MapaPageContent() {
         }
       }
       setMunicipioSelecionado(municipioFinal);
+      console.log(`🗺️ [MapaPage] Município selecionado no mapa (busca por texto)`);
     } else {
+      console.error(`❌ [MapaPage] Município não encontrado por texto: "${municipio}" em "${estado}"`);
       setErroBusca(`Município "${municipio}" não encontrado no estado "${estado}".`);
     }
   }
@@ -468,7 +513,9 @@ function MapaPageContent() {
               </div>
             </form>
 
-            {erroBusca && <span className="text-red-400 mt-1 text-sm">{erroBusca}</span>}
+            {erroBusca && (
+              <span className="text-red-400 mt-1 text-sm">{erroBusca}</span>
+            )}
           </section>
         </div>
         </div>
@@ -522,7 +569,10 @@ function MapaPageContent() {
                             aria-expanded={tooltipVisible}
                             onMouseEnter={() => setTooltipVisible(true)}
                             onMouseLeave={() => setTooltipVisible(false)}
-                            onClick={() => setTooltipVisible(v => !v)}
+                            onClick={() => {
+                              console.log(`✈️ [MapaPage] Tooltip de pistas ${!tooltipVisible ? 'aberto' : 'fechado'}`);
+                              setTooltipVisible(v => !v);
+                            }}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' || e.key === ' ') {
                                 e.preventDefault();
@@ -808,6 +858,9 @@ function MapaPageContent() {
       </PortalTooltip>
     </div>
   );
+
+  // Log quando a página está totalmente carregada
+  console.log(`✅ [MapaPage] Página renderizada - Loading: ${loading}, Município selecionado: ${!!municipioSelecionado}`);
 }
 
 export default function MapaPage() {

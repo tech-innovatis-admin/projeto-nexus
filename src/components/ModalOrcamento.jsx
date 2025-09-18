@@ -164,90 +164,94 @@ function ModalOrcamento({ isOpen, onClose, mapData }) {
         <div className="p-4 md:p-6 overflow-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Estados */}
-            <div className="border border-gray-200 rounded-md">
-              <div className="px-3 py-2 border-b border-gray-200 bg-gray-50 flex items-center justify-between relative">
-                <div className="absolute inset-x-0 text-center">
-                  <span className="font-medium text-gray-800">Estados</span>
+            <div>
+              <div className="border border-gray-200 rounded-md">
+                <div className="px-3 py-2 border-b border-gray-200 bg-gray-50 flex items-center justify-between relative">
+                  <div className="absolute inset-x-0 text-center">
+                    <span className="font-medium text-gray-800">Estados</span>
+                  </div>
+                  <div className="invisible">
+                    <span className="font-medium text-gray-800">Estados</span>
+                  </div>
+                  <div className="space-x-2 z-10">
+                    <button className="text-xs font-semibold text-sky-600 hover:text-sky-900 px-2 py-1 rounded border border-sky-200 hover:bg-sky-50 transition-colors min-w-[50px] inline-block" onClick={() => setSelectedStates([...allStates])}>Todos</button>
+                    <button className="text-xs font-semibold text-sky-600 hover:text-sky-900 px-2 py-1 rounded border border-sky-200 hover:bg-sky-50 transition-colors min-w-[50px] inline-block" onClick={() => setSelectedStates([])}>Nenhum</button>
+                  </div>
                 </div>
-                <div className="invisible">
-                  <span className="font-medium text-gray-800">Estados</span>
-                </div>
-                <div className="space-x-2 z-10">
-                  <button className="text-xs font-semibold text-sky-600 hover:text-sky-900 px-2 py-1 rounded border border-sky-200 hover:bg-sky-50 transition-colors min-w-[50px] inline-block" onClick={() => setSelectedStates([...allStates])}>Todos</button>
-                  <button className="text-xs font-semibold text-sky-600 hover:text-sky-900 px-2 py-1 rounded border border-sky-200 hover:bg-sky-50 transition-colors min-w-[50px] inline-block" onClick={() => setSelectedStates([])}>Nenhum</button>
+                <div className="p-3">
+                  <input
+                    type="text"
+                    placeholder="Buscar estado..."
+                    value={searchState}
+                    onChange={(e) => setSearchState(e.target.value)}
+                    className="text-gray-700 w-full border border-gray-300 rounded px-2 py-1 mb-2 text-sm"
+                  />
+                  <div className="max-h-64 overflow-auto space-y-1 tex-sm text-gray-700">
+                    {filteredStates.map((st) => (
+                      <label key={st} className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={selectedStates.includes(st)}
+                          onChange={(e) => {
+                            if (e.target.checked) setSelectedStates(prev => [...prev, st]);
+                            else setSelectedStates(prev => prev.filter(s => s !== st));
+                          }}
+                        />
+                        <span className="text-sm text-gray-700">{st}</span>
+                      </label>
+                    ))}
+                  </div>
                 </div>
               </div>
-              <div className="p-3">
-                <input
-                  type="text"
-                  placeholder="Buscar estado..."
-                  value={searchState}
-                  onChange={(e) => setSearchState(e.target.value)}
-                  className="text-gray-700 w-full border border-gray-300 rounded px-2 py-1 mb-2 text-sm"
-                />
-        <div className="max-h-64 overflow-auto space-y-1 tex-sm text-gray-700">
-                  {filteredStates.map((st) => (
-                    <label key={st} className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={selectedStates.includes(st)}
-                        onChange={(e) => {
-                          if (e.target.checked) setSelectedStates(prev => [...prev, st]);
-                          else setSelectedStates(prev => prev.filter(s => s !== st));
-                        }}
-                      />
-          <span className="text-sm text-gray-700">{st}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-              <p className="text-xs text-gray-500 text-center mt-2 px-3">
+              <p className="text-xs text-gray-500 mt-2 text-center">
                 {selectedStates.length} de {allStates.length} selecionados
               </p>
             </div>
 
             {/* Municípios */}
-            <div className="border border-gray-200 rounded-md">
-              <div className="px-3 py-2 border-b border-gray-200 bg-gray-50 flex items-center justify-between relative">
-                <div className="absolute inset-x-0 text-center">
-                  <span className="font-medium text-gray-800">Municípios</span>
+            <div>
+              <div className="border border-gray-200 rounded-md">
+                <div className="px-3 py-2 border-b border-gray-200 bg-gray-50 flex items-center justify-between relative">
+                  <div className="absolute inset-x-0 text-center">
+                    <span className="font-medium text-gray-800">Municípios</span>
+                  </div>
+                  <div className="invisible">
+                    <span className="font-medium text-gray-800">Municípios</span>
+                  </div>
+                  <div className="space-x-2 z-10">
+                    <button className="text-xs font-semibold text-sky-600 hover:text-sky-900 px-2 py-1 rounded border border-sky-200 hover:bg-sky-50 transition-colors min-w-[50px] inline-block" onClick={() => setSelectedMunicipalities(filteredMunicipalities.map(m => municipalityKey(m)))}>Todos</button>
+                    <button className="text-xs font-semibold text-sky-600 hover:text-sky-900 px-2 py-1 rounded border border-sky-200 hover:bg-sky-50 transition-colors min-w-[50px] inline-block" onClick={() => setSelectedMunicipalities([])}>Nenhum</button>
+                  </div>
                 </div>
-                <div className="invisible">
-                  <span className="font-medium text-gray-800">Municípios</span>
-                </div>
-                <div className="space-x-2 z-10">
-                  <button className="text-xs font-semibold text-sky-600 hover:text-sky-900 px-2 py-1 rounded border border-sky-200 hover:bg-sky-50 transition-colors min-w-[50px] inline-block" onClick={() => setSelectedMunicipalities(filteredMunicipalities.map(m => municipalityKey(m)))}>Todos</button>
-                  <button className="text-xs font-semibold text-sky-600 hover:text-sky-900 px-2 py-1 rounded border border-sky-200 hover:bg-sky-50 transition-colors min-w-[50px] inline-block" onClick={() => setSelectedMunicipalities([])}>Nenhum</button>
+                <div className="p-3">
+                  <input
+                    type="text"
+                    placeholder="Buscar município..."
+                    value={searchMunicipio}
+                    onChange={(e) => setSearchMunicipio(e.target.value)}
+                    className="text-gray-700 w-full border border-gray-300 rounded px-2 py-1 mb-2 text-sm"
+                  />
+                  <div className="max-h-64 overflow-auto space-y-1 text-sm text-gray-700">
+                    {filteredMunicipalities.map((m) => {
+                      const key = municipalityKey(m);
+                      return (
+                        <label key={key} className="text-gray-700 flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={selectedMunicipalities.includes(key)}
+                            onChange={(e) => {
+                              if (e.target.checked) setSelectedMunicipalities(prev => [...prev, key]);
+                              else setSelectedMunicipalities(prev => prev.filter(x => x !== key));
+                            }}
+                          />
+                          <span className="text-sm text-gray-700">{m.name} - {m.state}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-              <div className="p-3">
-                <input
-                  type="text-black"
-                  placeholder="Buscar município..."
-                  value={searchMunicipio}
-                  onChange={(e) => setSearchMunicipio(e.target.value)}
-                  className="text-gray-700 w-full border border-gray-300 rounded px-2 py-1 mb-2 text-sm"
-                />
-    <div className="max-h-64 overflow-auto space-y-1 text-sm text-gray-700">
-                  {filteredMunicipalities.map((m) => {
-                    const key = municipalityKey(m);
-                    return (
-                      <label key={key} className="text-gray-700 flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          checked={selectedMunicipalities.includes(key)}
-                          onChange={(e) => {
-                            if (e.target.checked) setSelectedMunicipalities(prev => [...prev, key]);
-                            else setSelectedMunicipalities(prev => prev.filter(x => x !== key));
-                          }}
-                        />
-      <span className="text-sm text-gray-700">{m.name} - {m.state}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-              <p className="text-xs text-gray-500 text-center mt-2 px-3">
+              <p className="text-xs text-gray-500 mt-2 text-center">
                 {selectedMunicipalities.length} de {filteredMunicipalities.length} selecionados
               </p>
             </div>

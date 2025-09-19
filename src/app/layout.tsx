@@ -12,6 +12,7 @@ import Nexus3D from "../components/Nexus3D";
 // Contexto do usuário
 import { UserProvider } from "../contexts/UserContext";
 import { MapDataProvider } from "../contexts/MapDataContext";
+import { EstrategiaDataProvider } from "../contexts/EstrategiaDataContext";
 
 // Metadados da aplicação (SEO e configurações da página)
 export const metadata: Metadata = {
@@ -39,7 +40,9 @@ export default function RootLayout({
       <body className="antialiased">
         <UserProvider>
           <MapDataProvider>
-            {children}
+            <EstrategiaDataProvider>
+              {children}
+            </EstrategiaDataProvider>
           </MapDataProvider>
         </UserProvider>
       </body>

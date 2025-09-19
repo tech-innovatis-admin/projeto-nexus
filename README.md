@@ -6,14 +6,15 @@
 1. [Visão Geral](#visão-geral)
 2. [Principais Funcionalidades](#principais-funcionalidades)
 3. [Arquitetura](#arquitetura)
-4. [Estrutura de Pastas](#estrutura-de-pastas)
-5. [Tecnologias Utilizadas](#tecnologias-utilizadas)
-6. [Configuração do Ambiente](#configuração-do-ambiente)
-7. [Scripts NPM](#scripts-npm)
-8. [Visualização em Dispositivos Móveis](#visualização-em-dispositivos-móveis)
-9. [Fluxo da Aplicação](#fluxo-da-aplicação)
-10. [Contribuindo](#contribuindo)
-11. [Licença](#licença)
+4. [Arquitetura Avançada: Resolução de Remount-Triggered Fetching](#-arquitetura-avançada-resolução-de-remount-triggered-fetching)
+5. [Estrutura de Pastas](#estrutura-de-pastas)
+6. [Tecnologias Utilizadas](#tecnologias-utilizadas)
+7. [Configuração do Ambiente](#configuração-do-ambiente)
+8. [Scripts NPM](#scripts-npm)
+9. [Visualização em Dispositivos Móveis](#visualização-em-dispositivos-móveis)
+10. [Fluxo da Aplicação](#fluxo-da-aplicação)
+11. [Contribuindo](#contribuindo)
+12. [Licença](#licença)
 
 ---
 
@@ -84,7 +85,6 @@ O **NEXUS** é uma plataforma web desenvolvida pela *Data Science Team – Innov
 - **Efeitos de Partículas** interativos ao mouse/touch
 - **Transições Suaves** entre estados da aplicação
 - **Responsividade Completa**: Mobile, tablet e desktop
-- **Tema Escuro** consistente
 - **Tooltips e Popovers** informativos
 - **Ícones Customizados** e FontAwesome
 
@@ -94,8 +94,7 @@ O **NEXUS** é uma plataforma web desenvolvida pela *Data Science Team – Innov
 ```
 Next.js App Router (15) ─┐
                         ├── Frontend (React 19 + TypeScript 5)
-                        │   ├── Context API (MapDataContext, UserContext)
-                        │   ├── Hooks (useS3Data, useEstrategiaData)
+                        │   ├── Context API (MapDataContext, UserContext, EstrategiaDataContext)
                         │   ├── Components (MapaMunicipal, InformacoesMunicipio, Nexus3D)
                         │   └── Utils (s3Service, pdfOrcamento, cacheGeojson)
                         │
@@ -141,6 +140,137 @@ AWS S3 ──> GeoJSON, JSON, CSV, PDF Templates
 10. **Painel** exibe produtos com status automático
 11. **Export** gera PDFs via template personalizado
 
+### 🚀 **Arquitetura Avançada: Resolução de Remount-Triggered Fetching**
+
+#### **🎯 Problema do Next.js App Router**
+No Next.js App Router, cada página é um componente React independente. Ao navegar entre rotas:
+- Página anterior **desmonta** completamente
+- Nova página **monta** do zero
+- `useEffect` roda novamente → **fetch desnecessário**
+- Resultado: múltiplos fetches para os mesmos dados
+
+```typescript
+// ❌ PROBLEMA: Fetch em cada navegação
+function PaginaMapa() {
+  useEffect(() => {
+    fetch('/api/dados').then(setData); // 🔥 Executa toda vez
+  }, []);
+}
+
+function PaginaEstrategia() {
+  useEffect(() => {
+    fetch('/api/dados').then(setData); // 🔥 Outro fetch
+  }, []);
+}
+```
+
+#### **✅ Solução: MapDataContext com Cache Hierárquico**
+
+```typescript
+// ✅ SOLUÇÃO: Provider persiste + useEffect condicional
+export function MapDataProvider({ children }) {
+  useEffect(() => {
+    if (mapData) return; // 🔥 PULA se dados existem
+    loadData();
+  }, [mapData]);
+
+  // Cache multi-camada + SWR
+  const loadData = async () => {
+    // 1️⃣ Cache localStorage (instantâneo)
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached?.data) {
+      setMapData(cached.data);
+      setLoading(false);
+      void fetchAndStore(false); // Revalidação em background
+      return;
+    }
+    // 2️⃣ Fetch completo se necessário
+    await fetchAndStore(true);
+  };
+}
+```
+
+#### **📊 Fluxo Otimizado de Navegação**
+
+```
+1️⃣ Login → /mapa (fetch + loading na primeira vez)
+   ├── MapDataProvider criado no Root Layout
+   └── Cache localStorage (30 dias)
+
+2️⃣ Navegação /mapa → /estrategia
+   ├── MapDataProvider PERSITE (não desmonta)
+   ├── useEffect vê mapData existe → SEM FETCH
+   └── Dados já disponíveis ⚡
+
+3️⃣ Refresh ou nova sessão
+   ├── Cache localStorage recuperado
+   ├── UI renderiza instantaneamente
+   └── Revalidação silenciosa em background
+```
+
+#### **🏆 Benefícios da Arquitetura**
+
+- **🚀 Zero fetches** em navegações entre páginas
+- **💾 Cache hierárquico**: Memória → localStorage → API
+- **🔄 Stale-While-Revalidate**: Dados velhos servem imediatamente
+- **⚡ Navegação instantânea** entre rotas
+- **📱 UX superior** com estados de loading apropriados
+
+#### **🔧 Implementação Técnica**
+
+```typescript
+// Root Layout - Provider persiste
+<MapDataProvider>  {/* 🔥 Nunca desmonta */}
+  {children}
+</MapDataProvider>
+
+// Context - Controle inteligente
+useEffect(() => {
+  if (mapData) return; // Condição crítica
+  loadData();
+}, [mapData]); // Dependência no estado
+
+// Cache Strategy - TTL + SWR
+const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dias
+```
+
+Esta arquitetura resolve completamente o problema de **remount-triggered fetching** e **overfetching**, garantindo performance excepcional em aplicações Next.js App Router.
+
+#### **🎯 Implementação na Página Estratégia**
+
+A página `/estrategia` foi atualizada para usar o mesmo padrão de cache hierárquico, resolvendo o problema de **remount-triggered fetching** dos dados estratégicos:
+
+```typescript
+// ❌ ANTES: Fetch direto na página (problema!)
+useEffect(() => {
+  const [valoresResp, periferiaResp] = await Promise.all([
+    fetchGeoJSONWithCache('/data/base_polo_valores.geojson', 'geo:polo_valores'),
+    fetchGeoJSONWithCache('/data/base_polo_periferia.geojson', 'geo:polo_periferia')
+  ]);
+  // Processamento dos dados...
+}, []);
+
+// ✅ DEPOIS: Usando EstrategiaDataContext (solução!)
+const { estrategiaData, loading, error } = useEstrategiaData();
+
+useEffect(() => {
+  if (!estrategiaData || loading) return;
+  // Processamento dos dados do contexto...
+}, [estrategiaData, loading]);
+```
+
+**🔄 Atualizações Realizadas:**
+- ✅ **Criado** `EstrategiaDataContext.tsx` - Contexto dedicado para dados estratégicos
+- ✅ **Integrado** `EstrategiaDataProvider` no `layout.tsx`
+- ✅ **Migrado** `/estrategia/page.tsx` para usar contexto ao invés de fetch direto
+- ✅ **Mantido** `/api/estrategia/data/route.ts` - API route otimizada
+- ✅ **Removido** `useS3Data.ts` - Hook obsoleto não utilizado
+
+**📊 Resultado:**
+- **Zero fetches** em navegações entre `/mapa` e `/estrategia`
+- **Cache compartilhado** para `base_polo_valores.geojson` e `base_polo_periferia.geojson`
+- **Performance otimizada** com SWR (Stale-While-Revalidate)
+
 ---
 
 ## Estrutura de Pastas
@@ -176,12 +306,9 @@ src/
 │   └── LayerControl.tsx   # Controles de camadas
 │
 ├── contexts/              # Contextos React para estado global
-│   ├── MapDataContext.tsx # Dados do mapa e cache
-│   └── UserContext.tsx    # Estado do usuário autenticado
-│
-├── hooks/                 # Hooks personalizados
-│   ├── useS3Data.ts       # Hook para dados S3
-│   └── useEstrategiaData.ts # Hook para dados estratégicos
+│   ├── MapDataContext.tsx     # Dados do mapa e cache
+│   ├── UserContext.tsx        # Estado do usuário autenticado
+│   └── EstrategiaDataContext.tsx # Dados estratégicos e cache
 │
 ├── utils/                 # Utilitários e serviços
 │   ├── s3Service.ts       # Cliente S3 e cache
@@ -628,15 +755,6 @@ npx tsc --noEmit
 - `GET /api/debug` - Informações de debug
 
 ---
-
-## Contribuindo
-
-### 🚀 **Como Contribuir**
-1. **Faça um fork** do repositório
-2. **Crie sua branch**: `git checkout -b feature/nova-funcionalidade`
-3. **Siga os padrões** de código (ESLint + TypeScript)
-4. **Teste suas mudanças** em diferentes dispositivos
-5. **Envie um PR** com descrição detalhada
 
 ### 📋 **Padrões de Código**
 - **TypeScript strict mode** habilitado

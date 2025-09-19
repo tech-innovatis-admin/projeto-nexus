@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, KeyboardEvent, Fragment } from 'react';
+import { useEstrategiaData } from '../../contexts/EstrategiaDataContext';
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import Navbar from '@/components/Navbar';
 import Sidebar from '@/components/Sidebar';
@@ -8,7 +9,7 @@ import MiniFooter from '@/components/MiniFooter';
 import ScrollToTopButton from '@/components/ScrollToTopButton';
 import dynamic from 'next/dynamic';
 import { AnimatePresence } from 'framer-motion';
-import { fetchGeoJSONWithCache } from '@/utils/cacheGeojson';
+// Removido: import { fetchGeoJSONWithCache } from '@/utils/cacheGeojson';
 import styles from './page.module.css';
 // Evita SSR para o mapa (MapLibre), prevenindo avisos de hidratação
 const MapLibrePolygons = dynamic(() => import('@/components/MapLibrePolygons'), { ssr: false });
@@ -104,27 +105,30 @@ function AnimatedMonetaryValue({ targetValue, selectedPolo }: { targetValue: num
 }
 
 export default function EstrategiaPage() {
+  console.log('📊 [EstrategiaPage] Componente montado');
+
+  // 🔥 USANDO O NOVO CONTEXTO - Resolve problema de remount-triggered fetching
+  const { estrategiaData, loading: loadingData, error: errorData } = useEstrategiaData();
+
   const [selectedMetric, setSelectedMetric] = useState('overview');
   const [showMunicipiosList, setShowMunicipiosList] = useState(false);
   const [isCardFlipped, setIsCardFlipped] = useState(false);
-  
+
   // Filtros selecionados (não aplicados ainda)
   const [selectedUF, setSelectedUF] = useState<string>('ALL');
   const [selectedPolo, setSelectedPolo] = useState<string>('ALL');
   const [minValor, setMinValor] = useState<number | ''>('');
   const [maxValor, setMaxValor] = useState<number | ''>('');
-  
+
   // Filtros aplicados (após clicar em buscar)
   const [appliedUF, setAppliedUF] = useState<string>('ALL');
   const [appliedPolo, setAppliedPolo] = useState<string>('ALL');
   const [appliedMinValor, setAppliedMinValor] = useState<number | ''>('');
   const [appliedMaxValor, setAppliedMaxValor] = useState<number | ''>('');
 
-  // Estado dos dados reais carregados de /public/data
+  // Estado dos dados processados do contexto
   const [polosValores, setPolosValores] = useState<PoloValoresProps[]>([]);
   const [periferia, setPeriferia] = useState<PeriferiaProps[]>([]);
-  const [loadingData, setLoadingData] = useState(true);
-  const [errorData, setErrorData] = useState<string | null>(null);
 
   // Normalizador de números pt-BR (aceita number ou string "1.234,56")
   const parsePtBrNumber = (v: unknown): number => {
@@ -139,70 +143,53 @@ export default function EstrategiaPage() {
     return Number.isFinite(n) ? n : 0;
   };
 
-  // Carregar as duas bases do /public/data
+  // 🔥 NOVO: Processar dados do contexto (resolve remount-triggered fetching)
   useEffect(() => {
-    let isMounted = true;
-    (async () => {
-      try {
-        setLoadingData(true);
-        setErrorData(null);
+    if (!estrategiaData || loadingData) return;
 
-        const [valoresResp, periferiaResp] = await Promise.all([
-          fetchGeoJSONWithCache('/data/base_polo_valores.geojson', 'geo:polo_valores', 24 * 60 * 60 * 1000),
-          fetchGeoJSONWithCache('/data/base_polo_periferia.geojson', 'geo:polo_periferia', 24 * 60 * 60 * 1000),
-        ]);
+    console.log('📊 [EstrategiaPage] Processando dados do contexto...');
 
-        if (!valoresResp.data || !periferiaResp.data) {
-          throw new Error('Falha ao carregar dados dos caches/servidor');
-        }
+    try {
+      const valoresJson = estrategiaData.poloValores;
+      const periferiaJson = estrategiaData.poloPeriferia;
 
-        const valoresJson = valoresResp.data;
-        const periferiaJson = periferiaResp.data;
+      const valores: PoloValoresProps[] = Array.isArray(valoresJson?.features)
+        ? valoresJson.features.map((f: any) => ({
+            codigo_origem: String(f?.properties?.codigo_origem ?? ''),
+            municipio_origem: String(f?.properties?.municipio_origem ?? ''),
+            soma_valor_total_destino: parsePtBrNumber(f?.properties?.soma_valor_total_destino),
+            valor_total_origem: parsePtBrNumber(f?.properties?.valor_total_origem),
+            UF_origem: String(f?.properties?.UF_origem ?? ''),
+            UF: String(f?.properties?.UF_origem ?? ''), // normaliza para UF
+            // Preserve a geometria (prioriza feature.geometry; fallback para properties.geom)
+            geom: f?.geometry ?? f?.properties?.geom ?? null,
+          }))
+        : [];
 
-        const valores: PoloValoresProps[] = Array.isArray(valoresJson?.features)
-          ? valoresJson.features.map((f: any) => ({
-              codigo_origem: String(f?.properties?.codigo_origem ?? ''),
-              municipio_origem: String(f?.properties?.municipio_origem ?? ''),
-              soma_valor_total_destino: parsePtBrNumber(f?.properties?.soma_valor_total_destino),
-              valor_total_origem: parsePtBrNumber(f?.properties?.valor_total_origem),
-              UF_origem: String(f?.properties?.UF_origem ?? ''),
-              UF: String(f?.properties?.UF_origem ?? ''), // normaliza para UF
-              // Preserve a geometria (prioriza feature.geometry; fallback para properties.geom)
-              geom: f?.geometry ?? f?.properties?.geom ?? null,
-            }))
-          : [];
+      const peri: PeriferiaProps[] = Array.isArray(periferiaJson?.features)
+        ? periferiaJson.features.map((f: any) => ({
+            codigo_origem: String(f?.properties?.codigo_origem ?? ''),
+            municipio_destino: String(f?.properties?.municipio_destino ?? ''),
+            valor_total_destino: parsePtBrNumber(f?.properties?.valor_total_destino),
+            ...(f?.properties?.codigo_destino ? { codigo_destino: String(f.properties.codigo_destino) } : {}),
+            // Preserve a geometria
+            geom: f?.geometry ?? f?.properties?.geom ?? null,
+          }))
+        : [];
 
-        const peri: PeriferiaProps[] = Array.isArray(periferiaJson?.features)
-          ? periferiaJson.features.map((f: any) => ({
-              codigo_origem: String(f?.properties?.codigo_origem ?? ''),
-              municipio_destino: String(f?.properties?.municipio_destino ?? ''),
-              valor_total_destino: parsePtBrNumber(f?.properties?.valor_total_destino),
-              ...(f?.properties?.codigo_destino ? { codigo_destino: String(f.properties.codigo_destino) } : {}),
-              // Preserve a geometria
-              geom: f?.geometry ?? f?.properties?.geom ?? null,
-            }))
-          : [];
+      // Enriquecer UF nas periferias herdando do polo (via codigo_origem)
+      const ufByCodigo = new Map(valores.map(v => [v.codigo_origem, String(v.UF || v.UF_origem || '').toUpperCase()]));
+      const valoresEnriched = valores.map(v => ({ ...v, UF: String(v.UF || v.UF_origem || '').toUpperCase() }));
+      const periEnriched = peri.map(v => ({ ...v, UF: ufByCodigo.get(v.codigo_origem) || '' }));
 
-        // Enriquecer UF nas periferias herdando do polo (via codigo_origem)
-        const ufByCodigo = new Map(valores.map(v => [v.codigo_origem, String(v.UF || v.UF_origem || '').toUpperCase()]));
-        const valoresEnriched = valores.map(v => ({ ...v, UF: String(v.UF || v.UF_origem || '').toUpperCase() }));
-        const periEnriched = peri.map(v => ({ ...v, UF: ufByCodigo.get(v.codigo_origem) || '' }));
+      setPolosValores(valoresEnriched);
+      setPeriferia(periEnriched);
 
-        if (isMounted) {
-          setPolosValores(valoresEnriched);
-          setPeriferia(periEnriched);
-          setLoadingData(false);
-        }
-      } catch (err: any) {
-        console.error('Erro ao carregar bases públicas:', err);
-        if (isMounted) {
-          setErrorData(err?.message || 'Erro ao carregar dados');
-          setLoadingData(false);
-        }
-      }
-    })();
-    return () => { isMounted = false; };
-  }, []);
+      console.log(`📊 [EstrategiaPage] Dados processados: ${valoresEnriched.length} polos, ${periEnriched.length} periferias`);
+    } catch (err: any) {
+      console.error('Erro ao processar dados estratégicos:', err);
+    }
+  }, [estrategiaData, loadingData]);
 
   // Função para formatar valores monetários
   const formatCurrency = (value: number) => {

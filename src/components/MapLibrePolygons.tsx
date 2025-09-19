@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import maplibregl, { LngLatBoundsLike, Map as MapLibreMap, LngLatBounds } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import * as turf from '@turf/turf';
 
 export interface FeatureLike {
   type: 'Feature';
@@ -106,28 +107,54 @@ export default function MapLibrePolygons({
   // Camadas visíveis: polos deve sempre iniciar ativado (e ficará bloqueado)
   const [showPolos, setShowPolos] = useState(true);
   const [showPeriferia, setShowPeriferia] = useState(false);
+  // ADICIONAR ESTADO PARA RAIO
+  const [radiusMode, setRadiusMode] = useState(false);
+  const [circleGeoJSON, setCircleGeoJSON] = useState<any>(null);
+  const centerRef = useRef<[number, number] | null>(null);
+  const radiusPopupRef = useRef<maplibregl.Popup | null>(null);
+  // ADICIONAR REFS NOVOS
+  const radiusModeRef = useRef(false);
+  const circleRef = useRef<any>(null);
+  const isDrawingRef = useRef(false);
+  const moveHandlerRef = useRef<((ev: MouseEvent) => void) | null>(null);
+  const upHandlerRef = useRef<((ev: MouseEvent) => void) | null>(null);
+  const [polosInRadius, setPolosInRadius] = useState<any[]>([]);
+  const [periferiasInRadius, setPeriferiasInRadius] = useState<any[]>([]);
+  
+  // Sincronizar checkbox da periferia com contexto de filtro
+  useEffect(() => {
+    const ufUpper = String(appliedUF || '').toUpperCase();
+    const inUFMode = appliedPolo === 'ALL' && ufUpper !== 'ALL' && ufUpper !== '';
+    const inPoloMode = appliedPolo !== 'ALL';
+    const inFilterMode = inUFMode || inPoloMode;
+    
+    // Ligar automaticamente o checkbox quando entrar em modo de filtro
+    if (inFilterMode && !showPeriferia) {
+      setShowPeriferia(true);
+    }
+  }, [appliedUF, appliedPolo, showPeriferia]);
   
   // Cores para polígonos normais e destacados (selecionados)
   const colors = {
     polo: {
-      fillOpacity: 0.45,
-      line: '#082A66',
-      lineWidth: 0.6,
+      fillOpacity: 0.6,
+      line: '#2563EB', // Azul substituindo cores anteriores
+      lineWidth: 2,
     },
     poloHighlighted: {
       fillOpacity: 0.8,
-      line: '#082A66',
-      lineWidth: 1.6,
+      line: '#2563EB', // Azul para destaque
+      lineWidth: 3,
     },
     periferia: {
-      fillOpacity: 0.35,
-      line: '#2B6CB0',
-      lineWidth: 0.6,
+      fillOpacity: 0.10,
+      line: '#2563EB', // Azul com baixa opacidade
+      lineWidth: 0, // Sem borda para periferia
     },
     periferiaHighlighted: {
-      fillOpacity: 0.55,
-      line: '#2B6CB0',
-      lineWidth: 1.2,
+      fillOpacity: 0.8,
+      line: '#2563EB', // Azul com baixa opacidade
+      lineWidth: 0, // Sem borda para periferia destacada
     }
   };
 
@@ -202,34 +229,34 @@ export default function MapLibrePolygons({
     }
   };
 
-  // Paleta oficial por UF (polo = escuro, periferia = claro)
+  // Paleta oficial por UF (polo = escuro, periferia = claro com +15% luminosidade)
   const UF_COLORS: Record<string, { polo: string; peri: string }> = {
-    AC: { polo: '#0A3D91', peri: '#8BB6FF' },
-    AL: { polo: '#2F5AA6', peri: '#A9C4FF' },
-    AM: { polo: '#3B47A5', peri: '#B8C0FF' },
-    AP: { polo: '#1E60A7', peri: '#A8D1FF' },
-    BA: { polo: '#234E9D', peri: '#9CB5FF' },
-    CE: { polo: '#2A6F9B', peri: '#A7D3F2' },
-    ES: { polo: '#1F7A8C', peri: '#9ED9E3' },
-    GO: { polo: '#0E91A1', peri: '#A3E7EF' },
-    MA: { polo: '#1A8F84', peri: '#A1E3D8' },
-    MG: { polo: '#1D7F62', peri: '#9DDCC3' },
-    MS: { polo: '#1E7D4F', peri: '#A6E4C8' },
-    MT: { polo: '#226B5C', peri: '#9ED3C5' },
-    PA: { polo: '#2BAE66', peri: '#B6F2D8' },
-    PB: { polo: '#2B9EA9', peri: '#B3E5EC' },
-    PE: { polo: '#3D5A80', peri: '#BBD1F3' },
-    PI: { polo: '#305A79', peri: '#AFC7DE' },
-    PR: { polo: '#2A7FB8', peri: '#AED7F4' },
-    RJ: { polo: '#2D8FD5', peri: '#B9E1FA' },
-    RN: { polo: '#3F6FE2', peri: '#C8D3FF' },
-    RO: { polo: '#4338CA', peri: '#C7D2FE' },
-    RR: { polo: '#2563EB', peri: '#BFDBFE' },
-    RS: { polo: '#06B6D4', peri: '#CFFAFE' },
-    SC: { polo: '#0D9488', peri: '#99F6E4' },
-    SE: { polo: '#059669', peri: '#A7F3D0' },
-    SP: { polo: '#0284C7', peri: '#BAE6FD' },
-    TO: { polo: '#6D28D9', peri: '#DDD6FE' },
+    AC: { polo: '#0A3D91', peri: '#A3C7FF' },
+    AL: { polo: '#2F5AA6', peri: '#C1D5FF' },
+    AM: { polo: '#3B47A5', peri: '#D0D1FF' },
+    AP: { polo: '#1E60A7', peri: '#C0E2FF' },
+    BA: { polo: '#234E9D', peri: '#B4C6FF' },
+    CE: { polo: '#2A6F9B', peri: '#BFE4F5' },
+    ES: { polo: '#1F7A8C', peri: '#B6E0E6' },
+    GO: { polo: '#0E91A1', peri: '#BBEAF2' },
+    MA: { polo: '#1A8F84', peri: '#B9E6DB' },
+    MG: { polo: '#1D7F62', peri: '#B5DFC6' },
+    MS: { polo: '#1E7D4F', peri: '#BEE7CB' },
+    MT: { polo: '#226B5C', peri: '#B6D6C8' },
+    PA: { polo: '#2BAE66', peri: '#CEF5DB' },
+    PB: { polo: '#2B9EA9', peri: '#CBE8EF' },
+    PE: { polo: '#3D5A80', peri: '#D3D4F6' },
+    PI: { polo: '#305A79', peri: '#C7CAE1' },
+    PR: { polo: '#2A7FB8', peri: '#C6DAF7' },
+    RJ: { polo: '#2D8FD5', peri: '#D1E4FD' },
+    RN: { polo: '#3F6FE2', peri: '#E0D6FF' },
+    RO: { polo: '#4338CA', peri: '#DFD5FE' },
+    RR: { polo: '#2563EB', peri: '#D7E4FE' },
+    RS: { polo: '#06B6D4', peri: '#E7FDFE' },
+    SC: { polo: '#0D9488', peri: '#B1F9E7' },
+    SE: { polo: '#059669', peri: '#BFF6D3' },
+    SP: { polo: '#0284C7', peri: '#D2E9FD' },
+    TO: { polo: '#6D28D9', peri: '#E5D9FE' },
   };
 
   // Expressões de cor por UF (memoizado)
@@ -261,27 +288,11 @@ export default function MapLibrePolygons({
       // sources
       map.addSource('polos-src', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
       map.addSource('periferia-src', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      // NOVO SOURCE
+      map.addSource('radius-circle-src', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
 
-    // layers
-      map.addLayer({
-        id: 'polos-fill',
-        type: 'fill',
-        source: 'polos-src',
-        paint: {
-      'fill-color': poloFillByUF as any,
-      'fill-opacity': colors.polo.fillOpacity,
-        },
-      });
-      map.addLayer({
-        id: 'polos-line',
-        type: 'line',
-        source: 'polos-src',
-        paint: {
-      'line-color': colors.polo.line,
-      'line-width': colors.polo.lineWidth,
-        },
-      });
-
+    // layers - ordem: periferia-fill → polos-fill → polos-line → polo-highlight-line
+      // 1. Periferia fill (camada mais baixa)
       map.addLayer({
         id: 'peri-fill',
         type: 'fill',
@@ -291,6 +302,8 @@ export default function MapLibrePolygons({
       'fill-opacity': colors.periferia.fillOpacity,
         },
       });
+      
+      // 2. Periferia line (opcional, pode ser removida)
       map.addLayer({
         id: 'peri-line',
         type: 'line',
@@ -301,17 +314,54 @@ export default function MapLibrePolygons({
         },
       });
 
-      // Camada para contorno vermelho destacando área total do polo
+      // 3. Polos fill (acima da periferia)
+      map.addLayer({
+        id: 'polos-fill',
+        type: 'fill',
+        source: 'polos-src',
+        paint: {
+      'fill-color': poloFillByUF as any,
+      'fill-opacity': colors.polo.fillOpacity,
+        },
+      });
+      
+      // 4. Polos line (acima do fill dos polos)
+      map.addLayer({
+        id: 'polos-line',
+        type: 'line',
+        source: 'polos-src',
+        paint: {
+      'line-color': colors.polo.line,
+      'line-width': colors.polo.lineWidth,
+        },
+      });
+
+      // Camada para contorno azul destacando área total do polo
       map.addSource('polo-highlight-src', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
       map.addLayer({
         id: 'polo-highlight-line',
         type: 'line',
         source: 'polo-highlight-src',
         paint: {
-          'line-color': '#DC2626', // Vermelho consistente
-          'line-width': 3,
+          'line-color': '#2563EB', // Azul consistente
+          'line-width': 2.5,
           'line-opacity': 0.9
         },
+      });
+
+      // Camada fill
+      map.addLayer({
+        id: 'radius-fill',
+        type: 'fill',
+        source: 'radius-circle-src',
+        paint: { 'fill-color': '#2563EB', 'fill-opacity': 0.15 },
+      });
+      // Camada line
+      map.addLayer({
+        id: 'radius-line',
+        type: 'line',
+        source: 'radius-circle-src',
+        paint: { 'line-color': '#2563EB', 'line-width': 2 },
       });
 
       // Aplicar visibilidade inicial (polos sempre visível)
@@ -321,9 +371,123 @@ export default function MapLibrePolygons({
         map.setLayoutProperty('peri-fill', 'visibility', showPeriferia ? 'visible' : 'none');
         map.setLayoutProperty('peri-line', 'visibility', showPeriferia ? 'visible' : 'none');
         map.setLayoutProperty('polo-highlight-line', 'visibility', 'visible'); // Contorno sempre visível quando há dados
+        // GARANTE VISIBILIDADE DO RAIO (inicial = none)
+        map.setLayoutProperty('radius-fill', 'visibility', 'none');
+        map.setLayoutProperty('radius-line', 'visibility', 'none');
       } catch (e) {
         // noop
       }
+
+      // HANDLERS PARA RAIO (MOVIDOS PARA CIMA PARA TER PRIORIDADE)
+      const startDraw = (e: any) => {
+        console.log('startDraw called, radiusModeRef.current:', radiusModeRef.current);
+        if (!radiusModeRef.current) return;
+        console.log('Starting draw at:', e.lngLat);
+        // Evita que outros handlers/movimentos interfiram
+        if (typeof e.preventDefault === 'function') e.preventDefault();
+        if (e.originalEvent && typeof e.originalEvent.stopPropagation === 'function') e.originalEvent.stopPropagation();
+        isDrawingRef.current = true;
+        const { lng, lat } = e.lngLat;
+        centerRef.current = [lng, lat];
+        const m = mapRef.current;
+        try {
+          m?.dragPan?.disable();
+          m?.doubleClickZoom?.disable();
+          m?.touchZoomRotate?.disable();
+        } catch {}
+        // Registrar listeners globais para garantir captura do movimento
+        const onMove = (ev: MouseEvent) => {
+          if (!radiusModeRef.current || !isDrawingRef.current || !centerRef.current) return;
+          if (!mapRef.current) return;
+          const point = { x: ev.clientX - (mapRef.current.getCanvas().getBoundingClientRect().left), y: ev.clientY - (mapRef.current.getCanvas().getBoundingClientRect().top) } as any;
+          const lngLat = mapRef.current.unproject(point);
+          // Reuso da lógica de drawMove
+          const radiusKm = turf.distance(turf.point(centerRef.current), turf.point([lngLat.lng, lngLat.lat]), { units: 'kilometers' });
+          const circle = turf.circle(centerRef.current, radiusKm, { steps: 128, units: 'kilometers' });
+          circleRef.current = circle;
+          try {
+            (map.getSource('radius-circle-src') as any).setData(circle);
+            map.setLayoutProperty('radius-fill', 'visibility', 'visible');
+            map.setLayoutProperty('radius-line', 'visibility', 'visible');
+          } catch {}
+          if (!radiusPopupRef.current) {
+            radiusPopupRef.current = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 4 })
+              .setLngLat([lngLat.lng, lngLat.lat])
+              .addTo(map);
+          } else {
+            radiusPopupRef.current.setLngLat([lngLat.lng, lngLat.lat]);
+          }
+          radiusPopupRef.current.setHTML(`<div class='nexus-popup-content' style="color:#000;font-weight:700">Raio: ${radiusKm.toFixed(1)} km</div>`);
+        };
+        const onUp = () => {
+          if (!radiusModeRef.current) return;
+          window.removeEventListener('mousemove', onMove);
+          window.removeEventListener('mouseup', onUp);
+          isDrawingRef.current = false;
+          if (radiusPopupRef.current) radiusPopupRef.current.remove();
+          radiusPopupRef.current = null;
+          try {
+            m?.dragPan?.enable();
+            m?.doubleClickZoom?.enable();
+            m?.touchZoomRotate?.enable();
+          } catch {}
+          const circleGeom = circleRef.current;
+          if (circleGeom) {
+            let total = 0;
+            const addIfIntersects = (f: any, valProp: string) => {
+              if (turf.booleanIntersects(circleGeom, f)) {
+                total += Number(f.properties?.[valProp] || 0);
+              }
+            };
+            try {
+              polos.features.forEach(f => addIfIntersects(f, 'valor_total_origem'));
+              periferias.features.forEach(f => addIfIntersects(f, 'valor_total_destino'));
+            } catch {}
+            // Construir listas para painel
+            try {
+              const pInside: any[] = [];
+              const periInside: any[] = [];
+              polos.features.forEach((f: any) => {
+                if (turf.booleanIntersects(circleGeom, f)) {
+                  pInside.push({
+                    nome: f.properties?.municipio_origem || '',
+                    uf: String(f.properties?.UF || f.properties?.UF_origem || ''),
+                    valor: Number(f.properties?.valor_total_origem) || 0,
+                    tipo: 'Polo'
+                  });
+                }
+              });
+              periferias.features.forEach((f: any) => {
+                if (turf.booleanIntersects(circleGeom, f)) {
+                  periInside.push({
+                    nome: f.properties?.municipio_destino || '',
+                    uf: String(f.properties?.UF || ''),
+                    valor: Number(f.properties?.valor_total_destino) || 0,
+                    tipo: 'Periferia'
+                  });
+                }
+              });
+              // Ordenar por valor desc
+              pInside.sort((a, b) => b.valor - a.valor);
+              periInside.sort((a, b) => b.valor - a.valor);
+              setPolosInRadius(pInside);
+              setPeriferiasInRadius(periInside);
+            } catch {}
+            const popup = new maplibregl.Popup({ closeButton: true, offset: 6 })
+              .setLngLat(centerRef.current as any)
+              .setHTML(`<div class='nexus-popup-content'><div class='nexus-popup-title' style="color:#000">Total no Raio</div><div class='nexus-popup-line' style="color:#000;font-weight:700">${formatCurrencyBRL(total)}</div></div>`)
+              .addTo(map);
+            popupRef.current = popup;
+          }
+        };
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
+        moveHandlerRef.current = onMove;
+        upHandlerRef.current = onUp;
+      };
+      map.on('mousedown', startDraw);
+      // map.on('mousemove', drawMove); // Removido para usar listeners globais
+      // map.on('mouseup', endDraw); // Removido para usar listeners globais
 
       // Eventos de clique nos polígonos
       map.on('click', 'polos-fill', (e) => {
@@ -394,6 +558,8 @@ export default function MapLibrePolygons({
 
     return () => {
       closeActivePopup();
+      if (moveHandlerRef.current) window.removeEventListener('mousemove', moveHandlerRef.current);
+      if (upHandlerRef.current) window.removeEventListener('mouseup', upHandlerRef.current);
       map.remove();
       mapRef.current = null;
     };
@@ -404,20 +570,28 @@ export default function MapLibrePolygons({
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
 
+    // Detectar se estamos em modo de filtro (UF ou Polo específico)
+    const ufUpper = String(appliedUF || '').toUpperCase();
+    const inUFMode = appliedPolo === 'ALL' && ufUpper !== 'ALL' && ufUpper !== '';
+    const inPoloMode = appliedPolo !== 'ALL';
+    const inFilterMode = inUFMode || inPoloMode;
+
     const setVis = (layerId: string, visible: boolean) => {
       if (map.getLayer(layerId)) map.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none');
     };
+    
     // Aplicar visibilidade conforme estados (polos agora controlável)
     setVis('polos-fill', showPolos);
     setVis('polos-line', showPolos);
 
-    // Periferia controlável
-    setVis('peri-fill', showPeriferia);
-    setVis('peri-line', showPeriferia);
+    // Periferia: sempre visível quando há filtro aplicado, senão depende do toggle
+    const shouldShowPeriferia = inFilterMode || showPeriferia;
+    setVis('peri-fill', shouldShowPeriferia);
+    setVis('peri-line', shouldShowPeriferia);
     
-    // Contorno vermelho sempre visível quando há dados (independente dos toggles individuais)
+    // Contorno azul sempre visível quando há dados (independente dos toggles individuais)
     setVis('polo-highlight-line', true);
-  }, [showPeriferia, showPolos]);
+  }, [showPeriferia, showPolos, appliedUF, appliedPolo]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -440,7 +614,7 @@ export default function MapLibrePolygons({
     (map.getSource('polos-src') as any)?.setData(polosFC);
     (map.getSource('periferia-src') as any)?.setData(periFilteredFC);
     
-    // Criar contorno vermelho unificado para polo selecionado ou UF
+    // Criar contorno azul unificado para polo selecionado ou UF
     let highlightGeometry = null;
     if (appliedPolo !== 'ALL') {
       // Modo polo específico - unificar polo + suas periferias
@@ -455,7 +629,7 @@ export default function MapLibrePolygons({
       highlightGeometry = dissolveGeometries(allFeatures);
     }
     
-    // Atualizar source do contorno vermelho
+    // Atualizar source do contorno azul
     const highlightFC = highlightGeometry 
       ? { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: highlightGeometry, properties: {} }] }
       : { type: 'FeatureCollection', features: [] };
@@ -530,6 +704,14 @@ export default function MapLibrePolygons({
     }
   }, [polos, periferias, appliedPolo, appliedUF]);
 
+  // SINCRONIZAR refs COM STATE DE RAIO E CURSOR
+  useEffect(() => {
+    radiusModeRef.current = radiusMode;
+    if (mapRef.current) {
+      mapRef.current.getCanvas().style.cursor = radiusMode ? 'crosshair' : '';
+    }
+  }, [radiusMode]);
+
   return (
     <div className="w-full h-full relative">
       <div ref={containerRef} className="w-full h-full" />
@@ -538,6 +720,41 @@ export default function MapLibrePolygons({
   <div className="absolute bottom-3 left-3 z-50">
         <div className="bg-[#0b1220]/80 text-white rounded-md shadow-md p-2 text-sm">
           <div className="flex flex-col gap-2">
+            <button
+              onClick={() => {
+                setRadiusMode(!radiusMode);
+                if (!radiusMode) {
+                  // entrando no modo, limpar circulo anterior
+                  setCircleGeoJSON(null);
+                  circleRef.current = null;
+                  setPolosInRadius([]);
+                  setPeriferiasInRadius([]);
+                  const map = mapRef.current;
+                  if (map) {
+                    (map.getSource('radius-circle-src') as any)?.setData({ type: 'FeatureCollection', features: [] });
+                    map.setLayoutProperty('radius-fill', 'visibility', 'none');
+                    map.setLayoutProperty('radius-line', 'visibility', 'none');
+                  }
+                }
+              }}
+              className={`w-full bg-sky-600 hover:bg-sky-700 rounded-md px-2 py-1 mb-1 ${radiusMode ? 'bg-emerald-600' : ''}`}
+            >{radiusMode ? 'Sair do Raio' : 'Raio'}</button>
+            <button
+              onClick={() => {
+                setCircleGeoJSON(null);
+                circleRef.current = null;
+                setPolosInRadius([]);
+                setPeriferiasInRadius([]);
+                const map = mapRef.current;
+                if (map) {
+                  (map.getSource('radius-circle-src') as any)?.setData({ type: 'FeatureCollection', features: [] });
+                  map.setLayoutProperty('radius-fill', 'visibility', 'none');
+                  map.setLayoutProperty('radius-line', 'visibility', 'none');
+                }
+                if (popupRef.current) { popupRef.current.remove(); popupRef.current=null; }
+              }}
+              className="w-full bg-red-600 hover:bg-red-700 rounded-md px-2 py-1"
+            >Limpar</button>
             <label className="flex items-center gap-2">
               <input 
                 type="checkbox" 
@@ -559,6 +776,49 @@ export default function MapLibrePolygons({
           </div>
         </div>
       </div>
+      {(polosInRadius.length > 0 || periferiasInRadius.length > 0) && (
+        <div className="absolute top-3 right-3 z-50">
+          <div className="bg-[#0b1220]/80 text-white rounded-md shadow-md p-3 text-sm w-72 max-h-[70vh] overflow-y-auto">
+            <div className="flex items-start justify-between mb-2">
+              <div>
+                <div className="text-base font-semibold">Dentro do Raio</div>
+                <div className="text-[11px] text-slate-300">{polosInRadius.length + periferiasInRadius.length} municípios</div>
+              </div>
+              <button
+                onClick={() => { setPolosInRadius([]); setPeriferiasInRadius([]); }}
+                className="text-slate-300 hover:text-white"
+                aria-label="Fechar lista"
+              >✕</button>
+            </div>
+            {polosInRadius.length > 0 && (
+              <div className="mb-3">
+                <div className="text-xs text-slate-300 mb-1">Polos ({polosInRadius.length})</div>
+                <div className="space-y-1">
+                  {polosInRadius.map((m, idx) => (
+                    <div key={`p-${idx}`} className="flex items-center justify-between bg-slate-800/50 border border-slate-700/40 rounded px-2 py-1">
+                      <span className="text-slate-200 truncate max-w-[140px]" title={`${m.nome} - ${m.uf}`}>{m.nome}</span>
+                      <span className="text-slate-300 tabular-nums">{formatCurrencyBRL(m.valor)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {periferiasInRadius.length > 0 && (
+              <div>
+                <div className="text-xs text-slate-300 mb-1">Periferias ({periferiasInRadius.length})</div>
+                <div className="space-y-1">
+                  {periferiasInRadius.map((m, idx) => (
+                    <div key={`peri-${idx}`} className="flex items-center justify-between bg-slate-800/50 border border-slate-700/40 rounded px-2 py-1">
+                      <span className="text-slate-200 truncate max-w-[140px]" title={`${m.nome} - ${m.uf}`}>{m.nome}</span>
+                      <span className="text-slate-300 tabular-nums">{formatCurrencyBRL(m.valor)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

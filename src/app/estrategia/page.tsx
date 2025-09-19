@@ -45,13 +45,12 @@ interface MunicipioRanking {
 // Componente para contagem animada de valores
 function AnimatedCurrency({ targetValue, selectedPolo }: { targetValue: number; selectedPolo: string }) {
   const count = useMotionValue(0);
-  const rounded = useTransform(count, (latest) => Math.round(latest));
-  const displayValue = useTransform(rounded, (latest) => {
+  const displayValue = useTransform(count, (latest) => {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
     }).format(latest);
   });
 
@@ -85,11 +84,11 @@ function AnimatedNumber({ targetValue, selectedPolo }: { targetValue: number; se
 // Componente para contagem animada de valores monetários
 function AnimatedMonetaryValue({ targetValue, selectedPolo }: { targetValue: number; selectedPolo: string }) {
   const count = useMotionValue(0);
-  const rounded = useTransform(count, (latest) => Math.round(latest));
+  const rounded = useTransform(count, (latest) => latest); // Removido Math.round para preservar decimais
   const formattedValue = useTransform(rounded, (latest) => {
     return new Intl.NumberFormat('pt-BR', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
     }).format(latest);
   });
 
@@ -584,19 +583,19 @@ export default function EstrategiaPage() {
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                               </svg>
                             </div>
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <div className="flex items-center gap-4">
-                                <p className="text-white font-extrabold leading-none text-7xl md:text-8xl">
+                            <div className="absolute inset-0 flex items-center justify-center px-2">
+                              <div className="flex items-center gap-3 sm:gap-4 lg:gap-4">
+                                <p className="text-white font-extrabold leading-none text-5xl sm:text-6xl md:text-7xl lg:text-6xl xl:text-7xl">
                                     <AnimatedNumber
                                       targetValue={derived.totalMunicipios}
                                       selectedPolo={selectedPolo}
                                     />
                                 </p>
                                 <div className="flex flex-col items-start leading-tight">
-                                  <span className="text-sky-400 text-xl md:text-2xl font-semibold">
+                                  <span className="text-sky-400 text-base sm:text-lg md:text-xl lg:text-lg xl:text-xl font-semibold">
                                     {derived.totalMunicipios === 1 ? 'Município' : 'Municípios'}
                                   </span>
-                                  <span className="text-slate-400 text-base md:text-lg">No Polo</span>
+                                  <span className="text-slate-400 text-sm sm:text-base md:text-lg lg:text-base xl:text-lg">No Polo</span>
                                 </div>
                               </div>
                             </div>
@@ -701,8 +700,8 @@ export default function EstrategiaPage() {
                                 </div>
                                 
                                 {/* Valor centralizado no meio do card */}
-                                <div className="absolute inset-0 flex items-center justify-center">
-                                  <p className="font-extrabold text-emerald-400 text-5xl">
+                                <div className="absolute inset-0 flex items-center justify-center px-2">
+                                  <p className="font-extrabold text-emerald-400 text-2xl sm:text-3xl md:text-4xl lg:text-3xl xl:text-4xl text-center leading-tight break-words">
                                     <AnimatedCurrency
                                       targetValue={metric.value as number}
                                       selectedPolo={appliedPolo}

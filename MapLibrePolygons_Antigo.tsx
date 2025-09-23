@@ -118,7 +118,6 @@ export default function MapLibrePolygons({
   const isDrawingRef = useRef(false);
   const moveHandlerRef = useRef<((ev: MouseEvent) => void) | null>(null);
   const upHandlerRef = useRef<((ev: MouseEvent) => void) | null>(null);
-  // Listas dentro do raio
   const [polosInRadius, setPolosInRadius] = useState<any[]>([]);
   const [periferiasInRadius, setPeriferiasInRadius] = useState<any[]>([]);
   
@@ -435,45 +434,45 @@ export default function MapLibrePolygons({
           const circleGeom = circleRef.current;
           if (circleGeom) {
             let total = 0;
-            const pInside: any[] = [];
-            const periInside: any[] = [];
+            const addIfIntersects = (f: any, valProp: string) => {
+              if (turf.booleanIntersects(circleGeom, f)) {
+                total += Number(f.properties?.[valProp] || 0);
+              }
+            };
             try {
-              // Polos
+              polos.features.forEach(f => addIfIntersects(f, 'valor_total_origem'));
+              periferias.features.forEach(f => addIfIntersects(f, 'valor_total_destino'));
+            } catch {}
+            // Construir listas para painel
+            try {
+              const pInside: any[] = [];
+              const periInside: any[] = [];
               polos.features.forEach((f: any) => {
                 if (turf.booleanIntersects(circleGeom, f)) {
-                  const valorOrigem = Number(f.properties?.valor_total_origem || 0);
-                  const somaDestino = Number(f.properties?.soma_valor_total_destino || 0);
-                  const valor = valorOrigem + somaDestino;
-                  total += valor;
                   pInside.push({
                     nome: f.properties?.municipio_origem || '',
                     uf: String(f.properties?.UF || f.properties?.UF_origem || ''),
-                    valor,
+                    valor: Number(f.properties?.valor_total_origem) || 0,
                     tipo: 'Polo'
                   });
                 }
               });
-              // Periferias
               periferias.features.forEach((f: any) => {
                 if (turf.booleanIntersects(circleGeom, f)) {
-                  const valor = Number(f.properties?.valor_total_destino || 0);
-                  total += valor;
                   periInside.push({
                     nome: f.properties?.municipio_destino || '',
                     uf: String(f.properties?.UF || ''),
-                    valor,
+                    valor: Number(f.properties?.valor_total_destino) || 0,
                     tipo: 'Periferia'
                   });
                 }
               });
-              // Ordenar e publicar
+              // Ordenar por valor desc
               pInside.sort((a, b) => b.valor - a.valor);
               periInside.sort((a, b) => b.valor - a.valor);
               setPolosInRadius(pInside);
               setPeriferiasInRadius(periInside);
-            } catch (error) {
-              console.warn('Erro ao calcular interseções do raio:', error);
-            }
+            } catch {}
             const popup = new maplibregl.Popup({ closeButton: true, offset: 6 })
               .setLngLat(centerRef.current as any)
               .setHTML(`<div class='nexus-popup-content'><div class='nexus-popup-title' style="color:#000">Total no Raio</div><div class='nexus-popup-line' style="color:#000;font-weight:700">${formatCurrencyBRL(total)}</div></div>`)
@@ -578,10 +577,7 @@ export default function MapLibrePolygons({
     const inFilterMode = inUFMode || inPoloMode;
 
     const setVis = (layerId: string, visible: boolean) => {
-      if (!map.getLayer(layerId)) return;
-      try {
-        map.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none');
-      } catch {}
+      if (map.getLayer(layerId)) map.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none');
     };
     
     // Aplicar visibilidade conforme estados (polos agora controlável)
@@ -611,27 +607,25 @@ export default function MapLibrePolygons({
     const ufUpper = String(appliedUF || '').toUpperCase();
     const inUFMode = appliedPolo === 'ALL' && ufUpper !== 'ALL' && ufUpper !== '';
     
-    // Filtrar polos e periferias em modo UF
-    const polosFilteredFC: FC = inUFMode
-      ? { type: 'FeatureCollection', features: polosFC.features.filter(f => String(f.properties?.UF || '').toUpperCase() === ufUpper) }
-      : polosFC;
+    // Mostrar todos os polos; periferias podem ser filtradas em modo UF
     const periFilteredFC: FC = inUFMode
       ? { type: 'FeatureCollection', features: periFC.features.filter(f => String(f.properties?.UF || '').toUpperCase() === ufUpper) }
       : periFC;
-    try { (map.getSource('polos-src') as any)?.setData(polosFilteredFC); } catch {}
-    try { (map.getSource('periferia-src') as any)?.setData(periFilteredFC); } catch {}
+    (map.getSource('polos-src') as any)?.setData(polosFC);
+    (map.getSource('periferia-src') as any)?.setData(periFilteredFC);
     
     // Criar contorno azul unificado para polo selecionado ou UF
     let highlightGeometry = null;
     if (appliedPolo !== 'ALL') {
       // Modo polo específico - unificar polo + suas periferias
-      const poloFeatures = polosFilteredFC.features.filter(f => f.properties?.codigo_origem === appliedPolo);
+      const poloFeatures = polosFC.features.filter(f => f.properties?.codigo_origem === appliedPolo);
       const periferiaFeatures = periFilteredFC.features.filter(f => f.properties?.codigo_origem === appliedPolo);
       const allFeatures = [...poloFeatures, ...periferiaFeatures];
       highlightGeometry = dissolveGeometries(allFeatures);
     } else if (inUFMode) {
       // Modo UF - unificar todos os polos da UF + suas periferias
-      const allFeatures = [...polosFilteredFC.features, ...periFilteredFC.features];
+      const polosUFFeatures = polosFC.features.filter(f => String(f.properties?.UF || '').toUpperCase() === ufUpper);
+      const allFeatures = [...polosUFFeatures, ...periFilteredFC.features];
       highlightGeometry = dissolveGeometries(allFeatures);
     }
     
@@ -639,7 +633,7 @@ export default function MapLibrePolygons({
     const highlightFC = highlightGeometry 
       ? { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: highlightGeometry, properties: {} }] }
       : { type: 'FeatureCollection', features: [] };
-    try { (map.getSource('polo-highlight-src') as any)?.setData(highlightFC); } catch {}
+    (map.getSource('polo-highlight-src') as any)?.setData(highlightFC);
     
     // Atualiza as propriedades de pintura para destacar o polo selecionado (apenas opacidade/espessura)
     if (map.isStyleLoaded()) {
@@ -663,17 +657,16 @@ export default function MapLibrePolygons({
         periLineWidthExpr = colors.periferiaHighlighted.lineWidth;
       }
 
-      // Proteger contra erros quando as camadas ainda não existem
-      if (map.getLayer('polos-fill')) map.setPaintProperty('polos-fill', 'fill-opacity', poloFillOpacityExpr as any);
-      if (map.getLayer('polos-line')) map.setPaintProperty('polos-line', 'line-width', poloLineWidthExpr as any);
-      if (map.getLayer('peri-fill')) map.setPaintProperty('peri-fill', 'fill-opacity', periFillOpacityExpr as any);
-      if (map.getLayer('peri-line')) map.setPaintProperty('peri-line', 'line-width', periLineWidthExpr as any);
+      map.setPaintProperty('polos-fill', 'fill-opacity', poloFillOpacityExpr as any);
+      map.setPaintProperty('polos-line', 'line-width', poloLineWidthExpr as any);
+      map.setPaintProperty('peri-fill', 'fill-opacity', periFillOpacityExpr as any);
+      map.setPaintProperty('peri-line', 'line-width', periLineWidthExpr as any);
     }
 
     // Fit bounds: Polo específico => enquadrar polo e suas periferias; UF mode => enquadrar UF; caso contrário, Brasil
     if (appliedPolo !== 'ALL') {
       // Modo polo específico - centralizar no polo selecionado e suas periferias
-      const poloSelecionado: FC = { type: 'FeatureCollection', features: polosFilteredFC.features.filter(f => f.properties?.codigo_origem === appliedPolo) };
+      const poloSelecionado: FC = { type: 'FeatureCollection', features: polosFC.features.filter(f => f.properties?.codigo_origem === appliedPolo) };
       const periferiasPolo: FC = { type: 'FeatureCollection', features: periFilteredFC.features.filter(f => f.properties?.codigo_origem === appliedPolo) };
       
       const boundsPoloSelecionado = computeBounds(poloSelecionado);
@@ -692,7 +685,8 @@ export default function MapLibrePolygons({
       }
     } else if (inUFMode) {
       // Modo UF - enquadrar todos os polos da UF
-      const boundsPolos = computeBounds(polosFilteredFC);
+      const polosUF: FC = { type: 'FeatureCollection', features: polosFC.features.filter(f => String(f.properties?.UF || '').toUpperCase() === ufUpper) };
+      const boundsPolos = computeBounds(polosUF);
       const boundsPeri = computeBounds(periFilteredFC);
       let finalBounds: LngLatBounds | null = null;
       if (boundsPolos && boundsPeri) {

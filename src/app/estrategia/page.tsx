@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, KeyboardEvent, Fragment } from 'react';
+import { useState, useEffect, useMemo, KeyboardEvent, Fragment, useRef, useCallback } from 'react';
 import { useEstrategiaData } from '../../contexts/EstrategiaDataContext';
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import Navbar from '@/components/Navbar';
@@ -9,8 +9,11 @@ import MiniFooter from '@/components/MiniFooter';
 import ScrollToTopButton from '@/components/ScrollToTopButton';
 import dynamic from 'next/dynamic';
 import { AnimatePresence } from 'framer-motion';
+import { createPortal } from 'react-dom';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
 // Removido: import { fetchGeoJSONWithCache } from '@/utils/cacheGeojson';
-import styles from './page.module.css';
+import { UF_ABERTURA, isUFAbertura, REGIOES_BRASIL, TODAS_UFS, isRegiaoAbertura, PRODUCTS } from '@/utils/mapConfig';
 // Evita SSR para o mapa (MapLibre), prevenindo avisos de hidratação
 const MapLibrePolygons = dynamic(() => import('@/components/MapLibrePolygons'), { ssr: false });
 
@@ -24,6 +27,7 @@ interface PoloValoresProps {
   UF?: string; // UF normalizada usada no mapa
   // Geometria do município polo (Polygon/MultiPolygon) vinda do GeoJSON (feature.geometry ou properties.geom)
   geom?: any;
+  productValues?: Record<string, number>;
 }
 
 interface PeriferiaProps {
@@ -33,6 +37,8 @@ interface PeriferiaProps {
   UF?: string; // UF herdada do polo de origem (para colorização)
   // Geometria do município periférico (Polygon/MultiPolygon) vinda do GeoJSON (feature.geometry ou properties.geom)
   geom?: any;
+  productValues?: Record<string, number>;
+  codigo_destino?: string;
 }
 
 interface MunicipioRanking {
@@ -103,6 +109,176 @@ function AnimatedMonetaryValue({ targetValue, selectedPolo }: { targetValue: num
   return <motion.span>{formattedValue}</motion.span>;
 }
 
+// Componente de Dropdown Portal para Estados/Regiões Unificado
+function EstadoDropdown({ 
+  isOpen, 
+  buttonRef, 
+  dropdownRef, 
+  selectedUFs, 
+  setSelectedUFs
+}: {
+  isOpen: boolean;
+  buttonRef: React.RefObject<HTMLButtonElement | null>;
+  dropdownRef: React.RefObject<HTMLDivElement | null>;
+  selectedUFs: string[];
+  setSelectedUFs: React.Dispatch<React.SetStateAction<string[]>>;
+}) {
+  const [position, setPosition] = useState({ top: 0, left: 0, width: 0 });
+
+  useEffect(() => {
+    if (isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setPosition({
+        top: rect.bottom + window.scrollY + 4, // 4px de margem
+        left: rect.left + window.scrollX,
+        width: rect.width
+      });
+    }
+  }, [isOpen, buttonRef]);
+
+  if (!isOpen) return null;
+
+  const dropdownContent = (
+    <div 
+      ref={dropdownRef}
+      className="fixed bg-[#0f172a] border border-slate-700/70 rounded-md shadow-lg z-[9999]"
+      style={{
+        top: position.top,
+        left: position.left,
+        width: position.width,
+        minWidth: '250px',
+        maxHeight: '400px',
+        height: '400px'
+      }}
+    >
+      <div className="h-full flex flex-col">
+        {/* Header fixo */}
+        <div className="p-2 border-b border-slate-700/50 flex-shrink-0 shadow-sm">
+          {/* Seção TODOS */}
+          <div className="px-1 py-1">
+            <label className="flex items-center gap-2 py-1 px-1 hover:bg-slate-800/50 rounded cursor-pointer">
+              <input
+                type="checkbox"
+                className="w-4 h-4"
+                checked={selectedUFs.length === UF_ABERTURA.length && UF_ABERTURA.every(uf => selectedUFs.includes(uf))}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  if (checked) {
+                    setSelectedUFs([...UF_ABERTURA]);
+                  } else {
+                    setSelectedUFs([]);
+                  }
+                }}
+              />
+              <span className="text-sm text-white font-semibold">Todos (Abertura)</span>
+            </label>
+            <label className="flex items-center gap-2 py-1 px-1 hover:bg-slate-800/50 rounded cursor-pointer">
+              <input
+                type="checkbox"
+                className="w-4 h-4"
+                checked={selectedUFs.length === TODAS_UFS.length && TODAS_UFS.every(uf => selectedUFs.includes(uf))}
+                onChange={(e) => {
+                  const checked = e.target.checked;
+                  if (checked) {
+                    setSelectedUFs([...TODAS_UFS]);
+                  } else {
+                    setSelectedUFs([]);
+                  }
+                }}
+              />
+              <span className="text-sm text-white font-semibold">Todos</span>
+            </label>
+            <button
+              onClick={() => setSelectedUFs([])}
+              className="flex items-center gap-2 py-1 px-1 hover:bg-slate-800/50 rounded cursor-pointer w-full text-left"
+            >
+              <div className="w-4 h-4 flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </div>
+              <span className="text-sm text-red-400 font-semibold">Limpar</span>
+            </button>
+          </div>
+        </div>
+        
+        {/* Área scrollável */}
+        <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
+          {/* Seção REGIÕES */}
+          <div className="px-3 py-2">
+            <p className="text-[10px] tracking-wider text-slate-400 font-semibold mb-2">REGIÕES</p>
+            {Object.entries(REGIOES_BRASIL).map(([regiao, ufs]) => {
+              const allSelected = ufs.every(uf => selectedUFs.includes(uf));
+              const someSelected = ufs.some(uf => selectedUFs.includes(uf));
+              const temAbertura = isRegiaoAbertura(regiao);
+              return (
+                <label key={regiao} className="flex items-center gap-2 py-1 px-1 hover:bg-slate-800/50 rounded cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4"
+                    checked={allSelected}
+                    ref={(el) => {
+                      if (el) el.indeterminate = someSelected && !allSelected;
+                    }}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setSelectedUFs((prev: string[]) => {
+                        const setPrev = new Set(prev);
+                        if (checked) {
+                          ufs.forEach(uf => setPrev.add(uf));
+                        } else {
+                          ufs.forEach(uf => setPrev.delete(uf));
+                        }
+                        return Array.from(setPrev);
+                      });
+                    }}
+                  />
+                  <span className="text-sm text-white">
+                    {regiao}{temAbertura ? <span className="text-sky-400"> (Abertura)</span> : ''}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+          
+          <div className="mx-3 border-t border-slate-700/50" />
+          
+          {/* Seção ESTADOS */}
+          <div className="px-3 py-2">
+            <p className="text-[10px] tracking-wider text-slate-400 font-semibold mb-2">ESTADOS</p>
+            {TODAS_UFS.map(uf => {
+              const temAbertura = isUFAbertura(uf);
+              return (
+                <label key={uf} className="flex items-center gap-2 py-1 px-1 hover:bg-slate-800/50 rounded cursor-pointer">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4"
+                    checked={selectedUFs.includes(uf)}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setSelectedUFs((prev: string[]) => {
+                        const next = new Set(prev);
+                        if (checked) next.add(uf); else next.delete(uf);
+                        return Array.from(next);
+                      });
+                    }}
+                  />
+                  <span className="text-sm text-white">
+                    {uf}{temAbertura ? <span className="text-sky-400"> (Abertura)</span> : ''}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Renderizar via portal no body
+  return typeof window !== 'undefined' ? createPortal(dropdownContent, document.body) : null;
+}
+
 export default function EstrategiaPage() {
   console.log('📊 [EstrategiaPage] Componente montado');
 
@@ -114,16 +290,27 @@ export default function EstrategiaPage() {
   const [isCardFlipped, setIsCardFlipped] = useState(false);
 
   // Filtros selecionados (não aplicados ainda)
-  const [selectedUF, setSelectedUF] = useState<string>('ALL');
   const [selectedPolo, setSelectedPolo] = useState<string>('ALL');
   const [minValor, setMinValor] = useState<number | ''>('');
   const [maxValor, setMaxValor] = useState<number | ''>('');
+  // Filtro de Produtos (por padrão todos selecionados)
+  const [selectedProducts, setSelectedProducts] = useState<string[]>(PRODUCTS.map(p => p.key));
+  const [isProdutosOpen, setIsProdutosOpen] = useState<boolean>(false);
+  const produtosButtonRef = useRef<HTMLButtonElement>(null);
+  const produtosDropdownRef = useRef<HTMLDivElement>(null);
+  // Filtro de Estados/Regiões unificado: lista de UFs selecionadas. Vazio = todos
+  const [selectedUFs, setSelectedUFs] = useState<string[]>([]);
+  const [isEstadoOpen, setIsEstadoOpen] = useState<boolean>(false);
+  const estadoButtonRef = useRef<HTMLButtonElement>(null);
+  const estadoDropdownRef = useRef<HTMLDivElement>(null);
 
   // Filtros aplicados (após clicar em buscar)
-  const [appliedUF, setAppliedUF] = useState<string>('ALL');
+  const [appliedUF, setAppliedUF] = useState<string>('ALL'); // Mantido para compatibilidade com mapa
   const [appliedPolo, setAppliedPolo] = useState<string>('ALL');
   const [appliedMinValor, setAppliedMinValor] = useState<number | ''>('');
   const [appliedMaxValor, setAppliedMaxValor] = useState<number | ''>('');
+  const [appliedUFs, setAppliedUFs] = useState<string[]>([]); // Novo: UFs aplicadas
+  const [appliedProducts, setAppliedProducts] = useState<string[]>([]);
 
   // Estado dos dados processados do contexto
   const [polosValores, setPolosValores] = useState<PoloValoresProps[]>([]);
@@ -149,6 +336,9 @@ export default function EstrategiaPage() {
     console.log('📊 [EstrategiaPage] Processando dados do contexto...');
 
     try {
+      const origemMissingSamples: Array<{ codigo: string; key: string }> = [];
+      const destinoMissingSamples: Array<{ codigo: string; key: string }> = [];
+
       const valoresJson = estrategiaData.poloValores;
       const periferiaJson = estrategiaData.poloPeriferia;
 
@@ -162,6 +352,16 @@ export default function EstrategiaPage() {
             UF: String(f?.properties?.UF_origem ?? ''), // normaliza para UF
             // Preserve a geometria (prioriza feature.geometry; fallback para properties.geom)
             geom: f?.geometry ?? f?.properties?.geom ?? null,
+            productValues: PRODUCTS.reduce((acc: Record<string, number>, p) => {
+              // Para polos, usar somente valores de ORIGEM
+              const origemvalorKey = (p as any).origemvalorKey as string;
+              const raw = f?.properties?.[origemvalorKey];
+              if ((raw === undefined || raw === null) && origemMissingSamples.length < 8) {
+                origemMissingSamples.push({ codigo: String(f?.properties?.codigo_origem ?? ''), key: origemvalorKey });
+              }
+              acc[p.key] = parsePtBrNumber(raw);
+              return acc;
+            }, {}),
           }))
         : [];
 
@@ -173,8 +373,26 @@ export default function EstrategiaPage() {
             ...(f?.properties?.codigo_destino ? { codigo_destino: String(f.properties.codigo_destino) } : {}),
             // Preserve a geometria
             geom: f?.geometry ?? f?.properties?.geom ?? null,
+            productValues: PRODUCTS.reduce((acc: Record<string, number>, p) => {
+              // Para periferias, usar somente valores de DESTINO
+              const destinoKey = (p as any).destinovalorKey as string;
+              const raw = f?.properties?.[destinoKey];
+              if ((raw === undefined || raw === null) && destinoMissingSamples.length < 8) {
+                destinoMissingSamples.push({ codigo: String(f?.properties?.codigo_origem ?? ''), key: destinoKey });
+              }
+              acc[p.key] = parsePtBrNumber(raw);
+              return acc;
+            }, {}),
           }))
         : [];
+
+      if (origemMissingSamples.length) {
+        console.warn('⚠️ [EstrategiaPage] Valores de origem ausentes/nulos identificados', origemMissingSamples);
+      }
+
+      if (destinoMissingSamples.length) {
+        console.warn('⚠️ [EstrategiaPage] Valores de destino ausentes/nulos identificados', destinoMissingSamples);
+      }
 
       // Enriquecer UF nas periferias herdando do polo (via codigo_origem)
       const ufByCodigo = new Map(valores.map(v => [v.codigo_origem, String(v.UF || v.UF_origem || '').toUpperCase()]));
@@ -190,6 +408,38 @@ export default function EstrategiaPage() {
     }
   }, [estrategiaData, loadingData]);
 
+  // Soma produtos selecionados com fallback para total quando nenhum produto aplicado
+  const sumSelectedProducts = (vals: Record<string, number> | undefined, fallbackTotal: number): number => {
+    if (!vals) return fallbackTotal || 0;
+    if (!appliedProducts.length) return fallbackTotal || 0;
+    let total = 0;
+    for (const key of appliedProducts) total += Number(vals[key] || 0);
+    if (total === 0 && appliedProducts.length === PRODUCTS.length) {
+      console.warn('⚠️ [EstrategiaPage] Soma de produtos resultou em 0 com todos os produtos aplicados. Aplicando fallback.', {
+        fallbackTotal,
+      });
+      return fallbackTotal || 0;
+    }
+    return total;
+  };
+
+  // Agregação por polo (codigo_origem) a partir da periferia filtrada
+  const periferiaAggByCodigo = useMemo(() => {
+    const ufUpper = String(appliedUF || '').toUpperCase();
+    const inUFMode = appliedPolo === 'ALL' && ufUpper !== 'ALL' && ufUpper !== '';
+    const inPoloMode = appliedPolo !== 'ALL';
+    let base = periferia as PeriferiaProps[];
+    if (appliedUFs.length) base = base.filter(p => appliedUFs.includes(String(p.UF)));
+    if (inPoloMode) base = base.filter(p => p.codigo_origem === appliedPolo);
+    else if (inUFMode) base = base.filter(p => String(p.UF || '').toUpperCase() === ufUpper);
+    const map = new Map<string, number>();
+    for (const f of base) {
+      const agg = sumSelectedProducts(f.productValues, Number(f.valor_total_destino) || 0);
+      map.set(f.codigo_origem, (map.get(f.codigo_origem) || 0) + agg);
+    }
+    return map;
+  }, [periferia, appliedUFs, appliedPolo, appliedUF, appliedProducts]);
+
   // Função para formatar valores monetários
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -203,7 +453,10 @@ export default function EstrategiaPage() {
   // Opções de polo vindas da base real (todas)
   const poloOptions = useMemo(() => {
     const seen = new Set<string>();
-    const opts = polosValores
+    const base = selectedUFs.length
+      ? polosValores.filter(p => selectedUFs.includes(String(p.UF || p.UF_origem)))
+      : polosValores;
+    const opts = base
       .filter(p => {
         if (!p.codigo_origem) return false;
         if (seen.has(p.codigo_origem)) return false;
@@ -213,14 +466,15 @@ export default function EstrategiaPage() {
       .map(p => ({ value: p.codigo_origem, label: p.municipio_origem }));
     // Ordena alfabeticamente pelo label
     return opts.sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
-  }, [polosValores]);
+  }, [polosValores, selectedUFs]);
 
-  // Opções filtradas por UF selecionada (para o select de POLO)
+  // Opções filtradas por UFs selecionadas (para o select de POLO)
   const filteredPoloOptions = useMemo(() => {
-    if (selectedUF === 'ALL') return poloOptions;
+    const base = selectedUFs.length
+      ? polosValores.filter(p => selectedUFs.includes(String(p.UF || p.UF_origem)))
+      : polosValores;
     const seen = new Set<string>();
-    const opts = polosValores
-      .filter(p => p.UF_origem === selectedUF)
+    const opts = base
       .filter(p => {
         if (!p.codigo_origem) return false;
         if (seen.has(p.codigo_origem)) return false;
@@ -229,18 +483,79 @@ export default function EstrategiaPage() {
       })
       .map(p => ({ value: p.codigo_origem, label: p.municipio_origem }));
     return opts.sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
-  }, [selectedUF, polosValores, poloOptions]);
+  }, [selectedUFs, polosValores]);
 
-  // Resetar polo selecionado caso UF mude e o polo atual não exista mais
+  // Resetar polo selecionado caso UFs mudem e o polo atual não exista mais
   useEffect(() => {
     if (selectedPolo === 'ALL') return;
     const exists = filteredPoloOptions.some(o => o.value === selectedPolo);
     if (!exists) setSelectedPolo('ALL');
-  }, [selectedUF, filteredPoloOptions, selectedPolo]);
+  }, [selectedUFs, filteredPoloOptions, selectedPolo]);
+
+  // Click outside e ESC para fechar dropdown de Estado
+  useEffect(() => {
+    if (!isEstadoOpen) return;
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        estadoButtonRef.current && 
+        estadoDropdownRef.current &&
+        !estadoButtonRef.current.contains(event.target as Node) &&
+        !estadoDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsEstadoOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsEstadoOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape as any);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape as any);
+    };
+  }, [isEstadoOpen]);
+
+  // Click outside e ESC para fechar dropdown de Produtos
+  useEffect(() => {
+    if (!isProdutosOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        produtosButtonRef.current &&
+        produtosDropdownRef.current &&
+        !produtosButtonRef.current.contains(event.target as Node) &&
+        !produtosDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsProdutosOpen(false);
+      }
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsProdutosOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape as any);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape as any);
+    };
+  }, [isProdutosOpen]);
 
   // GeoJSON minimal para o mapa (com geometria e apenas campos usados no mapa/popup)
   const polosFCForMap = useMemo(() => {
-    const features = polosValores
+    const ufUpper = String(appliedUF || '').toUpperCase();
+    const inUFMode = appliedPolo === 'ALL' && ufUpper !== 'ALL' && ufUpper !== '';
+    const inPoloMode = appliedPolo !== 'ALL';
+    let base = polosValores;
+    if (appliedUFs.length) base = base.filter(p => appliedUFs.includes(String(p.UF || p.UF_origem)));
+    if (inPoloMode) base = base.filter(p => p.codigo_origem === appliedPolo);
+    else if (inUFMode) base = base.filter(p => String(p.UF || p.UF_origem || '').toUpperCase() === ufUpper);
+    const features = base
       .filter(p => !!p.geom)
       .map(p => ({
         type: 'Feature' as const,
@@ -250,15 +565,22 @@ export default function EstrategiaPage() {
           municipio_origem: p.municipio_origem,
           UF: String(p.UF || p.UF_origem || '').toUpperCase(),
           UF_origem: p.UF_origem || '',
-          soma_valor_total_destino: p.soma_valor_total_destino,
-          valor_total_origem: p.valor_total_origem,
+          soma_valor_total_destino: periferiaAggByCodigo.get(p.codigo_origem) || 0,
+          valor_total_origem: Number(p.valor_total_origem) || 0,
         }
       }));
     return { type: 'FeatureCollection' as const, features };
-  }, [polosValores]);
+  }, [polosValores, appliedUF, appliedPolo, appliedUFs, periferiaAggByCodigo]);
 
   const periferiasFCForMap = useMemo(() => {
-    const features = periferia
+    const ufUpper = String(appliedUF || '').toUpperCase();
+    const inUFMode = appliedPolo === 'ALL' && ufUpper !== 'ALL' && ufUpper !== '';
+    const inPoloMode = appliedPolo !== 'ALL';
+    let base = periferia;
+    if (appliedUFs.length) base = base.filter(p => appliedUFs.includes(String(p.UF)));
+    if (inPoloMode) base = base.filter(p => p.codigo_origem === appliedPolo);
+    else if (inUFMode) base = base.filter(p => String(p.UF || '').toUpperCase() === ufUpper);
+    const features = base
       .filter(p => !!p.geom)
       .map(p => ({
         type: 'Feature' as const,
@@ -267,12 +589,12 @@ export default function EstrategiaPage() {
           codigo_origem: p.codigo_origem,
           municipio_destino: p.municipio_destino,
           UF: p.UF || '',
-          valor_total_destino: p.valor_total_destino,
+          valor_total_destino: sumSelectedProducts(p.productValues, Number(p.valor_total_destino) || 0),
           // codigo_destino pode não existir na tipagem atual; manter se vier na base original
         } as any
       }));
     return { type: 'FeatureCollection' as const, features };
-  }, [periferia]);
+  }, [periferia, appliedUF, appliedPolo, appliedUFs, appliedProducts]);
 
   // Cálculos derivados para cards com base no polo aplicado
   const derived = useMemo(() => {
@@ -280,30 +602,49 @@ export default function EstrategiaPage() {
     const inUFMode = appliedPolo === 'ALL' && ufUpper !== 'ALL' && ufUpper !== '';
     const inPoloMode = appliedPolo !== 'ALL';
 
-    // Filtrar registros conforme modo
+    // Filtrar registros conforme interseção: UFs selecionadas, UF/Polo
     let valoresFiltrados = polosValores;
+    if (appliedUFs.length) valoresFiltrados = valoresFiltrados.filter(v => appliedUFs.includes(String(v.UF || v.UF_origem)));
     if (inPoloMode) {
-      valoresFiltrados = polosValores.filter(v => v.codigo_origem === appliedPolo);
+      valoresFiltrados = valoresFiltrados.filter(v => v.codigo_origem === appliedPolo);
     } else if (inUFMode) {
-      valoresFiltrados = polosValores.filter(v => String(v.UF || v.UF_origem || '').toUpperCase() === ufUpper);
+      valoresFiltrados = valoresFiltrados.filter(v => String(v.UF || v.UF_origem || '').toUpperCase() === ufUpper);
     }
 
-    // Card 1: soma(soma_valor_total_destino + valor_total_origem)
-    const valorPolo = valoresFiltrados.reduce((acc, v) => acc + (v.soma_valor_total_destino + v.valor_total_origem), 0);
-
-    // Card 2 e 3: periferias filtradas por modo
+    // Card 2 e 3: base de periferias filtrada
     let periferiaFiltrada = periferia;
+    if (appliedUFs.length) periferiaFiltrada = periferiaFiltrada.filter(p => appliedUFs.includes(String(p.UF)));
     if (inPoloMode) {
-      periferiaFiltrada = periferia.filter(p => p.codigo_origem === appliedPolo);
+      periferiaFiltrada = periferiaFiltrada.filter(p => p.codigo_origem === appliedPolo);
     } else if (inUFMode) {
-      periferiaFiltrada = periferia.filter(p => String(p.UF || '').toUpperCase() === ufUpper);
+      periferiaFiltrada = periferiaFiltrada.filter(p => String(p.UF || '').toUpperCase() === ufUpper);
     }
+    if (appliedMinValor !== '' || appliedMaxValor !== '') {
+      periferiaFiltrada = periferiaFiltrada.filter(p => {
+        const val = Number(p.valor_total_destino) || 0;
+        if (appliedMinValor !== '' && val < (appliedMinValor as number)) return false;
+        if (appliedMaxValor !== '' && val > (appliedMaxValor as number)) return false;
+        return true;
+      });
+    }
+
+    // Card 1: soma por produtos selecionados na periferia (fallback para total quando nada selecionado) + valor_total_origem dos polos
+    let somaOrigemSelecionada = 0;
+    let somaPeriferiaSelecionada = 0;
+
+    const valorPolo = valoresFiltrados.reduce((acc, polo) => {
+      const valorPeriferias = periferiaAggByCodigo.get(polo.codigo_origem) || 0;
+      const valorOrigem = sumSelectedProducts(polo.productValues, Number(polo.valor_total_origem) || 0);
+      somaPeriferiaSelecionada += valorPeriferias;
+      somaOrigemSelecionada += valorOrigem;
+      return acc + valorPeriferias + valorOrigem;
+    }, 0);
 
     // Consolidar por município_destino e pegar Top 3
     const aggMap = new Map<string, number>();
     for (const p of periferiaFiltrada) {
       const nome = p.municipio_destino || '';
-      const val = Number(p.valor_total_destino) || 0;
+      const val = sumSelectedProducts(p.productValues, Number(p.valor_total_destino) || 0);
       if (!nome) continue;
       aggMap.set(nome, (aggMap.get(nome) || 0) + val);
     }
@@ -323,6 +664,16 @@ export default function EstrategiaPage() {
         ? `UF ${ufUpper}`
         : 'Todos os Polos';
 
+    console.log('📈 [EstrategiaPage] Métricas calculadas – Valor do Polo', {
+      contexto: poloLabel,
+      appliedUF,
+      appliedPolo,
+      appliedProducts,
+      somaOrigemSelecionada,
+      somaPeriferiaSelecionada,
+      valorPolo,
+    });
+
     return {
       valorPolo,
       top3,
@@ -330,7 +681,7 @@ export default function EstrategiaPage() {
       totalMunicipios: municipiosList.length,
       poloLabel
     };
-  }, [appliedPolo, appliedUF, polosValores, periferia, poloOptions]);
+  }, [appliedPolo, appliedUF, appliedUFs, appliedProducts, appliedMinValor, appliedMaxValor, polosValores, periferia, poloOptions, periferiaAggByCodigo]);
 
   // Reset da lista de municípios quando o polo mudar
   useEffect(() => {
@@ -355,7 +706,7 @@ export default function EstrategiaPage() {
       title: 'Valor do Polo',
       value: derived.valorPolo, // valor numérico real calculado
       subtitle: derived.poloLabel,
-      description: 'Soma de Polo + Periferia'
+      description: appliedProducts.length ? 'Soma dos produtos selecionados' : 'Soma total (fallback sem seleção)'
     },
     {
       id: 'top_municipios',
@@ -400,6 +751,99 @@ export default function EstrategiaPage() {
     setIsRunwayOpen(false);
     setTimeout(() => setSelectedRunway(null), 400);
   };
+
+  const handleExportResultados = useCallback(() => {
+    try {
+      const ufUpper = String(appliedUF || '').toUpperCase();
+      const inUFMode = appliedPolo === 'ALL' && ufUpper !== 'ALL' && ufUpper !== '';
+      const inPoloMode = appliedPolo !== 'ALL';
+
+      let valoresFiltrados = polosValores;
+      if (appliedUFs.length) valoresFiltrados = valoresFiltrados.filter(v => appliedUFs.includes(String(v.UF || v.UF_origem)));
+      if (inPoloMode) valoresFiltrados = valoresFiltrados.filter(v => v.codigo_origem === appliedPolo);
+      else if (inUFMode) valoresFiltrados = valoresFiltrados.filter(v => String(v.UF || v.UF_origem || '').toUpperCase() === ufUpper);
+
+      let periferiaFiltrada = periferia;
+      if (appliedUFs.length) periferiaFiltrada = periferiaFiltrada.filter(p => appliedUFs.includes(String(p.UF)));
+      if (inPoloMode) periferiaFiltrada = periferiaFiltrada.filter(p => p.codigo_origem === appliedPolo);
+      else if (inUFMode) periferiaFiltrada = periferiaFiltrada.filter(p => String(p.UF || '').toUpperCase() === ufUpper);
+      if (appliedMinValor !== '' || appliedMaxValor !== '') {
+        periferiaFiltrada = periferiaFiltrada.filter(p => {
+          const val = Number(p.valor_total_destino) || 0;
+          if (appliedMinValor !== '' && val < (appliedMinValor as number)) return false;
+          if (appliedMaxValor !== '' && val > (appliedMaxValor as number)) return false;
+          return true;
+        });
+      }
+
+      const periferiaAgg = new Map<string, number>();
+      for (const item of periferiaFiltrada) {
+        const val = sumSelectedProducts(item.productValues, Number(item.valor_total_destino) || 0);
+        periferiaAgg.set(item.codigo_origem, (periferiaAgg.get(item.codigo_origem) || 0) + val);
+      }
+
+      const polosSheetData = valoresFiltrados.map(polo => {
+        const valorOrigemSelecionada = sumSelectedProducts(polo.productValues, Number(polo.valor_total_origem) || 0);
+        const valorDestinoSelecionada = periferiaAgg.get(polo.codigo_origem) || 0;
+        const row: Record<string, any> = {
+          codigo_origem: polo.codigo_origem,
+          municipio_origem: polo.municipio_origem,
+          UF: polo.UF || polo.UF_origem || '',
+          valor_origem_selecionada: valorOrigemSelecionada,
+          valor_destinos_selecionada: valorDestinoSelecionada,
+          valor_polo_total: valorOrigemSelecionada + valorDestinoSelecionada,
+        };
+        const activeProducts = appliedProducts.length ? appliedProducts : PRODUCTS.map(p => p.key);
+        for (const key of activeProducts) {
+          row[key] = Number(polo.productValues?.[key] || 0);
+        }
+        return row;
+      });
+
+      const periferiasSheetData = periferiaFiltrada.map(periItem => ({
+        codigo_origem: periItem.codigo_origem,
+        municipio_destino: periItem.municipio_destino,
+        UF: periItem.UF || '',
+        valor_destino_selecionada: sumSelectedProducts(periItem.productValues, Number(periItem.valor_total_destino) || 0),
+        ...(periItem.codigo_destino ? { codigo_destino: periItem.codigo_destino } : {}),
+      }));
+
+      const periferiasPorPoloSheetData = Array.from(periferiaAgg.entries()).map(([codigo, valor]) => {
+        const polo = valoresFiltrados.find(v => v.codigo_origem === codigo);
+        return {
+          codigo_origem: codigo,
+          UF: polo?.UF || polo?.UF_origem || '',
+          municipio_origem: polo?.municipio_origem || '',
+          valor_destinos_selecionada: valor,
+        };
+      });
+
+      const workbook = XLSX.utils.book_new();
+      if (polosSheetData.length) {
+        const sheet = XLSX.utils.json_to_sheet(polosSheetData);
+        XLSX.utils.book_append_sheet(workbook, sheet, 'Polos');
+      }
+      if (periferiasSheetData.length) {
+        const sheet = XLSX.utils.json_to_sheet(periferiasSheetData);
+        XLSX.utils.book_append_sheet(workbook, sheet, 'Periferias');
+      }
+      if (periferiasPorPoloSheetData.length) {
+        const sheet = XLSX.utils.json_to_sheet(periferiasPorPoloSheetData);
+        XLSX.utils.book_append_sheet(workbook, sheet, 'Periferias_por_Polo');
+      }
+
+      const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(blob, 'resultado_estrategia.xlsx');
+      console.log('📤 [EstrategiaPage] Exportação de resultados concluída', {
+        polos: polosSheetData.length,
+        periferias: periferiasSheetData.length,
+        periferiasPorPolo: periferiasPorPoloSheetData.length,
+      });
+    } catch (error) {
+      console.error('Erro ao exportar resultados:', error);
+    }
+  }, [appliedUF, appliedPolo, appliedUFs, appliedMinValor, appliedMaxValor, appliedProducts, polosValores, periferia, sumSelectedProducts]);
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#0f172a] to-[#1e293b] text-white">
@@ -451,30 +895,39 @@ export default function EstrategiaPage() {
               >
                 <div className="bg-[#1e293b] border border-slate-700/50 rounded-lg p-3">
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                    {/* UF */}
+                    {/* ESTADO/REGIÃO Unificado */}
                     <div className="flex flex-col">
-                      <label className="text-slate-300 text-xs mb-0.5 text-center font-bold">ESTADO</label>
-                      <select
-                        value={selectedUF}
-                        onChange={(e) => setSelectedUF(e.target.value)}
-                        className="bg-[#0f172a] text-slate-200 border border-slate-700/50 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-colors"
+                      <label className="text-slate-300 text-sm mb-0.5 text-center font-bold">ESTADO/REGIÃO</label>
+                      <button
+                        ref={estadoButtonRef}
+                        type="button"
+                        onClick={() => setIsEstadoOpen(v => !v)}
+                        className="bg-[#0f172a] text-slate-200 border border-slate-700/50 rounded-md px-3 py-1.5 text-left flex items-center justify-between min-h-[40px]"
                       >
-                        <option value="ALL">Todas as UFs</option>
-                        {[
-                          'AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT','PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO'
-                        ].map(uf => (
-                          <option key={uf} value={uf}>{uf}</option>
-                        ))}
-                      </select>
+                        <span className="text-sm">
+                          {selectedUFs.length === 0 ? 'Todos os Estados' :
+                           selectedUFs.length === UF_ABERTURA.length && UF_ABERTURA.every(uf => selectedUFs.includes(uf)) ? 'Todos (Abertura)' :
+                           selectedUFs.length === TODAS_UFS.length ? 'Todos' :
+                           selectedUFs.length <= 3 ? selectedUFs.join(', ') : `${selectedUFs.length} selecionados`}
+                        </span>
+                        <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 transition-transform ${isEstadoOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd"/></svg>
+                      </button>
+                      <EstadoDropdown
+                        isOpen={isEstadoOpen}
+                        buttonRef={estadoButtonRef}
+                        dropdownRef={estadoDropdownRef}
+                        selectedUFs={selectedUFs}
+                        setSelectedUFs={setSelectedUFs}
+                      />
                     </div>
 
                     {/* POLO */}
                     <div className="flex flex-col">
-                      <label className="text-slate-300 text-xs mb-0.5 text-center font-bold">POLO</label>
+                      <label className="text-slate-300 text-sm mb-0.5 text-center font-bold">POLO</label>
                       <select
                         value={selectedPolo}
                         onChange={(e) => setSelectedPolo(e.target.value)}
-                        className="bg-[#0f172a] text-slate-200 border border-slate-700/50 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-colors"
+                        className="bg-[#0f172a] text-slate-200 border border-slate-700/50 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-colors min-h-[40px]"
                       >
                         <option value="ALL">Todos os Polos</option>
                         {filteredPoloOptions.map(opt => (
@@ -483,50 +936,109 @@ export default function EstrategiaPage() {
                       </select>
                     </div>
 
-                    {/* VALOR (R$) */}
+                    {/* PRODUTOS (Dropdown multi-select via Portal) */}
                     <div className="flex flex-col">
-                      <label className="text-slate-300 text-xs mb-0.5 text-center font-bold">VALOR (R$)</label>
-                      <div className="grid grid-cols-2 gap-1.5">
-                        <input
-                          type="number"
-                          min={0}
-                          step={1000}
-                          value={minValor}
-                          onChange={(e) => setMinValor(e.target.value === '' ? '' : Number(e.target.value))}
-                          placeholder="Mínimo"
-                          className={`bg-[#0f172a] text-slate-200 border border-slate-700/50 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-colors ${styles['input-number']}`}
-                        />
-                        <input
-                          type="number"
-                          min={0}
-                          step={1000}
-                          value={maxValor}
-                          onChange={(e) => setMaxValor(e.target.value === '' ? '' : Number(e.target.value))}
-                          placeholder="Máximo"
-                          className={`bg-[#0f172a] text-slate-200 border border-slate-700/50 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-colors ${styles['input-number']}`}
-                        />
-                      </div>
+                      <label className="text-slate-300 text-sm mb-0.5 text-center font-bold" title="Filtro por produto (soma das colunas selecionadas). Sem seleção: usa total agregado.">PRODUTOS</label>
+                      <button
+                        ref={produtosButtonRef}
+                        type="button"
+                        onClick={() => setIsProdutosOpen(v => !v)}
+                        className="bg-[#0f172a] text-slate-200 border border-slate-700/50 rounded-md px-3 py-1.5 text-left flex items-center justify-between min-h-[40px]"
+                      >
+                        <span className="text-sm">
+                          {selectedProducts.length === PRODUCTS.length ? 'Todos' : selectedProducts.length === 0 ? 'Nenhum' : selectedProducts.map(k => (PRODUCTS.find(p => p.key === k)?.label || k)).join(', ')}
+                        </span>
+                        <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 transition-transform ${isProdutosOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd"/></svg>
+                      </button>
+                      {typeof window !== 'undefined' && isProdutosOpen && createPortal((
+                        <div 
+                          ref={produtosDropdownRef}
+                          className="fixed bg-[#0f172a] border border-slate-700/70 rounded-md shadow-lg p-2 z-[9999]"
+                          style={{
+                            top: ((produtosButtonRef.current?.getBoundingClientRect()?.bottom || 0) + window.scrollY + 4),
+                            left: ((produtosButtonRef.current?.getBoundingClientRect()?.left || 0) + window.scrollX),
+                            width: produtosButtonRef.current?.getBoundingClientRect()?.width
+                          }}
+                        >
+                          <div className="px-1 py-1">
+                            <p className="text-[10px] tracking-wider text-slate-400 font-semibold mb-1">PRODUTOS</p>
+                            <label className="flex items-center gap-2 py-1 px-1 hover:bg-slate-800/50 rounded cursor-pointer">
+                              <input
+                                type="checkbox"
+                                className="w-4 h-4"
+                                checked={selectedProducts.length === PRODUCTS.length}
+                                ref={(el) => { if (el) el.indeterminate = selectedProducts.length > 0 && selectedProducts.length < PRODUCTS.length; }}
+                                onChange={(e) => {
+                                  const checked = e.target.checked;
+                                  if (checked) {
+                                    setSelectedProducts(PRODUCTS.map(p => p.key));
+                                  } else {
+                                    setSelectedProducts([]);
+                                  }
+                                }}
+                              />
+                              <span className="text-sm text-white">Todos</span>
+                            </label>
+                            {PRODUCTS.map(prod => (
+                              <label key={prod.key} className="flex items-center gap-2 py-1 px-1 hover:bg-slate-800/50 rounded cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  className="w-4 h-4"
+                                  checked={selectedProducts.includes(prod.key)}
+                                  onChange={(e) => {
+                                    const checked = e.target.checked;
+                                    setSelectedProducts(prev => {
+                                      const next = new Set(prev);
+                                      if (checked) next.add(prod.key); else next.delete(prod.key);
+                                      return Array.from(next);
+                                    });
+                                  }}
+                                />
+                                <span className="text-sm text-white">{prod.label}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      ), document.body)}
                     </div>
-                    
+
                     {/* Botão de Buscar */}
                     <div className="flex flex-col justify-end">
-                      <label className="text-slate-300 text-xs mb-0.5 text-center font-bold opacity-0">Buscar</label>
-                      <button
-                        onClick={() => {
-                          setAppliedUF(selectedUF);
-                          setAppliedPolo(selectedPolo);
-                          setAppliedMinValor(minValor);
-                          setAppliedMaxValor(maxValor);
-                        }}
-                        className="bg-sky-600 hover:bg-sky-700 text-white px-4 py-1.5 rounded-md font-medium transition-colors duration-200 flex items-center justify-center gap-2 h-[38px]"
-                      >
-                        <span>
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <label className="text-slate-300 text-sm mb-0.5 text-center font-bold opacity-0">Buscar</label>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => {
+                            // Aplicar filtros selecionados
+                            setAppliedPolo(selectedPolo);
+                            setAppliedMinValor(minValor);
+                            setAppliedMaxValor(maxValor);
+                            setAppliedUFs(selectedUFs);
+                            setAppliedProducts(selectedProducts);
+                            // Manter appliedUF para compatibilidade com mapa (ALL quando múltiplas UFs)
+                            setAppliedUF(selectedUFs.length === 1 ? selectedUFs[0] : 'ALL');
+                            // Fechar dropdowns
+                            setIsEstadoOpen(false);
+                            setIsProdutosOpen(false);
+                          }}
+                          className="bg-sky-600 hover:bg-sky-700 text-white px-3 py-1.5 rounded-md font-medium transition-colors duration-200 flex items-center justify-center gap-1.5 min-h-[40px] flex-1"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 104.5 4.5a7.5 7.5 0 0012.15 12.15z" />
                           </svg>
-                        </span>
-                        <span>Buscar</span>
-                      </button>
+                          <span className="text-sm font-semibold">Buscar</span>
+                        </button>
+                        <button
+                          onClick={handleExportResultados}
+                          className="bg-slate-600/70 hover:bg-slate-500/80 text-white px-3 py-1.5 rounded-md font-medium transition-colors duration-200 flex items-center justify-center gap-1.5 min-h-[40px] flex-1"
+                          title="Exportar filtros"
+                          aria-label="Exportar filtros aplicados"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M8 12l4 4m0 0l4-4m-4 4V4" />
+                          </svg>
+                          <span className="text-sm font-semibold">Exportar</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>

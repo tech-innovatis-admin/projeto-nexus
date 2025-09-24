@@ -123,6 +123,48 @@ ESTADOS:
 - **UX Otimizada**: Interface unificada substituindo filtros separados
 - **Performance**: Aplicação em tempo real nos dados estratégicos
 
+### 🎯 **Sistema Avançado de Exportação do Raio**
+O Raio agora oferece um sistema completo de exportação profissional com múltiplos formatos para análise estratégica avançada.
+
+#### **Critérios de Seleção:**
+- **Intersecta** (padrão): Municípios que tocam qualquer parte do círculo
+- **Contém**: Apenas municípios cujo centroide está completamente dentro do círculo
+
+#### **Formatos Disponíveis:**
+
+##### **📊 XLSX Completo:**
+- **7 Abas Estruturadas**: Metadados, Subtotais, Polos, Periferias, Consolidado, Produtos Detalhados Periferia, Produtos Detalhados Polos
+- **Metadados Ricos**: Raio, centro geográfico, critério, timestamp, filtros aplicados
+- **Subtotais Detalhados**: Origem vs Destinos com valores formatados
+- **Listas Completas**: Códigos IBGE, municípios, UFs e valores individuais
+- **Produtos Detalhados Periferia**: Visão específica dos valores destino por município periférico
+- **Produtos Detalhados Polos**: Visão específica dos valores origem por município polo
+
+##### **🏙️ Produtos Detalhados Periferia:**
+- **Foco em Destinos**: Um registro por município periférico dentro do raio
+- **11 Colunas de Produtos**: Apenas variáveis `_destino` (PD, PMSB, CTM, etc.)
+- **Colunas de Identificação**: codigo_origem, codigo_destino, municipio_destino, UF
+- **Coluna Total**: Soma de todos os valores destino para conferência
+- **Visão Específica**: Análise detalhada dos municípios que recebem recursos
+
+##### **🏭 Produtos Detalhados Polos:**
+- **Foco em Origens**: Um registro por município polo dentro do raio
+- **11 Colunas de Produtos**: Apenas variáveis `_origem` (PD, PMSB, CTM, etc.)
+- **Colunas de Identificação**: codigo_origem, municipio_origem, UF
+- **Coluna Total**: Soma de todos os valores origem para conferência
+- **Visão Específica**: Análise detalhada dos municípios que geram recursos
+
+##### **📸 PNG do Mapa:**
+- **Screenshot Inteligente**: Captura o mapa completo com visualizações ativas
+- **Sobreposição de Dados**: Metadados diretamente na imagem (raio, centro, contagem, total)
+- **Alta Resolução**: Adequado para apresentações e publicações
+
+#### **Interface de Exportação:**
+- **Painel Integrado**: Botões dedicados no painel "Dentro do Raio"
+- **Ícones Distintivos**: XLSX e PNG com identificação visual clara
+- **Tooltips Informativos**: Descrição completa da funcionalidade
+- **Nomes Automáticos**: Arquivos nomeados com data para organização
+
 ### 💼 **Gestão Completa de Produtos**
 - **12 Produtos Municipais** com status automático:
   - Plano Diretor (verificação de vencimento 10 anos)
@@ -763,9 +805,12 @@ model municipios {
 - **Códigos IBGE Corretos**: Popups das periferias agora exibem códigos IBGE corretos
   - Adicionado `codigo_destino` nas properties do FeatureCollection de periferias
   - Fallback inteligente: `codigo_destino` → `codigo` → `codigo_ibge` → vazio
-- **Exportação XLSX Aprimorada**: Coluna "Código IBGE" padronizada
-  - Polos: usam `codigo_origem`
-  - Periferias: usam `codigo_destino` (com fallback para `codigo_origem`)
+- **Sistema Completo de Exportação do Raio**:
+  - **XLSX Multi-Abas**: Metadados, subtotais, polos, periferias, consolidado, produtos detalhados periferia, produtos detalhados polos
+  - **Abas Específicas**: "Produtos Detalhados Periferia" (11 colunas destino) e "Produtos Detalhados Polos" (11 colunas origem)
+  - **PNG do Mapa**: Screenshots de alta resolução com metadados visuais
+  - **Critérios de Seleção**: "Intersecta" vs "Contém" para diferentes necessidades
+  - **Interface Aprimorada**: Botões maiores e melhor posicionamento
 - **Filtro Unificado**: Substituição do filtro separado "UF's Abertura"
   - Componente `EstadoDropdown` com Portal React
   - Seleção múltipla por regiões e estados

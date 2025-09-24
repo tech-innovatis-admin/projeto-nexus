@@ -7,6 +7,51 @@ import * as turf from '@turf/turf';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 
+// Tipos para o sistema de exportação do raio
+export interface MunicipioRaio {
+  tipo: 'Polo' | 'Periferia';
+  codigo_origem: string;
+  codigo_destino?: string;
+  nome: string;
+  uf: string;
+  valor: number;
+  productValues?: Record<string, number>;
+  propriedadesOriginais?: Record<string, any>; // Para acessar valores originais das propriedades
+}
+
+export interface RadiusMetadata {
+  raioKm: number;
+  centro: [number, number]; // [lng, lat]
+  criterio: 'intersecta' | 'contem';
+  timestamp: string;
+  filtrosAplicados: {
+    polosSelecionados: string[];
+    ufsSelecionadas: string[];
+    produtosSelecionados: string[];
+    minValor?: number;
+    maxValor?: number;
+  };
+}
+
+export interface RadiusSubtotais {
+  origem: number;
+  destinos: number;
+  total: number;
+}
+
+export interface RadiusResultPayload {
+  metadata: RadiusMetadata;
+  subtotais: RadiusSubtotais;
+  polos: MunicipioRaio[];
+  periferias: MunicipioRaio[];
+  todosMunicipios: MunicipioRaio[];
+  geoJsonData?: {
+    circulo: any;
+    polos: any[];
+    periferias: any[];
+  };
+}
+
 export interface FeatureLike {
   type: 'Feature';
   properties: Record<string, any>;
@@ -97,11 +142,25 @@ export default function MapLibrePolygons({
   periferias,
   appliedPolo,
   appliedUF,
+  appliedUFs,
+  appliedProducts,
+  appliedMinValor,
+  appliedMaxValor,
+  onRadiusResult,
+  onExportXLSX,
+  onExportPNG,
 }: {
   polos: FC;
   periferias: FC;
   appliedPolo: string;
   appliedUF: string;
+  appliedUFs?: string[];
+  appliedProducts?: string[];
+  appliedMinValor?: number | '';
+  appliedMaxValor?: number | '';
+  onRadiusResult?: (payload: RadiusResultPayload) => void;
+  onExportXLSX?: () => void;
+  onExportPNG?: () => void;
 }) {
   const mapRef = useRef<MapLibreMap | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -114,6 +173,8 @@ export default function MapLibrePolygons({
   const [circleGeoJSON, setCircleGeoJSON] = useState<any>(null);
   const centerRef = useRef<[number, number] | null>(null);
   const radiusPopupRef = useRef<maplibregl.Popup | null>(null);
+  // Critério de seleção para o raio
+  const [radiusCriterion, setRadiusCriterion] = useState<'intersecta' | 'contem'>('intersecta');
   // ADICIONAR REFS NOVOS
   const radiusModeRef = useRef(false);
   const circleRef = useRef<any>(null);
@@ -425,6 +486,22 @@ export default function MapLibrePolygons({
           }
           radiusPopupRef.current.setHTML(`<div class='nexus-popup-content' style="color:#000;font-weight:700">Raio: ${radiusKm.toFixed(1)} km</div>`);
         };
+        // Função auxiliar para verificar se feature está dentro do círculo baseado no critério
+        const isFeatureInCircle = (feature: any, circle: any, criterion: 'intersecta' | 'contem') => {
+          if (criterion === 'intersecta') {
+            return turf.booleanIntersects(circle, feature);
+          } else {
+            // 'contem': verifica se o centroide da feature está dentro do círculo
+            try {
+              const centroid = turf.centroid(feature);
+              return turf.booleanPointInPolygon(centroid.geometry.coordinates, circle);
+            } catch {
+              // Fallback para interseção se centroid falhar
+              return turf.booleanIntersects(circle, feature);
+            }
+          }
+        };
+
         const onUp = () => {
           if (!radiusModeRef.current) return;
           window.removeEventListener('mousemove', onMove);
@@ -437,11 +514,9 @@ export default function MapLibrePolygons({
             m?.doubleClickZoom?.enable();
             m?.touchZoomRotate?.enable();
           } catch {}
+
           const circleGeom = circleRef.current;
-          if (circleGeom) {
-            let total = 0;
-            const pInside: any[] = [];
-            const periInside: any[] = [];
+          if (circleGeom && centerRef.current) {
             try {
               // Usar as features mais recentes já filtradas e normalizadas
               const polosCur = polosLatestRef.current?.features || [];
@@ -452,48 +527,107 @@ export default function MapLibrePolygons({
               const periForIntersect: any[] = Array.isArray(periCur) && periCur.every((f: any) => !!f.geometry)
                 ? periCur
                 : toGeometryFromPropsGeom(periCur as any);
-              // Polos: somar apenas o valor de origem para evitar dupla contagem dos destinos
+
+              // Calcular raio em km
+              const radiusKm = turf.distance(
+                turf.point(centerRef.current),
+                turf.point([centerRef.current[0] + 0.001, centerRef.current[1]]),
+                { units: 'kilometers' }
+              ) * 1000; // Aproximação baseada na geometria do círculo
+
+              const polosInRadius: MunicipioRaio[] = [];
+              const periferiasInRadius: MunicipioRaio[] = [];
+              let totalOrigem = 0;
+              let totalDestinos = 0;
+
+              // Processar polos
               polosForIntersect.forEach((f: any) => {
-                if (turf.booleanIntersects(circleGeom, f)) {
+                if (isFeatureInCircle(f, circleGeom, radiusCriterion)) {
                   const valorOrigem = Number(f.properties?.valor_total_origem || 0);
-                  total += valorOrigem;
-                  pInside.push({
+                  totalOrigem += valorOrigem;
+                  const municipio: MunicipioRaio = {
+                    tipo: 'Polo',
                     codigo_origem: String(f.properties?.codigo_origem || ''),
                     nome: f.properties?.municipio_origem || '',
                     uf: String(f.properties?.UF || f.properties?.UF_origem || ''),
                     valor: valorOrigem,
-                    tipo: 'Polo'
-                  });
+                    productValues: f.properties?.productValues || {},
+                    propriedadesOriginais: f.properties || {}
+                  };
+                  polosInRadius.push(municipio);
                 }
               });
-              // Periferias
+
+              // Processar periferias
               periForIntersect.forEach((f: any) => {
-                if (turf.booleanIntersects(circleGeom, f)) {
-                  const valor = Number(f.properties?.valor_total_destino || 0);
-                  total += valor;
-                  periInside.push({
+                if (isFeatureInCircle(f, circleGeom, radiusCriterion)) {
+                  const valorDestino = Number(f.properties?.valor_total_destino || 0);
+                  totalDestinos += valorDestino;
+                  const municipio: MunicipioRaio = {
+                    tipo: 'Periferia',
                     codigo_origem: String(f.properties?.codigo_origem || ''),
                     codigo_destino: String(f.properties?.codigo_destino || ''),
                     nome: f.properties?.municipio_destino || '',
                     uf: String(f.properties?.UF || ''),
-                    valor,
-                    tipo: 'Periferia'
-                  });
+                    valor: valorDestino,
+                    productValues: f.properties?.productValues || {},
+                    propriedadesOriginais: f.properties || {}
+                  };
+                  periferiasInRadius.push(municipio);
                 }
               });
-              // Ordenar e publicar
-              pInside.sort((a, b) => b.valor - a.valor);
-              periInside.sort((a, b) => b.valor - a.valor);
-              setPolosInRadius(pInside);
-              setPeriferiasInRadius(periInside);
+
+              // Ordenar por valor decrescente
+              polosInRadius.sort((a, b) => b.valor - a.valor);
+              periferiasInRadius.sort((a, b) => b.valor - a.valor);
+
+              // Atualizar estado da UI
+              setPolosInRadius(polosInRadius);
+              setPeriferiasInRadius(periferiasInRadius);
+
+              // Preparar payload rico para exportações
+              if (onRadiusResult) {
+                const payload: RadiusResultPayload = {
+                  metadata: {
+                    raioKm: radiusKm,
+                    centro: centerRef.current,
+                    criterio: radiusCriterion,
+                    timestamp: new Date().toISOString(),
+                    filtrosAplicados: {
+                      polosSelecionados: appliedPolo !== 'ALL' ? [appliedPolo] : [],
+                      ufsSelecionadas: appliedUFs || [],
+                      produtosSelecionados: appliedProducts || [],
+                      minValor: appliedMinValor !== '' ? Number(appliedMinValor) : undefined,
+                      maxValor: appliedMaxValor !== '' ? Number(appliedMaxValor) : undefined,
+                    }
+                  },
+                  subtotais: {
+                    origem: totalOrigem,
+                    destinos: totalDestinos,
+                    total: totalOrigem + totalDestinos
+                  },
+                  polos: polosInRadius,
+                  periferias: periferiasInRadius,
+                  todosMunicipios: [...polosInRadius, ...periferiasInRadius],
+                  geoJsonData: {
+                    circulo: circleGeom,
+                    polos: polosInRadius.map(p => polosForIntersect.find((f: any) => f.properties?.codigo_origem === p.codigo_origem)).filter(Boolean),
+                    periferias: periferiasInRadius.map(p => periForIntersect.find((f: any) => f.properties?.codigo_destino === p.codigo_destino)).filter(Boolean)
+                  }
+                };
+                onRadiusResult(payload);
+              }
+
+              // Mostrar popup com total
+            const popup = new maplibregl.Popup({ closeButton: true, offset: 6 })
+                .setLngLat(centerRef.current)
+                .setHTML(`<div class='nexus-popup-content'><div class='nexus-popup-title' style="color:#000">Total no Raio</div><div class='nexus-popup-line' style="color:#000;font-weight:700">${formatCurrencyBRL(totalOrigem + totalDestinos)}</div></div>`)
+              .addTo(map);
+            popupRef.current = popup;
+
             } catch (error) {
               console.warn('Erro ao calcular interseções do raio:', error);
             }
-            const popup = new maplibregl.Popup({ closeButton: true, offset: 6 })
-              .setLngLat(centerRef.current as any)
-              .setHTML(`<div class='nexus-popup-content'><div class='nexus-popup-title' style="color:#000">Total no Raio</div><div class='nexus-popup-line' style="color:#000;font-weight:700">${formatCurrencyBRL(total)}</div></div>`)
-              .addTo(map);
-            popupRef.current = popup;
           }
         };
         window.addEventListener('mousemove', onMove);
@@ -763,6 +897,24 @@ export default function MapLibrePolygons({
               }}
               className={`w-full bg-sky-600 hover:bg-sky-700 rounded-md px-2 py-1 mb-1 ${radiusMode ? 'bg-emerald-600' : ''}`}
             >{radiusMode ? 'Sair do Raio' : 'Raio'}</button>
+
+            {/* Seletor de critério quando em modo raio */}
+            {radiusMode && (
+              <div className="border-t border-slate-600 pt-2">
+                <label className="text-xs text-slate-300 mb-1 block">Critério:</label>
+                <select
+                  value={radiusCriterion}
+                  onChange={(e) => setRadiusCriterion(e.target.value as 'intersecta' | 'contem')}
+                  className="w-full bg-slate-700 text-white rounded px-2 py-1 text-xs border border-slate-600"
+                >
+                  <option value="intersecta">Intersecta</option>
+                  <option value="contem">Contém</option>
+                </select>
+                <div className="text-[10px] text-slate-400 mt-1">
+                  {radiusCriterion === 'intersecta' ? 'Municípios que tocam o círculo' : 'Municípios cujo centro está dentro'}
+                </div>
+              </div>
+            )}
             <button
               onClick={() => {
                 setCircleGeoJSON(null);
@@ -809,36 +961,33 @@ export default function MapLibrePolygons({
                 <div className="text-[11px] text-slate-300">{polosInRadius.length + periferiasInRadius.length} municípios</div>
               </div>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    // Exportar XLSX: tipo,Código IBGE,municipio,UF,valor
-                    const rows = [...polosInRadius, ...periferiasInRadius]
-                      .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'))
-                      .map(r => ({
-                        tipo: r.tipo,
-                        'Código IBGE': (r.tipo === 'Polo' ? (r.codigo_origem || '') : (r.codigo_destino || r.codigo_origem || '')),
-                        municipio: r.nome || '',
-                        UF: r.uf || '',
-                        valor: r.valor || 0,
-                      }));
-                    const wb = XLSX.utils.book_new();
-                    const ws = XLSX.utils.json_to_sheet(rows);
-                    XLSX.utils.book_append_sheet(wb, ws, 'Dentro_do_Raio');
-                    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-                    const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-                    saveAs(blob, 'municipios_no_raio.xlsx');
-                  }}
-                  title="Exportar XLSX"
-                  aria-label="Exportar XLSX"
-                  className="p-1 rounded hover:bg-slate-700/50"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M8 12l4 4m0 0l4-4m-4 4V4" />
-                  </svg>
-                </button>
+                {onExportXLSX && (
+                  <button
+                    onClick={onExportXLSX}
+                    title="Exportar XLSX completo"
+                    aria-label="Exportar XLSX"
+                    className="p-2 rounded hover:bg-slate-700/50 text-slate-300 hover:text-white"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </button>
+                )}
+                {onExportPNG && (
+                  <button
+                    onClick={onExportPNG}
+                    title="Exportar PNG do mapa"
+                    aria-label="Exportar PNG"
+                    className="p-2 rounded hover:bg-slate-700/50 text-slate-300 hover:text-white"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </button>
+                )}
                 <button
                   onClick={() => { setPolosInRadius([]); setPeriferiasInRadius([]); }}
-                  className="text-slate-300 hover:text-white"
+                  className="text-slate-300 hover:text-white p-2"
                   aria-label="Fechar lista"
                 >✕</button>
               </div>

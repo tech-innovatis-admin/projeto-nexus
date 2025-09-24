@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useLayoutEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useUser } from '@/contexts/UserContext';
 
@@ -9,19 +9,47 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ className = '' }: SidebarProps) {
-  // Usar localStorage para persistir o estado do sidebar entre navegações
+  // Estado para controlar se já houve hidratação
+  const [isHydrated, setIsHydrated] = useState(false);
+
+  // Estado do sidebar - inicializa com base no localStorage no cliente
   const [isOpen, setIsOpen] = useState(() => {
-    // Verificar se estamos no cliente antes de acessar localStorage
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('sidebarOpen');
       return saved === 'true';
     }
-    return false;
+    return false; // Valor padrão para SSR
   });
-  
+
+  // Hooks de contexto/roteamento DEVEM ser chamados incondicionalmente (antes de qualquer return)
   const router = useRouter();
   const pathname = usePathname();
   const { user, setUser } = useUser();
+
+  // Efeito para marcar que a hidratação ocorreu
+  useLayoutEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
+  // Só renderiza o conteúdo após a hidratação para evitar mismatches
+  if (!isHydrated) {
+    return (
+      <nav className="flex flex-col bg-slate-800 h-auto rounded-r-[18px] relative transition-all duration-500 z-10 min-w-[82px]">
+        <div className="p-3">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-16 h-16 rounded-[24px] bg-gradient-to-br from-sky-400 to-blue-600 flex items-center justify-center">
+              <span className="text-white text-lg font-bold">US</span>
+            </div>
+            <div className="flex flex-col transition-all duration-600 w-0 h-0 overflow-hidden whitespace-nowrap">
+              <span className="text-white text-base font-semibold">Carregando...</span>
+              <span className="text-gray-400 text-sm">Carregando...</span>
+            </div>
+          </div>
+        </div>
+      </nav>
+    );
+  }
+  
 
   const menuItems = [
     {

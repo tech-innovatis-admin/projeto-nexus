@@ -12,6 +12,7 @@ import { AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
+import { RadiusResultPayload, MunicipioRaio } from '@/components/MapLibrePolygons';
 // Removido: import { fetchGeoJSONWithCache } from '@/utils/cacheGeojson';
 import { UF_ABERTURA, isUFAbertura, REGIOES_BRASIL, TODAS_UFS, isRegiaoAbertura, PRODUCTS } from '@/utils/mapConfig';
 // Evita SSR para o mapa (MapLibre), prevenindo avisos de hidratação
@@ -28,6 +29,7 @@ interface PoloValoresProps {
   // Geometria do município polo (Polygon/MultiPolygon) vinda do GeoJSON (feature.geometry ou properties.geom)
   geom?: any;
   productValues?: Record<string, number>;
+  propriedadesOriginais?: Record<string, any>; // Preserva todas as propriedades originais
 }
 
 interface PeriferiaProps {
@@ -39,6 +41,7 @@ interface PeriferiaProps {
   geom?: any;
   productValues?: Record<string, number>;
   codigo_destino?: string;
+  propriedadesOriginais?: Record<string, any>; // Preserva todas as propriedades originais
 }
 
 interface MunicipioRanking {
@@ -155,7 +158,7 @@ function EstadoDropdown({
         {/* Header fixo */}
         <div className="p-2 border-b border-slate-700/50 flex-shrink-0 shadow-sm">
           {/* Seção TODOS */}
-          <div className="px-1 py-1">
+      <div className="px-1 py-1">
             <label className="flex items-center gap-2 py-1 px-1 hover:bg-slate-800/50 rounded cursor-pointer">
               <input
                 type="checkbox"
@@ -211,62 +214,62 @@ function EstadoDropdown({
               const allSelected = ufs.every(uf => selectedUFs.includes(uf));
               const someSelected = ufs.some(uf => selectedUFs.includes(uf));
               const temAbertura = isRegiaoAbertura(regiao);
-              return (
-                <label key={regiao} className="flex items-center gap-2 py-1 px-1 hover:bg-slate-800/50 rounded cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="w-4 h-4"
-                    checked={allSelected}
-                    ref={(el) => {
-                      if (el) el.indeterminate = someSelected && !allSelected;
-                    }}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
+          return (
+            <label key={regiao} className="flex items-center gap-2 py-1 px-1 hover:bg-slate-800/50 rounded cursor-pointer">
+              <input
+                type="checkbox"
+                className="w-4 h-4"
+                checked={allSelected}
+                ref={(el) => {
+                  if (el) el.indeterminate = someSelected && !allSelected;
+                }}
+                onChange={(e) => {
+                  const checked = e.target.checked;
                       setSelectedUFs((prev: string[]) => {
-                        const setPrev = new Set(prev);
-                        if (checked) {
-                          ufs.forEach(uf => setPrev.add(uf));
-                        } else {
-                          ufs.forEach(uf => setPrev.delete(uf));
-                        }
-                        return Array.from(setPrev);
-                      });
-                    }}
-                  />
+                    const setPrev = new Set(prev);
+                    if (checked) {
+                      ufs.forEach(uf => setPrev.add(uf));
+                    } else {
+                      ufs.forEach(uf => setPrev.delete(uf));
+                    }
+                    return Array.from(setPrev);
+                  });
+                }}
+              />
                   <span className="text-sm text-white">
                     {regiao}{temAbertura ? <span className="text-sky-400"> (Abertura)</span> : ''}
                   </span>
-                </label>
-              );
-            })}
-          </div>
+            </label>
+          );
+        })}
+      </div>
           
           <div className="mx-3 border-t border-slate-700/50" />
           
-          {/* Seção ESTADOS */}
+      {/* Seção ESTADOS */}
           <div className="px-3 py-2">
             <p className="text-[10px] tracking-wider text-slate-400 font-semibold mb-2">ESTADOS</p>
             {TODAS_UFS.map(uf => {
               const temAbertura = isUFAbertura(uf);
               return (
-                <label key={uf} className="flex items-center gap-2 py-1 px-1 hover:bg-slate-800/50 rounded cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="w-4 h-4"
+          <label key={uf} className="flex items-center gap-2 py-1 px-1 hover:bg-slate-800/50 rounded cursor-pointer">
+            <input
+              type="checkbox"
+              className="w-4 h-4"
                     checked={selectedUFs.includes(uf)}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
+              onChange={(e) => {
+                const checked = e.target.checked;
                       setSelectedUFs((prev: string[]) => {
-                        const next = new Set(prev);
-                        if (checked) next.add(uf); else next.delete(uf);
-                        return Array.from(next);
-                      });
-                    }}
-                  />
+                  const next = new Set(prev);
+                  if (checked) next.add(uf); else next.delete(uf);
+                  return Array.from(next);
+                });
+              }}
+            />
                   <span className="text-sm text-white">
                     {uf}{temAbertura ? <span className="text-sky-400"> (Abertura)</span> : ''}
                   </span>
-                </label>
+          </label>
               );
             })}
           </div>
@@ -316,6 +319,13 @@ export default function EstrategiaPage() {
   const [polosValores, setPolosValores] = useState<PoloValoresProps[]>([]);
   const [periferia, setPeriferia] = useState<PeriferiaProps[]>([]);
 
+  // Estado para paginação do card de municípios
+  const [currentPage, setCurrentPage] = useState(0);
+  const MUNICIPIOS_PER_PAGE = 10;
+
+  // Estado para o payload do raio
+  const [radiusPayload, setRadiusPayload] = useState<RadiusResultPayload | null>(null);
+
   // Normalizador de números pt-BR (aceita number ou string "1.234,56")
   const parsePtBrNumber = (v: unknown): number => {
     if (typeof v === 'number') return v;
@@ -362,6 +372,8 @@ export default function EstrategiaPage() {
               acc[p.key] = parsePtBrNumber(raw);
               return acc;
             }, {}),
+            // Preserva TODAS as propriedades originais para acesso posterior
+            propriedadesOriginais: f?.properties || {},
           }))
         : [];
 
@@ -383,6 +395,8 @@ export default function EstrategiaPage() {
               acc[p.key] = parsePtBrNumber(raw);
               return acc;
             }, {}),
+            // Preserva TODAS as propriedades originais para acesso posterior
+            propriedadesOriginais: f?.properties || {},
           }))
         : [];
 
@@ -561,12 +575,15 @@ export default function EstrategiaPage() {
         type: 'Feature' as const,
         geometry: p.geom,
         properties: {
+          // Propriedades essenciais primeiro (evita sobrescrever com valores originais)
           codigo_origem: p.codigo_origem,
           municipio_origem: p.municipio_origem,
           UF: String(p.UF || p.UF_origem || '').toUpperCase(),
           UF_origem: p.UF_origem || '',
           soma_valor_total_destino: periferiaAggByCodigo.get(p.codigo_origem) || 0,
           valor_total_origem: Number(p.valor_total_origem) || 0,
+          // Inclui TODAS as propriedades originais para acesso aos valores de produtos
+          ...p.propriedadesOriginais,
         }
       }));
     return { type: 'FeatureCollection' as const, features };
@@ -586,11 +603,14 @@ export default function EstrategiaPage() {
         type: 'Feature' as const,
         geometry: p.geom,
         properties: {
+          // Propriedades essenciais primeiro (evita sobrescrever com valores originais)
           codigo_origem: p.codigo_origem,
           codigo_destino: String((p as any).codigo_destino ?? (p as any).codigo ?? (p as any).codigo_ibge ?? ''),
           municipio_destino: p.municipio_destino,
           UF: String(p.UF || '').toUpperCase(),
           valor_total_destino: sumSelectedProducts(p.productValues, Number(p.valor_total_destino) || 0),
+          // Inclui TODAS as propriedades originais para acesso aos valores de produtos
+          ...p.propriedadesOriginais,
         } as any
       }));
     return { type: 'FeatureCollection' as const, features };
@@ -751,6 +771,212 @@ export default function EstrategiaPage() {
     setIsRunwayOpen(false);
     setTimeout(() => setSelectedRunway(null), 400);
   };
+
+  // Funções de exportação do raio
+  const handleExportRadiusXLSX = useCallback(() => {
+    if (!radiusPayload) return;
+
+    const workbook = XLSX.utils.book_new();
+
+    // Aba de Metadados
+    const metadataSheet = XLSX.utils.json_to_sheet([{
+      'Raio (km)': radiusPayload.metadata.raioKm.toFixed(2),
+      'Centro (Lat/Lng)': `${radiusPayload.metadata.centro[1].toFixed(6)}, ${radiusPayload.metadata.centro[0].toFixed(6)}`,
+      'Critério': radiusPayload.metadata.criterio === 'intersecta' ? 'Intersecta' : 'Contém',
+      'Timestamp': new Date(radiusPayload.metadata.timestamp).toLocaleString('pt-BR'),
+      'Polos Selecionados': radiusPayload.metadata.filtrosAplicados.polosSelecionados.join(', ') || 'Todos',
+      'UFs Selecionadas': radiusPayload.metadata.filtrosAplicados.ufsSelecionadas.join(', ') || 'Todas',
+      'Produtos Selecionados': radiusPayload.metadata.filtrosAplicados.produtosSelecionados.join(', ') || 'Todos',
+      'Valor Mínimo': radiusPayload.metadata.filtrosAplicados.minValor || 'N/A',
+      'Valor Máximo': radiusPayload.metadata.filtrosAplicados.maxValor || 'N/A'
+    }]);
+    XLSX.utils.book_append_sheet(workbook, metadataSheet, 'Metadados');
+
+    // Aba de Subtotais
+    const subtotaisSheet = XLSX.utils.json_to_sheet([{
+      'Origem (Polos)': radiusPayload.subtotais.origem,
+      'Destinos (Periferias)': radiusPayload.subtotais.destinos,
+      'Total': radiusPayload.subtotais.total,
+      'Total Formatado': formatCurrency(radiusPayload.subtotais.total)
+    }]);
+    XLSX.utils.book_append_sheet(workbook, subtotaisSheet, 'Subtotais');
+
+    // Aba de Polos
+    const polosData = radiusPayload.polos.map(p => ({
+      'Código IBGE': p.codigo_origem,
+      'Município': p.nome,
+      'UF': p.uf,
+      'Valor': p.valor,
+      'Valor Formatado': formatCurrency(p.valor)
+    }));
+    const polosSheet = XLSX.utils.json_to_sheet(polosData);
+    XLSX.utils.book_append_sheet(workbook, polosSheet, 'Polos');
+
+    // Aba de Periferias
+    const periferiasData = radiusPayload.periferias.map(p => ({
+      'Código Origem': p.codigo_origem,
+      'Código IBGE': p.codigo_destino || p.codigo_origem,
+      'Município': p.nome,
+      'UF': p.uf,
+      'Valor': p.valor,
+      'Valor Formatado': formatCurrency(p.valor)
+    }));
+    const periferiasSheet = XLSX.utils.json_to_sheet(periferiasData);
+    XLSX.utils.book_append_sheet(workbook, periferiasSheet, 'Periferias');
+
+    // Aba Consolidada
+    const consolidadaData = radiusPayload.todosMunicipios.map(m => ({
+      'Tipo': m.tipo,
+      'Código IBGE': m.tipo === 'Polo' ? m.codigo_origem : (m.codigo_destino || m.codigo_origem),
+      'Município': m.nome,
+      'UF': m.uf,
+      'Valor': m.valor,
+      'Valor Formatado': formatCurrency(m.valor)
+    }));
+    const consolidadaSheet = XLSX.utils.json_to_sheet(consolidadaData);
+    XLSX.utils.book_append_sheet(workbook, consolidadaSheet, 'Consolidado');
+
+    // Aba de Produtos Detalhados Periferia - um registro por município periférico
+    const produtosDetalhadosPeriferiaData = radiusPayload.periferias.map(periferia => {
+      const total_destino =
+        (periferia.propriedadesOriginais?.valor_pd_num_destino || 0) +
+        (periferia.propriedadesOriginais?.valor_pmsb_num_destino || 0) +
+        (periferia.propriedadesOriginais?.valor_ctm_num_destino || 0) +
+        (periferia.propriedadesOriginais?.VALOR_DEC_AMBIENTAL_NUM_destino || 0) +
+        (periferia.propriedadesOriginais?.PLHIS_destino || 0) +
+        (periferia.propriedadesOriginais?.valor_start_iniciais_finais_destino || 0) +
+        (periferia.propriedadesOriginais?.LIVRO_FUND_1_2_destino || 0) +
+        (periferia.propriedadesOriginais?.PVA_destino || 0) +
+        (periferia.propriedadesOriginais?.educagame_destino || 0) +
+        (periferia.propriedadesOriginais?.valor_reurb_destino || 0) +
+        (periferia.propriedadesOriginais?.VALOR_DESERT_NUM_destino || 0);
+
+      return {
+        'codigo_origem': String(periferia.propriedadesOriginais?.codigo_origem || ''),
+        'codigo_destino': String(periferia.propriedadesOriginais?.codigo_destino || periferia.propriedadesOriginais?.codigo || periferia.propriedadesOriginais?.codigo_ibge || ''),
+        'municipio_destino': periferia.nome,
+        'UF': periferia.uf,
+        'valor_pd_num_destino': periferia.propriedadesOriginais?.valor_pd_num_destino || 0,
+        'valor_pmsb_num_destino': periferia.propriedadesOriginais?.valor_pmsb_num_destino || 0,
+        'valor_ctm_num_destino': periferia.propriedadesOriginais?.valor_ctm_num_destino || 0,
+        'VALOR_DEC_AMBIENTAL_NUM_destino': periferia.propriedadesOriginais?.VALOR_DEC_AMBIENTAL_NUM_destino || 0,
+        'PLHIS_destino': periferia.propriedadesOriginais?.PLHIS_destino || 0,
+        'valor_start_iniciais_finais_destino': periferia.propriedadesOriginais?.valor_start_iniciais_finais_destino || 0,
+        'LIVRO_FUND_1_2_destino': periferia.propriedadesOriginais?.LIVRO_FUND_1_2_destino || 0,
+        'PVA_destino': periferia.propriedadesOriginais?.PVA_destino || 0,
+        'educagame_destino': periferia.propriedadesOriginais?.educagame_destino || 0,
+        'valor_reurb_destino': periferia.propriedadesOriginais?.valor_reurb_destino || 0,
+        'VALOR_DESERT_NUM_destino': periferia.propriedadesOriginais?.VALOR_DESERT_NUM_destino || 0,
+        'total_destino': total_destino
+      };
+    });
+    const produtosDetalhadosPeriferiaSheet = XLSX.utils.json_to_sheet(produtosDetalhadosPeriferiaData);
+    XLSX.utils.book_append_sheet(workbook, produtosDetalhadosPeriferiaSheet, 'Produtos Detalhados Periferia');
+
+    // Aba de Produtos Detalhados Polos - um registro por município polo
+    const produtosDetalhadosPolosData = radiusPayload.polos.map(polo => {
+      const total_origem =
+        (polo.propriedadesOriginais?.valor_pd_num_origem || 0) +
+        (polo.propriedadesOriginais?.valor_pmsb_num_origem || 0) +
+        (polo.propriedadesOriginais?.valor_ctm_num_origem || 0) +
+        (polo.propriedadesOriginais?.VALOR_DEC_AMBIENTAL_NUM_origem || 0) +
+        (polo.propriedadesOriginais?.PLHIS_origem || 0) +
+        (polo.propriedadesOriginais?.valor_start_iniciais_finais_origem || 0) +
+        (polo.propriedadesOriginais?.LIVRO_FUND_1_2_origem || 0) +
+        (polo.propriedadesOriginais?.PVA_origem || 0) +
+        (polo.propriedadesOriginais?.educagame_origem || 0) +
+        (polo.propriedadesOriginais?.valor_reurb_origem || 0) +
+        (polo.propriedadesOriginais?.VALOR_DESERT_NUM_origem || 0);
+
+      return {
+        'codigo_origem': String(polo.propriedadesOriginais?.codigo_origem || ''),
+        'municipio_origem': polo.nome,
+        'UF': polo.uf,
+        'valor_pd_num_origem': polo.propriedadesOriginais?.valor_pd_num_origem || 0,
+        'valor_pmsb_num_origem': polo.propriedadesOriginais?.valor_pmsb_num_origem || 0,
+        'valor_ctm_num_origem': polo.propriedadesOriginais?.valor_ctm_num_origem || 0,
+        'VALOR_DEC_AMBIENTAL_NUM_origem': polo.propriedadesOriginais?.VALOR_DEC_AMBIENTAL_NUM_origem || 0,
+        'PLHIS_origem': polo.propriedadesOriginais?.PLHIS_origem || 0,
+        'valor_start_iniciais_finais_origem': polo.propriedadesOriginais?.valor_start_iniciais_finais_origem || 0,
+        'LIVRO_FUND_1_2_origem': polo.propriedadesOriginais?.LIVRO_FUND_1_2_origem || 0,
+        'PVA_origem': polo.propriedadesOriginais?.PVA_origem || 0,
+        'educagame_origem': polo.propriedadesOriginais?.educagame_origem || 0,
+        'valor_reurb_origem': polo.propriedadesOriginais?.valor_reurb_origem || 0,
+        'VALOR_DESERT_NUM_origem': polo.propriedadesOriginais?.VALOR_DESERT_NUM_origem || 0,
+        'total_origem': total_origem
+      };
+    });
+    const produtosDetalhadosPolosSheet = XLSX.utils.json_to_sheet(produtosDetalhadosPolosData);
+    XLSX.utils.book_append_sheet(workbook, produtosDetalhadosPolosSheet, 'Produtos Detalhados Polos');
+
+    const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    saveAs(blob, `raio_analise_${new Date().toISOString().split('T')[0]}.xlsx`);
+  }, [radiusPayload]);
+
+
+  const handleExportRadiusPNG = useCallback(async () => {
+    if (!radiusPayload) return;
+
+    try {
+      // Encontrar o canvas do MapLibre GL
+      const mapCanvas = document.querySelector('.maplibregl-canvas') as HTMLCanvasElement;
+      if (!mapCanvas) {
+        alert('Canvas do mapa não encontrado para captura de screenshot');
+        return;
+      }
+
+      // Criar um novo canvas para combinar mapa + informações
+      const finalCanvas = document.createElement('canvas');
+      const ctx = finalCanvas.getContext('2d');
+      if (!ctx) return;
+
+      // Definir dimensões do canvas final
+      const mapWidth = mapCanvas.width;
+      const mapHeight = mapCanvas.height;
+      const infoHeight = 140; // Espaço para informações
+
+      finalCanvas.width = mapWidth;
+      finalCanvas.height = mapHeight + infoHeight;
+
+      // Copiar o conteúdo do mapa
+      ctx.drawImage(mapCanvas, 0, 0);
+
+      // Adicionar fundo para as informações
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+      ctx.fillRect(0, mapHeight, mapWidth, infoHeight);
+
+      // Adicionar informações do raio
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 18px Arial';
+      ctx.fillText('Análise de Raio - NEXUS', 20, mapHeight + 30);
+
+      ctx.font = '16px Arial';
+      ctx.fillText(`Raio: ${radiusPayload.metadata.raioKm.toFixed(2)} km`, 20, mapHeight + 60);
+      ctx.fillText(`Centro: ${radiusPayload.metadata.centro[1].toFixed(6)}, ${radiusPayload.metadata.centro[0].toFixed(6)}`, 20, mapHeight + 85);
+      ctx.fillText(`Municípios: ${radiusPayload.todosMunicipios.length}`, 20, mapHeight + 110);
+      ctx.fillText(`Total: ${formatCurrency(radiusPayload.subtotais.total)}`, 20, mapHeight + 135);
+
+      // Adicionar timestamp no canto inferior direito
+      const timestamp = new Date(radiusPayload.metadata.timestamp).toLocaleString('pt-BR');
+      ctx.font = '12px Arial';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+      ctx.textAlign = 'right';
+      ctx.fillText(timestamp, mapWidth - 20, mapHeight + infoHeight - 10);
+      ctx.textAlign = 'left'; // Resetar alinhamento
+
+      // Converter para blob e salvar
+      finalCanvas.toBlob((blob) => {
+        if (blob) {
+          saveAs(blob, `raio_mapa_${new Date().toISOString().split('T')[0]}.png`);
+        }
+      }, 'image/png', 0.95);
+
+    } catch (error) {
+      console.error('Erro ao capturar screenshot:', error);
+      alert('Erro ao capturar screenshot do mapa. Tente novamente.');
+    }
+  }, [radiusPayload]);
 
   const handleExportResultados = useCallback(() => {
     try {
@@ -1273,6 +1499,13 @@ export default function EstrategiaPage() {
                           periferias={periferiasFCForMap as any}
                           appliedPolo={appliedPolo}
                           appliedUF={appliedUF}
+                          appliedUFs={appliedUFs}
+                          appliedProducts={appliedProducts}
+                          appliedMinValor={appliedMinValor}
+                          appliedMaxValor={appliedMaxValor}
+                          onRadiusResult={setRadiusPayload}
+                          onExportXLSX={handleExportRadiusXLSX}
+                          onExportPNG={handleExportRadiusPNG}
                         />
                       </div>
                       <AnimatePresence initial={false}>
@@ -1323,6 +1556,13 @@ export default function EstrategiaPage() {
                         periferias={periferiasFCForMap as any}
                         appliedPolo={appliedPolo}
                         appliedUF={appliedUF}
+                        appliedUFs={appliedUFs}
+                        appliedProducts={appliedProducts}
+                        appliedMinValor={appliedMinValor}
+                        appliedMaxValor={appliedMaxValor}
+                        onRadiusResult={setRadiusPayload}
+                        onExportXLSX={handleExportRadiusXLSX}
+                        onExportPNG={handleExportRadiusPNG}
                       />
                       <AnimatePresence>
                         {isRunwayOpen && (

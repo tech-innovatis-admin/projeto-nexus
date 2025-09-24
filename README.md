@@ -42,12 +42,86 @@ O **NEXUS** é uma plataforma web desenvolvida pela *Data Science Team – Innov
 - **Destaque Inteligente**: Animações de fade-in/fade-out
 - **Popups Informativos**: Dados demográficos, políticos e produtos
 - **Busca Inteligente**: Autocomplete com normalização de acentos
+- **Ferramenta de Raio**: Análise de cobertura de valores por área geográfica
 
 ### 📊 **Módulo Estratégia**
 - **Análise de Polos de Valores** (geojson estratégico)
 - **Dados de Periferia Urbana** para planejamento
 - **Visualização Temática** de conectividade municipal
 - **Integração com Dados Municipais** para insights estratégicos
+- **Filtro Unificado ESTADO/REGIÃO** com seleção por regiões e estados
+- **Indicadores Visuais de Abertura** comercial por estado/região
+- **Ferramenta de Raio Interativo** para análise de cobertura de valores
+
+### 🔍 **Ferramenta de Raio Interativo**
+A ferramenta de Raio permite ao usuário desenhar um círculo no mapa para calcular o total dos valores estratégicos dos municípios (polos e periferias) que estão dentro da área selecionada.
+
+#### **Como Funciona:**
+1. **Ativação**: Clique no botão "Raio" no painel de controles do mapa
+2. **Desenho**: Clique e arraste no mapa para definir o centro e raio do círculo
+3. **Cálculo Automático**: O sistema identifica todos os municípios que intersectam com o círculo
+4. **Resultado**: Exibe o total monetário e lista detalhada dos municípios afetados
+5. **Exportação XLSX**: Download de dados organizados por Código IBGE, município, UF e valor
+
+#### **Lógica de Cálculo (Corrigida em 2025):**
+- **Polos**: Contribui apenas com `valor_total_origem` (valor gerado no próprio município polo)
+- **Periferias**: Contribui com `valor_total_destino` (recursos destinados ao município periférico)
+- **Evita Dupla Contagem**: Anteriormente, somava `origem + destinos` para polos e depois somava novamente os destinos individuais das periferias, causando inflação no total. A correção garante que cada valor seja contado apenas uma vez.
+
+#### **Exemplo Prático:**
+Para o filtro **PB / Campina Grande**:
+- **Card do Polo**: Mostra origem + destinos = R$ X
+- **Raio sobre Campina Grande**: Mostra apenas origem (se apenas o polo intersecta) ou origem + destinos das periferias dentro do círculo
+- **Resultado**: Valores agora consistentes, sem duplicação
+
+#### **Benefícios:**
+- **Análise Estratégica**: Avaliar cobertura de investimentos por área geográfica
+- **Planejamento Urbano**: Identificar regiões com maior concentração de valores
+- **Decisões Baseadas em Dados**: Totais precisos para relatórios e apresentações
+
+#### **Exportação XLSX Aprimorada:**
+- **Coluna "Código IBGE"**: Padronização com códigos oficiais dos municípios
+  - **Polos**: Utiliza `codigo_origem` do município polo
+  - **Periferias**: Utiliza `codigo_destino` do município periférico
+- **Ordenação Alfabética**: Dados ordenados por nome do município
+- **Estrutura Completa**: Tipo (Polo/Periferia), Código IBGE, Município, UF, Valor
+- **Compatibilidade**: Arquivo compatível com Excel e planilhas Google
+
+### 🗂️ **Filtro Unificado ESTADO/REGIÃO**
+O filtro unificado permite uma seleção avançada de estados e regiões para análise estratégica, com indicadores visuais de abertura comercial.
+
+#### **Funcionalidades:**
+- **Seleção por Regiões**: Norte, Nordeste, Centro-Oeste, Sudeste, Sul
+- **Seleção Individual de Estados**: Todos os 27 estados brasileiros
+- **Indicadores de Abertura**: Estados/regiões com abertura comercial marcados em azul
+- **Seleção em Lote**: Opções "Todos" e "Todos (Abertura)" para seleção rápida
+- **Botão Limpar**: Para resetar todos os filtros aplicados
+- **Interface Responsiva**: Dropdown com altura fixa e scroll para grande volume de opções
+
+#### **Estrutura do Filtro:**
+```
+__________________________
+Todos (Abertura)
+Todos
+[Limpar]
+__________________________
+REGIÕES:
+□ Norte
+□ Nordeste (Abertura)
+□ Centro-Oeste (Abertura)
+□ Sudeste
+□ Sul
+__________________________
+ESTADOS:
+□ AC □ AL □ AM ... □ SP
+□ BA (Abertura) □ MT (Abertura)
+```
+
+#### **Benefícios:**
+- **Filtragem Inteligente**: Combinação de filtros por região e estado
+- **Visibilidade de Oportunidades**: Indicadores claros de abertura comercial
+- **UX Otimizada**: Interface unificada substituindo filtros separados
+- **Performance**: Aplicação em tempo real nos dados estratégicos
 
 ### 💼 **Gestão Completa de Produtos**
 - **12 Produtos Municipais** com status automático:
@@ -572,7 +646,10 @@ npm run dev
 - **Dados de polos de valores** e periferia
 - **Visualização temática** para análise estratégica
 - **Integração com dados municipais**
-- **Dados mock** para desenvolvimento
+- **Filtro unificado ESTADO/REGIÃO** com seleção avançada
+- **Indicadores visuais de abertura comercial**
+- **Ferramenta de raio com exportação XLSX aprimorada**
+- **Popups corrigidos** com códigos IBGE completos
 
 ### 🔄 **Fluxo de Dados Técnicos**
 
@@ -681,6 +758,18 @@ model municipios {
 - **Code splitting** automático por rotas
 - **Image optimization** com Next.js Image
 - **Bundle analysis** para otimização
+
+### 🔧 **Correções Técnicas Recentes (2025)**
+- **Códigos IBGE Corretos**: Popups das periferias agora exibem códigos IBGE corretos
+  - Adicionado `codigo_destino` nas properties do FeatureCollection de periferias
+  - Fallback inteligente: `codigo_destino` → `codigo` → `codigo_ibge` → vazio
+- **Exportação XLSX Aprimorada**: Coluna "Código IBGE" padronizada
+  - Polos: usam `codigo_origem`
+  - Periferias: usam `codigo_destino` (com fallback para `codigo_origem`)
+- **Filtro Unificado**: Substituição do filtro separado "UF's Abertura"
+  - Componente `EstadoDropdown` com Portal React
+  - Seleção múltipla por regiões e estados
+  - Indicadores visuais de abertura comercial em azul
 
 ### 🔒 **Segurança Implementada**
 - **JWT tokens** com expiração de 1 hora

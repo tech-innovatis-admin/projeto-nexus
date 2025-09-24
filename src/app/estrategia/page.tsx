@@ -587,10 +587,10 @@ export default function EstrategiaPage() {
         geometry: p.geom,
         properties: {
           codigo_origem: p.codigo_origem,
+          codigo_destino: String((p as any).codigo_destino ?? (p as any).codigo ?? (p as any).codigo_ibge ?? ''),
           municipio_destino: p.municipio_destino,
-          UF: p.UF || '',
+          UF: String(p.UF || '').toUpperCase(),
           valor_total_destino: sumSelectedProducts(p.productValues, Number(p.valor_total_destino) || 0),
-          // codigo_destino pode não existir na tipagem atual; manter se vier na base original
         } as any
       }));
     return { type: 'FeatureCollection' as const, features };
@@ -1068,21 +1068,23 @@ export default function EstrategiaPage() {
                             rotateX: isCardFlipped ? 180 : 0
                           }}
                           transition={{ duration: 0.6, ease: 'easeInOut' }}
-                          className="relative w-full h-full cursor-pointer focus:outline-none focus:ring-2 focus:ring-sky-500 rounded-lg"
+                          className="relative w-full h-full focus:outline-none focus:ring-2 focus:ring-sky-500 rounded-lg"
                           style={{ transformStyle: 'preserve-3d' }}
-                          onClick={() => {
-                            setIsCardFlipped(!isCardFlipped);
-                            setSelectedMetric(metric.id);
-                          }}
-                          onKeyDown={(e) => handleCardKeyDown(e, metric.id)}
+                          onKeyDown={(e) => { if (!isCardFlipped) handleCardKeyDown(e, metric.id); }}
                           tabIndex={0}
                           role="button"
                           aria-label={isCardFlipped ? 'Fechar lista de municípios' : 'Ver lista de municípios do polo'}
                         >
                           {/* Frente do Card */}
                           <div
-                            className="absolute inset-0 w-full h-full bg-[#1e293b] rounded-lg border border-slate-700/50 hover:bg-[#233044] transition-all duration-300 p-4"
+                            className="absolute inset-0 w-full h-full bg-[#1e293b] rounded-lg border border-slate-700/50 hover:bg-[#233044] transition-all duration-300 p-4 cursor-pointer"
                             style={{ backfaceVisibility: 'hidden' }}
+                            onClick={() => {
+                              if (!isCardFlipped) {
+                                setIsCardFlipped(true);
+                                setSelectedMetric(metric.id);
+                              }
+                            }}
                           >
                             <div className="absolute top-3 right-3">
                               <svg

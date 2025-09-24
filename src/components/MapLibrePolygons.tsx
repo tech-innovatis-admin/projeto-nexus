@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import maplibregl, { LngLatBoundsLike, Map as MapLibreMap, LngLatBounds } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import * as turf from '@turf/turf';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
 
 export interface FeatureLike {
   type: 'Feature';
@@ -121,6 +123,9 @@ export default function MapLibrePolygons({
   // Listas dentro do raio
   const [polosInRadius, setPolosInRadius] = useState<any[]>([]);
   const [periferiasInRadius, setPeriferiasInRadius] = useState<any[]>([]);
+  // Refs com os dados mais recentes das features (evita closures com dados antigos)
+  const polosLatestRef = useRef<FC>({ type: 'FeatureCollection', features: [] });
+  const periLatestRef = useRef<FC>({ type: 'FeatureCollection', features: [] });
   
   // Sincronizar checkbox da periferia com contexto de filtro
   useEffect(() => {
@@ -438,27 +443,37 @@ export default function MapLibrePolygons({
             const pInside: any[] = [];
             const periInside: any[] = [];
             try {
-              // Polos
-              polos.features.forEach((f: any) => {
+              // Usar as features mais recentes já filtradas e normalizadas
+              const polosCur = polosLatestRef.current?.features || [];
+              const periCur = periLatestRef.current?.features || [];
+              const polosForIntersect: any[] = Array.isArray(polosCur) && polosCur.every((f: any) => !!f.geometry)
+                ? polosCur
+                : toGeometryFromPropsGeom(polosCur as any);
+              const periForIntersect: any[] = Array.isArray(periCur) && periCur.every((f: any) => !!f.geometry)
+                ? periCur
+                : toGeometryFromPropsGeom(periCur as any);
+              // Polos: somar apenas o valor de origem para evitar dupla contagem dos destinos
+              polosForIntersect.forEach((f: any) => {
                 if (turf.booleanIntersects(circleGeom, f)) {
                   const valorOrigem = Number(f.properties?.valor_total_origem || 0);
-                  const somaDestino = Number(f.properties?.soma_valor_total_destino || 0);
-                  const valor = valorOrigem + somaDestino;
-                  total += valor;
+                  total += valorOrigem;
                   pInside.push({
+                    codigo_origem: String(f.properties?.codigo_origem || ''),
                     nome: f.properties?.municipio_origem || '',
                     uf: String(f.properties?.UF || f.properties?.UF_origem || ''),
-                    valor,
+                    valor: valorOrigem,
                     tipo: 'Polo'
                   });
                 }
               });
               // Periferias
-              periferias.features.forEach((f: any) => {
+              periForIntersect.forEach((f: any) => {
                 if (turf.booleanIntersects(circleGeom, f)) {
                   const valor = Number(f.properties?.valor_total_destino || 0);
                   total += valor;
                   periInside.push({
+                    codigo_origem: String(f.properties?.codigo_origem || ''),
+                    codigo_destino: String(f.properties?.codigo_destino || ''),
                     nome: f.properties?.municipio_destino || '',
                     uf: String(f.properties?.UF || ''),
                     valor,
@@ -618,8 +633,11 @@ export default function MapLibrePolygons({
     const periFilteredFC: FC = inUFMode
       ? { type: 'FeatureCollection', features: periFC.features.filter(f => String(f.properties?.UF || '').toUpperCase() === ufUpper) }
       : periFC;
-    try { (map.getSource('polos-src') as any)?.setData(polosFilteredFC); } catch {}
-    try { (map.getSource('periferia-src') as any)?.setData(periFilteredFC); } catch {}
+  try { (map.getSource('polos-src') as any)?.setData(polosFilteredFC); } catch {}
+  try { (map.getSource('periferia-src') as any)?.setData(periFilteredFC); } catch {}
+  // Atualizar refs com os dados mais recentes (evita stale closures no handler do raio)
+  polosLatestRef.current = polosFilteredFC;
+  periLatestRef.current = periFilteredFC;
     
     // Criar contorno azul unificado para polo selecionado ou UF
     let highlightGeometry = null;
@@ -784,17 +802,46 @@ export default function MapLibrePolygons({
       </div>
       {(polosInRadius.length > 0 || periferiasInRadius.length > 0) && (
         <div className="absolute top-3 right-3 z-50">
-          <div className="bg-[#0b1220]/80 text-white rounded-md shadow-md p-3 text-sm w-72 max-h-[70vh] overflow-y-auto">
+          <div className="bg-[#0b1220]/80 text-white rounded-md shadow-md p-3 text-sm w-80 max-h-[70vh] overflow-y-auto">
             <div className="flex items-start justify-between mb-2">
               <div>
                 <div className="text-base font-semibold">Dentro do Raio</div>
                 <div className="text-[11px] text-slate-300">{polosInRadius.length + periferiasInRadius.length} municípios</div>
               </div>
-              <button
-                onClick={() => { setPolosInRadius([]); setPeriferiasInRadius([]); }}
-                className="text-slate-300 hover:text-white"
-                aria-label="Fechar lista"
-              >✕</button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    // Exportar XLSX: tipo,Código IBGE,municipio,UF,valor
+                    const rows = [...polosInRadius, ...periferiasInRadius]
+                      .sort((a, b) => String(a.nome).localeCompare(String(b.nome), 'pt-BR'))
+                      .map(r => ({
+                        tipo: r.tipo,
+                        'Código IBGE': (r.tipo === 'Polo' ? (r.codigo_origem || '') : (r.codigo_destino || r.codigo_origem || '')),
+                        municipio: r.nome || '',
+                        UF: r.uf || '',
+                        valor: r.valor || 0,
+                      }));
+                    const wb = XLSX.utils.book_new();
+                    const ws = XLSX.utils.json_to_sheet(rows);
+                    XLSX.utils.book_append_sheet(wb, ws, 'Dentro_do_Raio');
+                    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+                    const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+                    saveAs(blob, 'municipios_no_raio.xlsx');
+                  }}
+                  title="Exportar XLSX"
+                  aria-label="Exportar XLSX"
+                  className="p-1 rounded hover:bg-slate-700/50"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M8 12l4 4m0 0l4-4m-4 4V4" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => { setPolosInRadius([]); setPeriferiasInRadius([]); }}
+                  className="text-slate-300 hover:text-white"
+                  aria-label="Fechar lista"
+                >✕</button>
+              </div>
             </div>
             {polosInRadius.length > 0 && (
               <div className="mb-3">

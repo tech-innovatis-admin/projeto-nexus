@@ -148,7 +148,6 @@ export default function MapLibrePolygons({
   appliedMaxValor,
   onRadiusResult,
   onExportXLSX,
-  onExportPNG,
 }: {
   polos: FC;
   periferias: FC;
@@ -160,7 +159,6 @@ export default function MapLibrePolygons({
   appliedMaxValor?: number | '';
   onRadiusResult?: (payload: RadiusResultPayload) => void;
   onExportXLSX?: () => void;
-  onExportPNG?: () => void;
 }) {
   const mapRef = useRef<MapLibreMap | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -173,8 +171,8 @@ export default function MapLibrePolygons({
   const [circleGeoJSON, setCircleGeoJSON] = useState<any>(null);
   const centerRef = useRef<[number, number] | null>(null);
   const radiusPopupRef = useRef<maplibregl.Popup | null>(null);
-  // Critério de seleção para o raio
-  const [radiusCriterion, setRadiusCriterion] = useState<'intersecta' | 'contem'>('intersecta');
+  // Critério de seleção para o raio (sempre intersecta)
+  const radiusCriterion: 'intersecta' = 'intersecta';
   // ADICIONAR REFS NOVOS
   const radiusModeRef = useRef(false);
   const circleRef = useRef<any>(null);
@@ -486,20 +484,9 @@ export default function MapLibrePolygons({
           }
           radiusPopupRef.current.setHTML(`<div class='nexus-popup-content' style="color:#000;font-weight:700">Raio: ${radiusKm.toFixed(1)} km</div>`);
         };
-        // Função auxiliar para verificar se feature está dentro do círculo baseado no critério
-        const isFeatureInCircle = (feature: any, circle: any, criterion: 'intersecta' | 'contem') => {
-          if (criterion === 'intersecta') {
-            return turf.booleanIntersects(circle, feature);
-          } else {
-            // 'contem': verifica se o centroide da feature está dentro do círculo
-            try {
-              const centroid = turf.centroid(feature);
-              return turf.booleanPointInPolygon(centroid.geometry.coordinates, circle);
-            } catch {
-              // Fallback para interseção se centroid falhar
-              return turf.booleanIntersects(circle, feature);
-            }
-          }
+        // Função auxiliar para verificar se feature está dentro do círculo (sempre usa interseção)
+        const isFeatureInCircle = (feature: any, circle: any) => {
+          return turf.booleanIntersects(circle, feature);
         };
 
         const onUp = () => {
@@ -540,29 +527,124 @@ export default function MapLibrePolygons({
               let totalOrigem = 0;
               let totalDestinos = 0;
 
+              // Função utilitária para normalizar valores para número (dados já vêm numéricos)
+              const parseValueBR = (value: any): number => {
+                if (typeof value === 'number') return value;
+                if (typeof value === 'string' && value !== '') {
+                  const num = parseFloat(value);
+                  return Number.isFinite(num) ? num : 0;
+                }
+                return 0;
+              };
+
+              // Função para obter productValues (priorizando productValues já calculados ou derivando das propriedades originais)
+              const deriveProductValues = (properties: any, isOrigin: boolean = true): Record<string, number> => {
+                // DEBUG: Log das propriedades recebidas
+                console.log('🔍 [DERIVE PRODUCT VALUES] Propriedades recebidas:', {
+                  isOrigin,
+                  totalKeys: Object.keys(properties || {}).length,
+                  hasProductValues: !!properties?.productValues,
+                  sampleValues: {
+                    valor_pd_num_origem: properties?.valor_pd_num_origem,
+                    valor_pmsb_num_origem: properties?.valor_pmsb_num_origem,
+                    valor_total_origem: properties?.valor_total_origem,
+                    productValues_VALOR_PD: properties?.productValues?.VALOR_PD
+                  }
+                });
+
+                // PRIMEIRA PRIORIDADE: Usar productValues já calculados se existir
+                if (properties?.productValues && typeof properties.productValues === 'object') {
+                  console.log('✅ [DERIVE PRODUCT VALUES] Usando productValues já calculados:', properties.productValues);
+                  return { ...properties.productValues };
+                }
+
+                // SEGUNDA PRIORIDADE: Derivar das propriedades originais
+                const productValues: Record<string, number> = {};
+
+                if (isOrigin) {
+                  // Para polos (valores de origem)
+                  productValues.VALOR_PD = parseValueBR(properties?.valor_pd_num_origem);
+                  productValues.VALOR_PMBSB = parseValueBR(properties?.valor_pmsb_num_origem);
+                  productValues.VALOR_CTM = parseValueBR(properties?.valor_ctm_num_origem);
+                  productValues.VALOR_DEC_AMBIENTAL = parseValueBR(properties?.VALOR_DEC_AMBIENTAL_NUM_origem);
+                  productValues.VALOR_PLHIS = parseValueBR(properties?.PLHIS_origem);
+                  productValues.VALOR_START = parseValueBR(properties?.valor_start_iniciais_finais_origem);
+                  productValues.VALOR_LIVRO = parseValueBR(properties?.LIVRO_FUND_1_2_origem);
+                  productValues.VALOR_PVA = parseValueBR(properties?.PVA_origem);
+                  productValues.VALOR_EDUCAGAME = parseValueBR(properties?.educagame_origem);
+                  productValues.VALOR_REURB = parseValueBR(properties?.valor_reurb_origem);
+                  productValues.VALOR_DESERT = parseValueBR(properties?.VALOR_DESERT_NUM_origem);
+                } else {
+                  // Para periferias (valores de destino)
+                  productValues.VALOR_PD = parseValueBR(properties?.valor_pd_num_destino);
+                  productValues.VALOR_PMBSB = parseValueBR(properties?.valor_pmsb_num_destino);
+                  productValues.VALOR_CTM = parseValueBR(properties?.valor_ctm_num_destino);
+                  productValues.VALOR_DEC_AMBIENTAL = parseValueBR(properties?.VALOR_DEC_AMBIENTAL_NUM_destino);
+                  productValues.VALOR_PLHIS = parseValueBR(properties?.PLHIS_destino);
+                  productValues.VALOR_START = parseValueBR(properties?.valor_start_iniciais_finais_destino);
+                  productValues.VALOR_LIVRO = parseValueBR(properties?.LIVRO_FUND_1_2_destino);
+                  productValues.VALOR_PVA = parseValueBR(properties?.PVA_destino);
+                  productValues.VALOR_EDUCAGAME = parseValueBR(properties?.educagame_destino);
+                  productValues.VALOR_REURB = parseValueBR(properties?.valor_reurb_destino);
+                  productValues.VALOR_DESERT = parseValueBR(properties?.VALOR_DESERT_NUM_destino);
+                }
+
+                // DEBUG: Log dos productValues derivados
+                console.log('🔍 [DERIVE PRODUCT VALUES] ProductValues derivados das propriedades originais:', {
+                  productValues,
+                  totalSum: Object.values(productValues).reduce((sum, val) => sum + val, 0)
+                });
+
+                return productValues;
+              };
+
               // Processar polos
               polosForIntersect.forEach((f: any) => {
-                if (isFeatureInCircle(f, circleGeom, radiusCriterion)) {
+                if (isFeatureInCircle(f, circleGeom)) {
                   const valorOrigem = Number(f.properties?.valor_total_origem || 0);
                   totalOrigem += valorOrigem;
+
+                  // Derivar productValues explicitamente das propriedades originais
+                  const derivedProductValues = deriveProductValues(f.properties, true);
+                  
                   const municipio: MunicipioRaio = {
                     tipo: 'Polo',
                     codigo_origem: String(f.properties?.codigo_origem || ''),
                     nome: f.properties?.municipio_origem || '',
                     uf: String(f.properties?.UF || f.properties?.UF_origem || ''),
                     valor: valorOrigem,
-                    productValues: f.properties?.productValues || {},
+                    productValues: derivedProductValues,
                     propriedadesOriginais: f.properties || {}
                   };
+
+                  // DEBUG: Log de depuração para verificar se productValues está sendo populado
+                  console.log('🏭 [POLO RADIUS] Município polo adicionado:', {
+                    nome: municipio.nome,
+                    codigo_origem: municipio.codigo_origem,
+                    valor: municipio.valor,
+                    productValues: municipio.productValues,
+                    totalProductValues: Object.values(municipio.productValues || {}).reduce((sum, val) => sum + val, 0),
+                    propriedadesOriginaisSample: {
+                      valor_pd_num_origem: f.properties?.valor_pd_num_origem,
+                      valor_pmsb_num_origem: f.properties?.valor_pmsb_num_origem,
+                      valor_ctm_num_origem: f.properties?.valor_ctm_num_origem,
+                      valor_total_origem: f.properties?.valor_total_origem
+                    }
+                  });
+
                   polosInRadius.push(municipio);
                 }
               });
 
               // Processar periferias
               periForIntersect.forEach((f: any) => {
-                if (isFeatureInCircle(f, circleGeom, radiusCriterion)) {
+                if (isFeatureInCircle(f, circleGeom)) {
                   const valorDestino = Number(f.properties?.valor_total_destino || 0);
                   totalDestinos += valorDestino;
+
+                  // Derivar productValues explicitamente das propriedades originais (valores de destino)
+                  const derivedProductValues = deriveProductValues(f.properties, false);
+
                   const municipio: MunicipioRaio = {
                     tipo: 'Periferia',
                     codigo_origem: String(f.properties?.codigo_origem || ''),
@@ -570,9 +652,26 @@ export default function MapLibrePolygons({
                     nome: f.properties?.municipio_destino || '',
                     uf: String(f.properties?.UF || ''),
                     valor: valorDestino,
-                    productValues: f.properties?.productValues || {},
+                    productValues: derivedProductValues,
                     propriedadesOriginais: f.properties || {}
                   };
+
+                  // DEBUG: Log de depuração para verificar se productValues está sendo populado
+                  console.log('🏘️ [PERIFERIA RADIUS] Município periferia adicionado:', {
+                    nome: municipio.nome,
+                    codigo_origem: municipio.codigo_origem,
+                    codigo_destino: municipio.codigo_destino,
+                    valor: municipio.valor,
+                    productValues: municipio.productValues,
+                    totalProductValues: Object.values(municipio.productValues || {}).reduce((sum, val) => sum + val, 0),
+                    propriedadesOriginaisSample: {
+                      valor_pd_num_destino: f.properties?.valor_pd_num_destino,
+                      valor_pmsb_num_destino: f.properties?.valor_pmsb_num_destino,
+                      valor_ctm_num_destino: f.properties?.valor_ctm_num_destino,
+                      valor_total_destino: f.properties?.valor_total_destino
+                    }
+                  });
+
                   periferiasInRadius.push(municipio);
                 }
               });
@@ -898,23 +997,6 @@ export default function MapLibrePolygons({
               className={`w-full bg-sky-600 hover:bg-sky-700 rounded-md px-2 py-1 mb-1 ${radiusMode ? 'bg-emerald-600' : ''}`}
             >{radiusMode ? 'Sair do Raio' : 'Raio'}</button>
 
-            {/* Seletor de critério quando em modo raio */}
-            {radiusMode && (
-              <div className="border-t border-slate-600 pt-2">
-                <label className="text-xs text-slate-300 mb-1 block">Critério:</label>
-                <select
-                  value={radiusCriterion}
-                  onChange={(e) => setRadiusCriterion(e.target.value as 'intersecta' | 'contem')}
-                  className="w-full bg-slate-700 text-white rounded px-2 py-1 text-xs border border-slate-600"
-                >
-                  <option value="intersecta">Intersecta</option>
-                  <option value="contem">Contém</option>
-                </select>
-                <div className="text-[10px] text-slate-400 mt-1">
-                  {radiusCriterion === 'intersecta' ? 'Municípios que tocam o círculo' : 'Municípios cujo centro está dentro'}
-                </div>
-              </div>
-            )}
             <button
               onClick={() => {
                 setCircleGeoJSON(null);
@@ -953,9 +1035,9 @@ export default function MapLibrePolygons({
         </div>
       </div>
       {(polosInRadius.length > 0 || periferiasInRadius.length > 0) && (
-        <div className="absolute top-3 right-3 z-50">
-          <div className="bg-[#0b1220]/80 text-white rounded-md shadow-md p-3 text-sm w-80 max-h-[70vh] overflow-y-auto">
-            <div className="flex items-start justify-between mb-2">
+        <div className="absolute top-4 right-4 bottom-4 z-50 md:bottom-4" style={{ bottom: 'max(16px, env(safe-area-inset-bottom))' }}>
+          <div className="bg-[#0b1220]/80 text-white rounded-md shadow-md p-3 text-sm w-80 h-full overflow-y-auto flex flex-col">
+            <div className="flex items-start justify-between mb-2 flex-shrink-0">
               <div>
                 <div className="text-base font-semibold">Dentro do Raio</div>
                 <div className="text-[11px] text-slate-300">{polosInRadius.length + periferiasInRadius.length} municípios</div>
@@ -973,18 +1055,6 @@ export default function MapLibrePolygons({
                     </svg>
                   </button>
                 )}
-                {onExportPNG && (
-                  <button
-                    onClick={onExportPNG}
-                    title="Exportar PNG do mapa"
-                    aria-label="Exportar PNG"
-                    className="p-2 rounded hover:bg-slate-700/50 text-slate-300 hover:text-white"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                  </button>
-                )}
                 <button
                   onClick={() => { setPolosInRadius([]); setPeriferiasInRadius([]); }}
                   className="text-slate-300 hover:text-white p-2"
@@ -992,32 +1062,34 @@ export default function MapLibrePolygons({
                 >✕</button>
               </div>
             </div>
-            {polosInRadius.length > 0 && (
-              <div className="mb-3">
-                <div className="text-xs text-slate-300 mb-1">Polos ({polosInRadius.length})</div>
-                <div className="space-y-1">
-                  {polosInRadius.map((m, idx) => (
-                    <div key={`p-${idx}`} className="flex items-center justify-between bg-slate-800/50 border border-slate-700/40 rounded px-2 py-1">
-                      <span className="text-slate-200 truncate max-w-[140px]" title={`${m.nome} - ${m.uf}`}>{m.nome}</span>
-                      <span className="text-slate-300 tabular-nums">{formatCurrencyBRL(m.valor)}</span>
-                    </div>
-                  ))}
+            <div className="flex-1 overflow-y-auto">
+              {polosInRadius.length > 0 && (
+                <div className="mb-3">
+                  <div className="text-xs text-slate-300 mb-1">Polos ({polosInRadius.length})</div>
+                  <div className="space-y-1">
+                    {polosInRadius.map((m, idx) => (
+                      <div key={`p-${idx}`} className="flex items-center justify-between bg-slate-800/50 border border-slate-700/40 rounded px-2 py-1">
+                        <span className="text-slate-200 truncate max-w-[140px]" title={`${m.nome} - ${m.uf}`}>{m.nome}</span>
+                        <span className="text-slate-300 tabular-nums">{formatCurrencyBRL(m.valor)}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
-            {periferiasInRadius.length > 0 && (
-              <div>
-                <div className="text-xs text-slate-300 mb-1">Periferias ({periferiasInRadius.length})</div>
-                <div className="space-y-1">
-                  {periferiasInRadius.map((m, idx) => (
-                    <div key={`peri-${idx}`} className="flex items-center justify-between bg-slate-800/50 border border-slate-700/40 rounded px-2 py-1">
-                      <span className="text-slate-200 truncate max-w-[140px]" title={`${m.nome} - ${m.uf}`}>{m.nome}</span>
-                      <span className="text-slate-300 tabular-nums">{formatCurrencyBRL(m.valor)}</span>
-                    </div>
-                  ))}
+              )}
+              {periferiasInRadius.length > 0 && (
+                <div>
+                  <div className="text-xs text-slate-300 mb-1">Periferias ({periferiasInRadius.length})</div>
+                  <div className="space-y-1">
+                    {periferiasInRadius.map((m, idx) => (
+                      <div key={`peri-${idx}`} className="flex items-center justify-between bg-slate-800/50 border border-slate-700/40 rounded px-2 py-1">
+                        <span className="text-slate-200 truncate max-w-[140px]" title={`${m.nome} - ${m.uf}`}>{m.nome}</span>
+                        <span className="text-slate-300 tabular-nums">{formatCurrencyBRL(m.valor)}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -26,6 +26,7 @@
     "downloadjs": "^1.4.7",
     "file-saver": "^2.0.5",
     "framer-motion": "^12.11.3",
+    "html2canvas": "^1.4.1",
     "jose": "^6.0.12",
     "jsonwebtoken": "^9.0.2",
     "jszip": "^3.10.1",

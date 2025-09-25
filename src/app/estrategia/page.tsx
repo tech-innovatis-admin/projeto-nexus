@@ -582,6 +582,8 @@ export default function EstrategiaPage() {
           UF_origem: p.UF_origem || '',
           soma_valor_total_destino: periferiaAggByCodigo.get(p.codigo_origem) || 0,
           valor_total_origem: Number(p.valor_total_origem) || 0,
+          // Inclui productValues já calculados para uso no raio/export
+          productValues: p.productValues,
           // Inclui TODAS as propriedades originais para acesso aos valores de produtos
           ...p.propriedadesOriginais,
         }
@@ -609,6 +611,8 @@ export default function EstrategiaPage() {
           municipio_destino: p.municipio_destino,
           UF: String(p.UF || '').toUpperCase(),
           valor_total_destino: sumSelectedProducts(p.productValues, Number(p.valor_total_destino) || 0),
+          // Inclui productValues já calculados para uso no raio/export
+          productValues: p.productValues,
           // Inclui TODAS as propriedades originais para acesso aos valores de produtos
           ...p.propriedadesOriginais,
         } as any
@@ -733,7 +737,7 @@ export default function EstrategiaPage() {
       title: 'Top 3 Municípios',
       value: 'ranking',
       subtitle: 'Maior Potencial',
-      description: 'Municipios com maior valor_total_destino'
+      description: 'Municipios com maior valor total em produtos'
     },
     {
       id: 'municipios_polo',
@@ -783,12 +787,7 @@ export default function EstrategiaPage() {
       'Raio (km)': radiusPayload.metadata.raioKm.toFixed(2),
       'Centro (Lat/Lng)': `${radiusPayload.metadata.centro[1].toFixed(6)}, ${radiusPayload.metadata.centro[0].toFixed(6)}`,
       'Critério': radiusPayload.metadata.criterio === 'intersecta' ? 'Intersecta' : 'Contém',
-      'Timestamp': new Date(radiusPayload.metadata.timestamp).toLocaleString('pt-BR'),
-      'Polos Selecionados': radiusPayload.metadata.filtrosAplicados.polosSelecionados.join(', ') || 'Todos',
-      'UFs Selecionadas': radiusPayload.metadata.filtrosAplicados.ufsSelecionadas.join(', ') || 'Todas',
-      'Produtos Selecionados': radiusPayload.metadata.filtrosAplicados.produtosSelecionados.join(', ') || 'Todos',
-      'Valor Mínimo': radiusPayload.metadata.filtrosAplicados.minValor || 'N/A',
-      'Valor Máximo': radiusPayload.metadata.filtrosAplicados.maxValor || 'N/A'
+      'Timestamp': new Date(radiusPayload.metadata.timestamp).toLocaleString('pt-BR')
     }]);
     XLSX.utils.book_append_sheet(workbook, metadataSheet, 'Metadados');
 
@@ -875,34 +874,47 @@ export default function EstrategiaPage() {
 
     // Aba de Produtos Detalhados Polos - um registro por município polo
     const produtosDetalhadosPolosData = radiusPayload.polos.map(polo => {
-      const total_origem =
-        (polo.propriedadesOriginais?.valor_pd_num_origem || 0) +
-        (polo.propriedadesOriginais?.valor_pmsb_num_origem || 0) +
-        (polo.propriedadesOriginais?.valor_ctm_num_origem || 0) +
-        (polo.propriedadesOriginais?.VALOR_DEC_AMBIENTAL_NUM_origem || 0) +
-        (polo.propriedadesOriginais?.PLHIS_origem || 0) +
-        (polo.propriedadesOriginais?.valor_start_iniciais_finais_origem || 0) +
-        (polo.propriedadesOriginais?.LIVRO_FUND_1_2_origem || 0) +
-        (polo.propriedadesOriginais?.PVA_origem || 0) +
-        (polo.propriedadesOriginais?.educagame_origem || 0) +
-        (polo.propriedadesOriginais?.valor_reurb_origem || 0) +
-        (polo.propriedadesOriginais?.VALOR_DESERT_NUM_origem || 0);
+      // DEBUG: Log de depuração no momento da exportação
+      console.log('📊 [XLSX EXPORT POLO] Processando polo para exportação:', {
+        nome: polo.nome,
+        codigo_origem: polo.codigo_origem,
+        productValues: polo.productValues,
+        productValuesKeys: Object.keys(polo.productValues || {}),
+        totalProductValues: Object.values(polo.productValues || {}).reduce((sum, val) => sum + val, 0)
+      });
+
+      // Usar productValues (que agora está corretamente populado) como fonte primária
+      const valor_pd_num_origem = polo.productValues?.VALOR_PD || 0;
+      const valor_pmsb_num_origem = polo.productValues?.VALOR_PMBSB || 0;
+      const valor_ctm_num_origem = polo.productValues?.VALOR_CTM || 0;
+      const VALOR_DEC_AMBIENTAL_NUM_origem = polo.productValues?.VALOR_DEC_AMBIENTAL || 0;
+      const PLHIS_origem = polo.productValues?.VALOR_PLHIS || 0;
+      const valor_start_iniciais_finais_origem = polo.productValues?.VALOR_START || 0;
+      const LIVRO_FUND_1_2_origem = polo.productValues?.VALOR_LIVRO || 0;
+      const PVA_origem = polo.productValues?.VALOR_PVA || 0;
+      const educagame_origem = polo.productValues?.VALOR_EDUCAGAME || 0;
+      const valor_reurb_origem = polo.productValues?.VALOR_REURB || 0;
+      const VALOR_DESERT_NUM_origem = polo.productValues?.VALOR_DESERT || 0;
+
+      const total_origem = valor_pd_num_origem + valor_pmsb_num_origem + valor_ctm_num_origem +
+                          VALOR_DEC_AMBIENTAL_NUM_origem + PLHIS_origem + valor_start_iniciais_finais_origem +
+                          LIVRO_FUND_1_2_origem + PVA_origem + educagame_origem + valor_reurb_origem + VALOR_DESERT_NUM_origem;
 
       return {
-        'codigo_origem': String(polo.propriedadesOriginais?.codigo_origem || ''),
+        'codigo_origem': String(polo.codigo_origem || ''),
         'municipio_origem': polo.nome,
         'UF': polo.uf,
-        'valor_pd_num_origem': polo.propriedadesOriginais?.valor_pd_num_origem || 0,
-        'valor_pmsb_num_origem': polo.propriedadesOriginais?.valor_pmsb_num_origem || 0,
-        'valor_ctm_num_origem': polo.propriedadesOriginais?.valor_ctm_num_origem || 0,
-        'VALOR_DEC_AMBIENTAL_NUM_origem': polo.propriedadesOriginais?.VALOR_DEC_AMBIENTAL_NUM_origem || 0,
-        'PLHIS_origem': polo.propriedadesOriginais?.PLHIS_origem || 0,
-        'valor_start_iniciais_finais_origem': polo.propriedadesOriginais?.valor_start_iniciais_finais_origem || 0,
-        'LIVRO_FUND_1_2_origem': polo.propriedadesOriginais?.LIVRO_FUND_1_2_origem || 0,
-        'PVA_origem': polo.propriedadesOriginais?.PVA_origem || 0,
-        'educagame_origem': polo.propriedadesOriginais?.educagame_origem || 0,
-        'valor_reurb_origem': polo.propriedadesOriginais?.valor_reurb_origem || 0,
-        'VALOR_DESERT_NUM_origem': polo.propriedadesOriginais?.VALOR_DESERT_NUM_origem || 0,
+        'valor_pd_num_origem': valor_pd_num_origem,
+        'valor_pmsb_num_origem': valor_pmsb_num_origem,
+        'valor_ctm_num_origem': valor_ctm_num_origem,
+        'VALOR_DEC_AMBIENTAL_NUM_origem': VALOR_DEC_AMBIENTAL_NUM_origem,
+        'PLHIS_origem': PLHIS_origem,
+        'valor_start_iniciais_finais_origem': valor_start_iniciais_finais_origem,
+        'LIVRO_FUND_1_2_origem': LIVRO_FUND_1_2_origem,
+        'PVA_origem': PVA_origem,
+        'educagame_origem': educagame_origem,
+        'valor_reurb_origem': valor_reurb_origem,
+        'VALOR_DESERT_NUM_origem': VALOR_DESERT_NUM_origem,
         'total_origem': total_origem
       };
     });
@@ -919,28 +931,46 @@ export default function EstrategiaPage() {
     if (!radiusPayload) return;
 
     try {
-      // Encontrar o canvas do MapLibre GL
-      const mapCanvas = document.querySelector('.maplibregl-canvas') as HTMLCanvasElement;
-      if (!mapCanvas) {
-        alert('Canvas do mapa não encontrado para captura de screenshot');
+      // Importar html2canvas dinamicamente
+      const html2canvas = (await import('html2canvas')).default;
+
+      // Encontrar o container do mapa completo
+      const mapContainer = document.querySelector('.maplibregl-map') as HTMLElement;
+      if (!mapContainer) {
+        alert('Container do mapa não encontrado para captura de screenshot');
         return;
       }
 
-      // Criar um novo canvas para combinar mapa + informações
+      // Capturar o mapa completo com todos os elementos visuais
+      const canvas = await html2canvas(mapContainer, {
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: null,
+        scale: 1,
+        logging: false,
+        ignoreElements: (element) => {
+          // Ignorar elementos de controle que não queremos na captura
+          return element.classList.contains('maplibregl-ctrl-top-right') ||
+                 element.classList.contains('maplibregl-ctrl-bottom-left') ||
+                 element.classList.contains('maplibregl-ctrl-bottom-right');
+        }
+      });
+
+      // Criar um novo canvas para adicionar informações
       const finalCanvas = document.createElement('canvas');
       const ctx = finalCanvas.getContext('2d');
       if (!ctx) return;
 
       // Definir dimensões do canvas final
-      const mapWidth = mapCanvas.width;
-      const mapHeight = mapCanvas.height;
+      const mapWidth = canvas.width;
+      const mapHeight = canvas.height;
       const infoHeight = 140; // Espaço para informações
 
       finalCanvas.width = mapWidth;
       finalCanvas.height = mapHeight + infoHeight;
 
-      // Copiar o conteúdo do mapa
-      ctx.drawImage(mapCanvas, 0, 0);
+      // Copiar o conteúdo do mapa capturado
+      ctx.drawImage(canvas, 0, 0);
 
       // Adicionar fundo para as informações
       ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
@@ -1343,7 +1373,7 @@ export default function EstrategiaPage() {
 
                           {/* Verso do Card */}
                           <div
-                            className="absolute inset-0 w-full h-full bg-[#1e293b] rounded-lg border border-slate-700/50 px-4 pt-2 pb-4 flex flex-col"
+                            className="absolute inset-0 w-full h-full bg-[#1e293b] rounded-lg border border-slate-700/50 p-4 flex flex-col"
                             style={{
                               backfaceVisibility: 'hidden',
                               transform: 'rotateX(180deg)'
@@ -1361,12 +1391,14 @@ export default function EstrategiaPage() {
                                 ✕
                               </button>
                             </div>
+
+                            {/* Área compacta: todos os municípios cabem sem rolagem */}
                             <div className="flex-1">
-                              <div className="grid grid-cols-2 gap-2 h-full content-start">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 sm:gap-1.5 justify-items-stretch content-start auto-rows-min">
                                 {derived.municipiosList.slice(0, 10).map((municipio, idx) => (
-                                  <div 
+                                  <div
                                     key={idx}
-                                    className="text-xs text-slate-300 py-1 px-2 max-w-[120px] overflow-hidden text-ellipsis whitespace-nowrap leading-tight bg-slate-800/60 rounded-md border border-slate-700/30 text-center hover:bg-slate-700/60 transition-colors"
+                                    className="w-full text-[9px] text-slate-300 py-1 px-1.5 truncate leading-tight bg-slate-800/60 rounded border border-slate-700/30 text-center hover:bg-slate-700/60 transition-colors"
                                     title={municipio}
                                   >
                                     {municipio}
@@ -1385,15 +1417,10 @@ export default function EstrategiaPage() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.5, delay: 0.2 + index * 0.1 }}
                         className={`bg-[#1e293b] rounded-lg border border-slate-700/50 hover:bg-[#233044] transition-all duration-300 group min-h-[160px] ${
-                          metric.id === 'valor_polo' ? 'focus:outline-none focus:ring-2 focus:ring-sky-500' : ''
-                        } ${metric.id === 'top_municipios' ? 'p-4' : metric.id === 'valor_polo' ? 'p-6' : 'p-4'}`}
+                          metric.id === 'top_municipios' ? 'p-4' : metric.id === 'valor_polo' ? 'p-6' : 'p-4'
+                        }`}
                         onClick={() => setSelectedMetric(metric.id)}
-                        onKeyDown={(e) => {
-                          if (metric.id === 'valor_polo') {
-                            handleCardKeyDown(e, metric.id);
-                          }
-                        }}
-                        tabIndex={metric.id === 'valor_polo' ? 0 : -1}
+                        tabIndex={-1}
                       >
                         {metric.id === 'top_municipios' ? (
                           // Layout especial para Top 3 Municípios
@@ -1505,7 +1532,6 @@ export default function EstrategiaPage() {
                           appliedMaxValor={appliedMaxValor}
                           onRadiusResult={setRadiusPayload}
                           onExportXLSX={handleExportRadiusXLSX}
-                          onExportPNG={handleExportRadiusPNG}
                         />
                       </div>
                       <AnimatePresence initial={false}>
@@ -1562,7 +1588,6 @@ export default function EstrategiaPage() {
                         appliedMaxValor={appliedMaxValor}
                         onRadiusResult={setRadiusPayload}
                         onExportXLSX={handleExportRadiusXLSX}
-                        onExportPNG={handleExportRadiusPNG}
                       />
                       <AnimatePresence>
                         {isRunwayOpen && (

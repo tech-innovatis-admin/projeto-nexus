@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import JSZip from 'jszip';
 import { generateBudgetPDF, resolveMunicipioNome, estadoParaUF, sanitizeFileName, mergePdfPages } from '@/utils/pdfOrcamento';
+import { useUser } from '../contexts/UserContext';
 
 function ModalOrcamento({ isOpen, onClose, mapData }) {
+  const { user } = useUser();
   const [allStates, setAllStates] = useState([]);
   const [allMunicipalities, setAllMunicipalities] = useState([]);
   const [selectedStates, setSelectedStates] = useState([]);
@@ -13,6 +15,15 @@ function ModalOrcamento({ isOpen, onClose, mapData }) {
   const [isExporting, setIsExporting] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0, label: '' });
   const [exportFileName, setExportFileName] = useState(`orcamentos_municipios_${new Date().toISOString().slice(0,10)}`);
+
+  // Função helper para formatar informações do usuário nos logs
+  const formatUserInfo = (user) => {
+    if (!user) return "Usuário não identificado";
+    const name = user.name || user.username || `ID:${user.id}`;
+    return `${name}${user.role ? ` (${user.role})` : ''}`;
+  };
+
+  const userInfo = formatUserInfo(user);
 
   // Load universe from mapData
   useEffect(() => {
@@ -30,10 +41,13 @@ function ModalOrcamento({ isOpen, onClose, mapData }) {
         return name && state ? ({ name, state, data: props }) : null;
       }).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }));
       setAllMunicipalities(municipalities);
+
+      console.log(`📤 [ModalOrcamento] ${userInfo} - Modal de exportação aberto`);
+      console.log(`📤 [ModalOrcamento] ${userInfo} - Dados carregados: ${states.length} estados, ${municipalities.length} municípios`);
     } catch (e) {
       console.warn('Erro ao montar universo de estados/municípios:', e);
     }
-  }, [isOpen, mapData]);
+  }, [isOpen, mapData, userInfo]);
 
   const filteredStates = useMemo(() => {
     const q = searchState.trim().toLowerCase();
@@ -69,9 +83,33 @@ function ModalOrcamento({ isOpen, onClose, mapData }) {
   const exportNow = async () => {
     const targets = buildExportSet();
     if (!targets || targets.length === 0) {
+      console.log(`📤 [ModalOrcamento] ${userInfo} - Tentativa de exportação sem municípios selecionados`);
       alert('Nenhum município encontrado para exportação.');
       return;
     }
+
+    // Log detalhado dos filtros aplicados
+    const filtrosAplicados = [];
+    if (selectedStates.length > 0) {
+      filtrosAplicados.push(`Estados: ${selectedStates.join(', ')}`);
+    }
+    if (selectedMunicipalities.length > 0) {
+      const municipioNomes = selectedMunicipalities.map(key => {
+        const [name] = key.split('|');
+        return name;
+      });
+      filtrosAplicados.push(`Municípios específicos: ${municipioNomes.slice(0, 3).join(', ')}${municipioNomes.length > 3 ? ` (+${municipioNomes.length - 3} outros)` : ''}`);
+    }
+    if (filtrosAplicados.length === 0) {
+      filtrosAplicados.push('Todos os municípios');
+    }
+
+    console.log(`📤 [ModalOrcamento] ${userInfo} - Iniciando exportação em massa`);
+    console.log(`📤 [ModalOrcamento] ${userInfo} - Filtros aplicados: ${filtrosAplicados.join(' | ')}`);
+    console.log(`📤 [ModalOrcamento] ${userInfo} - Total de municípios: ${targets.length}`);
+    console.log(`📤 [ModalOrcamento] ${userInfo} - Modo: ${mode === 'merged' ? 'PDF único (mesclado)' : 'ZIP (arquivos separados)'}`);
+    console.log(`📤 [ModalOrcamento] ${userInfo} - Nome do arquivo: ${exportFileName || 'orcamentos_municipios_' + new Date().toISOString().slice(0,10)}`);
+
     setIsExporting(true);
     setProgress({ current: 0, total: targets.length, label: '' });
 
@@ -108,31 +146,38 @@ function ModalOrcamento({ isOpen, onClose, mapData }) {
       }
 
       if (mode === 'zip') {
+        const finalFileName = `${exportFileName || `orcamentos_municipios_${new Date().toISOString().slice(0,10)}`}.zip`;
         const blob = await zip.generateAsync({ type: 'blob' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${exportFileName || `orcamentos_municipios_${new Date().toISOString().slice(0,10)}`}.zip`;
+        a.download = finalFileName;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+
+        console.log(`✅ [ModalOrcamento] ${userInfo} - Exportação ZIP concluída com sucesso: "${finalFileName}" (${targets.length} municípios)`);
       } else {
+        const finalFileName = `${exportFileName || `orcamentos_municipios_${new Date().toISOString().slice(0,10)}`}.pdf`;
         const mergedBytes = await mergePdfPages(pdfBuffers);
         const blob = new Blob([mergedBytes], { type: 'application/pdf' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${exportFileName || `orcamentos_municipios_${new Date().toISOString().slice(0,10)}`}.pdf`;
+        a.download = finalFileName;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+
+        console.log(`✅ [ModalOrcamento] ${userInfo} - Exportação PDF mesclado concluída com sucesso: "${finalFileName}" (${targets.length} municípios, ${pdfBuffers.length} páginas)`);
       }
 
       onClose();
     } catch (e) {
-      console.error('Erro na exportação em massa:', e);
+      console.error(`❌ [ModalOrcamento] ${userInfo} - Erro na exportação em massa:`, e);
+      console.log(`❌ [ModalOrcamento] ${userInfo} - Exportação falhou após processar ${progress.current}/${targets.length} municípios`);
       alert('Erro ao gerar orçamentos. Verifique o template e tente novamente.');
     } finally {
       setIsExporting(false);
@@ -152,7 +197,10 @@ function ModalOrcamento({ isOpen, onClose, mapData }) {
         <div className="relative flex items-center justify-center p-6 border-b border-gray-200 flex-shrink-0">
           <h2 className="text-xl font-semibold text-gray-900 w-full text-center">Exportar Orçamento</h2>
           <button
-            onClick={onClose}
+            onClick={() => {
+              console.log(`📤 [ModalOrcamento] ${userInfo} - Modal fechado (botão X)`);
+              onClose();
+            }}
             className="absolute right-4 top-4 text-gray-500 hover:text-gray-700"
             aria-label="Fechar"
           >
@@ -174,8 +222,14 @@ function ModalOrcamento({ isOpen, onClose, mapData }) {
                     <span className="font-medium text-gray-800">Estados</span>
                   </div>
                   <div className="space-x-2 z-10">
-                    <button className="text-xs font-semibold text-sky-600 hover:text-sky-900 px-2 py-1 rounded border border-sky-200 hover:bg-sky-50 transition-colors min-w-[50px] inline-block" onClick={() => setSelectedStates([...allStates])}>Todos</button>
-                    <button className="text-xs font-semibold text-sky-600 hover:text-sky-900 px-2 py-1 rounded border border-sky-200 hover:bg-sky-50 transition-colors min-w-[50px] inline-block" onClick={() => setSelectedStates([])}>Nenhum</button>
+                    <button className="text-xs font-semibold text-sky-600 hover:text-sky-900 px-2 py-1 rounded border border-sky-200 hover:bg-sky-50 transition-colors min-w-[50px] inline-block" onClick={() => {
+                      setSelectedStates([...allStates]);
+                      console.log(`📤 [ModalOrcamento] ${userInfo} - Selecionou todos os estados (${allStates.length})`);
+                    }}>Todos</button>
+                    <button className="text-xs font-semibold text-sky-600 hover:text-sky-900 px-2 py-1 rounded border border-sky-200 hover:bg-sky-50 transition-colors min-w-[50px] inline-block" onClick={() => {
+                      setSelectedStates([]);
+                      console.log(`📤 [ModalOrcamento] ${userInfo} - Desmarcou todos os estados`);
+                    }}>Nenhum</button>
                   </div>
                 </div>
                 <div className="p-3">
@@ -219,8 +273,15 @@ function ModalOrcamento({ isOpen, onClose, mapData }) {
                     <span className="font-medium text-gray-800">Municípios</span>
                   </div>
                   <div className="space-x-2 z-10">
-                    <button className="text-xs font-semibold text-sky-600 hover:text-sky-900 px-2 py-1 rounded border border-sky-200 hover:bg-sky-50 transition-colors min-w-[50px] inline-block" onClick={() => setSelectedMunicipalities(filteredMunicipalities.map(m => municipalityKey(m)))}>Todos</button>
-                    <button className="text-xs font-semibold text-sky-600 hover:text-sky-900 px-2 py-1 rounded border border-sky-200 hover:bg-sky-50 transition-colors min-w-[50px] inline-block" onClick={() => setSelectedMunicipalities([])}>Nenhum</button>
+                    <button className="text-xs font-semibold text-sky-600 hover:text-sky-900 px-2 py-1 rounded border border-sky-200 hover:bg-sky-50 transition-colors min-w-[50px] inline-block" onClick={() => {
+                      const allKeys = filteredMunicipalities.map(m => municipalityKey(m));
+                      setSelectedMunicipalities(allKeys);
+                      console.log(`📤 [ModalOrcamento] ${userInfo} - Selecionou todos os municípios visíveis (${allKeys.length})`);
+                    }}>Todos</button>
+                    <button className="text-xs font-semibold text-sky-600 hover:text-sky-900 px-2 py-1 rounded border border-sky-200 hover:bg-sky-50 transition-colors min-w-[50px] inline-block" onClick={() => {
+                      setSelectedMunicipalities([]);
+                      console.log(`📤 [ModalOrcamento] ${userInfo} - Desmarcou todos os municípios`);
+                    }}>Nenhum</button>
                   </div>
                 </div>
                 <div className="p-3">
@@ -264,7 +325,13 @@ function ModalOrcamento({ isOpen, onClose, mapData }) {
               <input
                 type="text"
                 value={exportFileName}
-                onChange={(e) => setExportFileName(e.target.value)}
+                onChange={(e) => {
+                  const newName = e.target.value;
+                  setExportFileName(newName);
+                  if (newName.trim()) {
+                    console.log(`📤 [ModalOrcamento] ${userInfo} - Nome do arquivo alterado para: "${newName}"`);
+                  }
+                }}
                 placeholder="ex.: minha_exportacao"
                 className="w-full max-w-sm text-sm border-gray-300 rounded px-3 py-2 text-gray-700"
               />
@@ -276,18 +343,27 @@ function ModalOrcamento({ isOpen, onClose, mapData }) {
           <div className="mt-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
             <div className="flex items-center gap-4">
               <label className="text-black flex items-center gap-2 text-sm">
-                <input type="radio" name="mode" value="merged" checked={mode === 'merged'} onChange={() => setMode('merged')} />
+                <input type="radio" name="mode" value="merged" checked={mode === 'merged'} onChange={() => {
+                  setMode('merged');
+                  console.log(`📤 [ModalOrcamento] ${userInfo} - Alterou modo para: PDF mesclado`);
+                }} />
                 <span>PDF</span>
               </label>
               <label className="text-black flex items-center gap-2 text-sm">
-                <input type="radio" name="mode" value="zip" checked={mode === 'zip'} onChange={() => setMode('zip')} />
+                <input type="radio" name="mode" value="zip" checked={mode === 'zip'} onChange={() => {
+                  setMode('zip');
+                  console.log(`📤 [ModalOrcamento] ${userInfo} - Alterou modo para: ZIP (arquivos separados)`);
+                }} />
                 <span>ZIP</span>
               </label>
             </div>
 
             <div className="flex items-center gap-2">
               <button
-                onClick={onClose}
+                onClick={() => {
+                  console.log(`📤 [ModalOrcamento] ${userInfo} - Modal fechado (botão Cancelar)`);
+                  onClose();
+                }}
                 className="px-4 py-2 rounded border border-gray-300 text-gray-700 hover:bg-gray-50"
                 disabled={isExporting}
               >Cancelar</button>

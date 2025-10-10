@@ -165,6 +165,170 @@ O Raio agora oferece um sistema completo de exportação profissional com múlti
 - **Tooltips Informativos**: Descrição completa da funcionalidade
 - **Nomes Automáticos**: Arquivos nomeados com data para organização
 
+---
+
+### 🚀 **Sistema de Rotas Multimodal (Página /rotas – 2025)**
+O Sistema de Rotas é uma página independente (`/rotas`) com **otimização multimodal completa** utilizando Google Routes API para planejamento inteligente de deslocamentos logísticos entre polos e periferias.
+
+#### ✨ **Estado Atual (Sistema 100% Funcional - Outubro 2025)**
+- **Página dedicada `/rotas`** com componente exclusivo `RotaMapa` (MapLibre GL) isolado de `MapLibrePolygons`
+- **Seleção múltipla de Polos e Periferias** usando dados compartilhados pelo `EstrategiaDataContext`
+- **Filtro por estado** para polos e periferias com **nomes completos** (ex: "Paraíba" ao invés de "PB")
+- **Correção crítica do mapeamento UF**: Polos usam `UF_origem`, Periferias usam `UF_destino`
+- **Configuração dinâmica de Velocidade Média de Voo** com presets (150 | 180 | 220 | 270 km/h)
+- **Sistema de numeração sequencial** nos marcadores do mapa para orientação de rota
+- **Interface completamente renovada**:
+  - Ícones Lucide (plane, car, building-2, building, gauge) substituindo emojis
+  - Backgrounds OKLCH personalizados (`oklch(92% 0.004 286.32)`)
+  - Formatação inteligente de tempo ("5 horas e 48 min" ao invés de "348 min")
+  - Contadores formatados ("Polos (0 - 695)") com texto menor e cinza
+  - Altura de containers aumentada (max-h-56) para melhor visualização
+- **Layout responsivo aprimorado**: Painel lateral aumentado (430px → 460px)
+- **Tiles OSM raster diretos** (3 subdomínios) substituindo dependência externa Stadia Maps
+- **Registro inteligente do mapa** no `mapRegistry` para evitar bugs de visualização
+- **Visualização inicial de ligações** (estrutura para linhas de voo e futuras rotas terrestres)
+- **Pins SVG customizados** (Polos / Periferias) substituindo círculos simples
+- **Remoção proposital de polígonos** (fills) para visão limpa de pontos e conexões
+- **Arquitetura preparada** para injeção de camadas de rota (OSRM + voos) sem refatoração estrutural adicional
+- **Separação de estilos**: Estratégia usa base Carto Positron; Rotas usa OSM raster/vetor
+
+#### 🔧 **Correções Críticas Implementadas (Outubro 2025)**
+- **Correção da Lógica de Transporte**: Polo → Polo sempre usa voo (não tenta rota terrestre)
+- **Simplificação da Interface**: Removido checkbox "Preferir voo entre polos" - agora sempre voo
+- **Regra de Negócio Clara**: Transportes terrestres apenas entre polos/periferias, nunca entre polos
+- **Tratamento de Erros**: Sistema robusto contra conflitos de modal de transporte
+- **Performance Otimizada**: Eliminação de cálculos redundantes de decisão de modal
+
+#### 🗺️ **Visualização Multimodal Avançada**
+- **Linhas diferenciadas**: Azul tracejado para voos, verde contínuo para rotas terrestres
+- **Marcadores especializados**: Polos com ícones de aeroporto, Periferias com marcadores simples
+- **Limpeza automática de imagens** para evitar conflitos de marcadores
+
+#### 🔄 **Otimização Multimodal Completa**
+- **Google Routes API integrada** para cálculos precisos de rotas terrestres
+- **TSP (Traveling Salesman Problem)** otimizado para sequências de voos entre polos
+- **TSP local** para otimização de visitas às periferias de cada polo
+- **Cálculo de distâncias geodésicas** (Haversine) para voos entre polos
+- **Instruções turn-by-turn** em português brasileiro para rotas terrestres
+- **Cache multinível**: localStorage (7 dias) + API (24h) para evitar recálculos
+- **Rate limiting** (60 req/min) e timeout (15s) para proteção da API
+- **Fallback inteligente** para haversine quando Google API indisponível
+
+#### 📊 **Painel de Detalhes Inteligente**
+- **3 abas estruturadas**: Resumo, Trechos, Instruções
+- **Estatísticas agregadas**: Tempo total, distância total, separação voo vs terrestre
+- **Detalhamento por segmento**: Voo "João Pessoa → Campina Grande (120km, 40min)"
+- **Instruções passo a passo** para rotas terrestres em português
+- **Exportação JSON** estruturada para relatórios externos
+- **Clique interativo** nos trechos para destacar no mapa
+
+#### O que Já Foi Desacoplado
+- Toda lógica prévia de rotas removida de `/estrategia`
+- Estado e efeitos redundantes eliminados (sem fetch duplicado)
+- Camadas de polígonos não são carregadas em `/rotas` (focus-first design)
+
+#### ✅ **Funcionalidades 100% Implementadas (Outubro 2025)**
+- ✅ **Google Routes API integrada** (substituiu OSRM) para roteamento terrestre preciso
+- ✅ **Cálculo de rotas carro reais** (Polo ↔ Periferias) com distância e tempo via Google Routes
+- ✅ **Geração de segmentos de voo** (linhas geodésicas com cálculo haversine) entre polos
+- ✅ **Otimização Local (TSP)** para ordem de visita às periferias de cada polo
+- ✅ **Otimização Global (TSP)** entre polos via Google Routes API com `optimizeWaypointOrder`
+- ✅ **Painel lateral completo** com 3 abas (Resumo, Trechos, Instruções)
+- ✅ **Estatísticas agregadas**: tempo total, km total, separação voo vs terrestre
+- ✅ **Exportação JSON** estruturada das rotas integradas
+- ✅ **Cache incremental multinível** (7 dias TSP + 24h rotas individuais) com memoização inteligente
+- ✅ **Correção crítica de lógica**: Polo → Polo sempre voo (eliminação de conflitos)
+- ✅ **Interface simplificada**: Remoção de controles desnecessários, informação clara sobre modais
+- ✅ **Tratamento robusto de erros**: Fallbacks inteligentes e validações completas
+- ✅ **Rate limiting avançado**: 60 req/min com proteção automática contra abuso
+- ✅ **Health check completo**: Monitoramento de APIs Google com status detalhado
+
+#### Próximas Evoluções (Roadmap Futuro)
+- ✅ **Exportação PDF**: Relatórios profissionais das rotas calculadas
+- Exportação XLSX/PNG das rotas integradas
+- Cenários de sensibilidade (diferentes velocidades de voo)
+- Persistência de cenários salvos por usuário
+- Comparativo de eficiência entre sequências manuais vs otimizadas
+
+#### Justificativa da Separação
+A extração do sistema de rotas para `/rotas`:
+- Evita interferência de estilos e camadas estratégicas
+- Reduz custo cognitivo para o usuário (contexto único por página)
+- Permite iteração rápida em camadas de rota sem risco sobre análises estratégicas
+- Melhora performance inicial (lazy load apenas do necessário)
+
+#### Valor Estratégico (Mesmo Objetivo Original)
+Continua alinhado em apoiar planejamento territorial e priorização de visitas, agora com base modular que permite evolução controlada rumo ao pacote completo de otimização multimodal.
+
+---
+
+## 🚀 **Funcionalidades Planejadas / Roadmap Complementar**
+
+Além da evolução do Sistema de Rotas detalhada acima, permanecem como itens de roadmap geral:
+
+### 🛤️ Sistema de Rotas Multimodal – ✅ **COMPLETO (2025)**
+- [x] **Google Routes API integrada** (substituiu OSRM)
+  - Rate limiting (60 req/min por IP)
+  - Cache incremental multinível (7 dias + 24h)
+  - Validações de entrada e timeout (15s)
+  - Tratamento de erros com fallbacks para haversine
+- [x] **Health check das APIs** (`/api/rotas/health`)
+- [x] **Integração completa com frontend multimodal**
+  - Hook `useRotas` otimizado para multimodal
+  - `calcularRotaTerrestre` usando Google Routes API
+  - Estados de loading/erro tratados
+- [x] **Documentação completa**
+  - `docs/GOOGLE_ROUTES_SETUP.md` - Setup da API
+  - `docs/SISTEMA_ROTAS_MULTIMODAL.md` - Arquitetura técnica
+  - `IMPLEMENTACAO_ROTAS_MULTIMODAL_2025.md` - Resumo executivo
+- [x] **Camada visual multimodal** (azul tracejado para voos, verde contínuo para rotas)
+- [x] **Instruções turn-by-turn** em português brasileiro
+- [x] **Ordens otimizadas (TSP completo)** - Global entre polos + Local por polo
+- [x] **Painel de detalhes inteligente** com 3 abas estruturadas
+- [x] **Exportação JSON** estruturada das rotas integradas
+- [x] **Comparativo automático** vs sequência manual nos cálculos
+- [x] **Limpeza automática de imagens** para evitar conflitos de marcadores
+- [x] **Correção crítica de lógica de transporte** (Outubro 2025)
+  - Polo → Polo sempre voo (eliminação de conflitos API)
+  - Interface simplificada (remoção controles desnecessários)
+  - Tratamento robusto de erros e validações completas
+  - Performance otimizada (eliminação cálculos redundantes)
+
+### 🗺️ Estratégia / Análise
+- [ ] Comparativo temporal de valores (ano vs ano)
+- [ ] Clusterização dinâmica de polos em níveis de zoom distintos
+
+### 📊 Relatórios & Exportações
+- [ ] Export consolidado multi-raio
+- [ ] Export geoespacial (GeoPackage ou Shapefile zipado)
+
+### ⚡ Performance
+- [x] **Cache incremental de rotas OSRM** (memoização por par coordenado, TTL 1h)
+- [x] **Sistema de Cache Multinível Google Routes** (Outubro 2025)
+  - **Otimização TSP**: Cache de 7 dias para sequências otimizadas
+  - **Rotas Individuais**: Cache de 24 horas para rotas terrestres
+  - **Memoização Inteligente**: Evita recálculos desnecessários
+  - **Limpeza Automática**: Expiração TTL e invalidação sob demanda
+- [ ] WebWorker para cálculos de otimização (TSP)
+- [ ] Pré-indexação espacial (R-tree) para matching rápido de periferias
+
+### 🔐 Segurança & Auditoria
+- [x] **Rate limiting na API de rotas** (60 req/min por IP)
+- [x] **Logs de uso de geração de rotas** (console logs estruturados)
+- [x] **Controle Preventivo de Custos Google Maps API** (Kill Switch + Limites Diários)
+- [x] **API Guard System** - Proteção automática contra custos excessivos
+- [x] **Monitoramento de Status** - Endpoint `/api/maps/status` para acompanhar uso
+- [ ] Auditoria completa em banco de dados
+- [x] **Limite de requisições OSRM por janela de tempo (implementação avançada)**
+- [x] **Controle Preventivo de Custos Google Maps API (Kill Switch + Limites Diários)**
+- [x] **API Guard System - Proteção automática contra custos excessivos**
+
+### 🧪 Qualidade
+- [ ] Testes de snapshot visual de camadas
+- [ ] Testes unitários de utilidades de distância/haversine
+
+Lista dinâmica – prioridades podem mudar conforme feedback operacional.
+
 ### 💼 **Gestão Completa de Produtos**
 - **12 Produtos Municipais** com status automático:
   - Plano Diretor (verificação de vencimento 10 anos)
@@ -352,6 +516,74 @@ const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dias
 
 Esta arquitetura resolve completamente o problema de **remount-triggered fetching** e **overfetching**, garantindo performance excepcional em aplicações Next.js App Router.
 
+#### 🎯 **Arquitetura Avançada: Resolução de Conflitos de Imagens MapLibre GL**
+
+##### **🎯 Problema dos Marcadores Duplicados**
+No MapLibre GL, adicionar imagens com IDs já existentes gera erro crítico:
+```javascript
+// ❌ ERRO: "An image named 'polo-marker-1' already exists"
+map.addImage('polo-marker-1', img);
+map.addImage('polo-marker-1', img); // 💥 CRASH!
+```
+
+##### **✅ Solução: Verificação Dupla + Limpeza Automática**
+
+```typescript
+// ✅ SOLUÇÃO: Verificação antes de adicionar
+const loadMarkerImage = (id: string, url: string) => {
+  return new Promise<void>((resolve) => {
+    // 1️⃣ Verificar SE já existe
+    if (map.hasImage(id)) {
+      console.log(`Imagem ${id} já existe, pulando...`);
+      resolve();
+      return;
+    }
+
+    const img = new Image();
+    img.onload = () => {
+      try {
+        // 2️⃣ Verificar NOVAMENTE (race condition)
+        if (!map.hasImage(id)) {
+          map.addImage(id, img);
+        }
+        resolve();
+      } catch (error) {
+        console.warn(`Erro ao adicionar imagem ${id}:`, error);
+        resolve();
+      }
+    };
+    // ...
+  });
+};
+
+// ✅ LIMPEZA: Remover imagens antigas automaticamente
+const cleanupLayers = () => {
+  // ... limpeza de layers e sources ...
+
+  // 3️⃣ Remover imagens de marcadores antigos
+  const imageKeys = Object.keys((map as any).style.imageManager?.images || {});
+  imageKeys.forEach(imageId => {
+    if (imageId.startsWith('polo-marker-') || imageId.startsWith('periferia-marker-')) {
+      try {
+        if (map.hasImage(imageId)) {
+          map.removeImage(imageId);
+        }
+      } catch (error) {
+        console.warn(`Erro ao remover imagem ${imageId}:`, error);
+      }
+    }
+  });
+};
+```
+
+##### **🏆 Benefícios da Arquitetura**
+
+- **🚫 Zero crashes** por imagens duplicadas
+- **🔄 Recálculo seguro** de rotas múltiplas vezes
+- **⚡ Performance otimizada** com limpeza automática
+- **🛡️ Robustez** contra race conditions
+- **📝 Logs informativos** para debug
+
 #### **🎯 Implementação na Página Estratégia**
 
 A página `/estrategia` foi atualizada para usar o mesmo padrão de cache hierárquico, resolvendo o problema de **remount-triggered fetching** dos dados estratégicos:
@@ -403,9 +635,13 @@ src/
 │   │   │   └── files/     # Lista de arquivos disponíveis
 │   │   ├── estrategia/    # Dados estratégicos
 │   │   ├── municipios/    # Dados por estado
+│   │   ├── rotas/         # Sistema de rotas multimodal
+│   │   │   ├── google-routes/route.ts         # Rotas terrestres via Google Routes
+│   │   │   └── google-routes-optimize/route.ts # Otimização TSP via Google Routes
 │   │   └── debug/         # Utilitários de debug
 │   ├── mapa/              # Página principal do mapa
 │   ├── estrategia/        # Módulo estratégico
+│   ├── rotas/             # Sistema de rotas independente
 │   ├── login/             # Tela de autenticação
 │   ├── layout.tsx         # Layout raiz com providers
 │   ├── globals.css        # Estilos globais Tailwind
@@ -419,7 +655,15 @@ src/
 │   ├── Navbar.tsx         # Cabeçalho da aplicação
 │   ├── ModalOrcamento.jsx # Modal de orçamento
 │   ├── ExportMenu.jsx     # Menu de exportação
-│   └── LayerControl.tsx   # Controles de camadas
+│   ├── LayerControl.tsx   # Controles de camadas
+│   ├── routing/           # Componentes do sistema de rotas multimodal
+│   │   ├── RotasComponent.tsx     # Interface principal de rotas
+│   │   ├── RotaMapVisualization.tsx # Visualização multimodal no mapa
+│   │   ├── ConfiguracaoRotas.tsx  # Configuração de velocidade
+│   │   ├── RotaMapa.tsx           # Componente do mapa para rotas
+│   │   ├── DetalhesRotaPanel.tsx  # Painel de detalhes inteligente
+│   │   └── index.ts               # Exportações dos componentes
+│   └── MapaMunicipal.tsx  # Componente principal do mapa
 │
 ├── contexts/              # Contextos React para estado global
 │   ├── MapDataContext.tsx     # Dados do mapa e cache
@@ -428,10 +672,14 @@ src/
 │
 ├── utils/                 # Utilitários e serviços
 │   ├── s3Service.ts       # Cliente S3 e cache
-│   ├── pdfOrcamento.ts    # Geração de PDFs
+│   ├── pdfOrcamento.ts    # Geração de PDFs + conversão UF ↔ Estado
 │   ├── cacheGeojson.ts    # Cache inteligente
 │   ├── authService.ts     # Utilitários de auth
-│   └── passwordUtils.ts   # Utilitários de senha
+│   ├── passwordUtils.ts   # Utilitários de senha
+│   ├── mapConfig.ts       # Configurações do mapa
+│   ├── mapRegistry.ts     # Registro global de instâncias do mapa
+│   ├── routingUtils.ts    # Utilitários de rotas terrestres
+│   └── routingOptimization.ts # Otimização multimodal e TSP
 │
 ├── lib/                   # Configurações de bibliotecas
 │   └── prisma.ts          # Cliente Prisma configurado
@@ -457,8 +705,8 @@ public/
 ## Tecnologias Utilizadas
 
 ### 🎯 **Core Framework**
-- **Next.js 15** (App Router & API Routes)
-- **React 19** com TypeScript 5
+- **Next.js 15.3.2** (App Router & API Routes)
+- **React 19.0.0** com TypeScript 5
 - **TailwindCSS 4** - Estilização utilitária responsiva
 - **Node.js 18+** com Turbopack
 
@@ -473,6 +721,7 @@ public/
 - **Three.js 0.176** & **React Three Fiber** - Animações 3D
 - **@react-three/drei** - Utilitários Three.js para React
 - **Framer Motion 12** - Transições e gestos suaves
+- **Lucide React** - Ícones SVG modernos (plane, car, building-2, building, gauge)
 - **React Icons** - Biblioteca de ícones
 - **FontAwesome 6** - Ícones vetoriais
 
@@ -480,6 +729,8 @@ public/
 - **Prisma ORM** - Cliente PostgreSQL com type safety
 - **PostgreSQL** - Banco de dados relacional
 - **AWS SDK v3** (`@aws-sdk/client-s3`) - Integração S3
+- **Google Routes API** - Otimização de rotas terrestres e TSP
+- **Google Maps JavaScript API** - Visualização interativa de mapas
 - **bcryptjs** - Hashing seguro de senhas
 - **jsonwebtoken** & **jose** - Tokens JWT
 - **dotenv** - Gerenciamento de variáveis ambiente
@@ -540,6 +791,16 @@ AWS_S3_BUCKET=projetonexusinnovatis
 # Autenticação JWT
 JWT_SECRET=your_super_secret_jwt_key_here
 
+# Sistema de Rotas Multimodal
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=sua_chave_google_maps_aqui
+# Nota: A mesma chave é usada para Google Maps JavaScript API e Google Routes API
+OSRM_URL=http://localhost:5000  # Fallback opcional
+
+# Controle Preventivo de Custos Google Maps API
+MAPS_DISABLED=false                    # Kill Switch: desabilita todas as chamadas quando true
+MAPS_DAILY_CAP_ROUTES=1000             # Limite diário para Routes API
+MAPS_DAILY_CAP_GEOCODE=1000            # Limite diário para Geocoding API
+
 # Ambiente (desenvolvimento/produção)
 NODE_ENV=development
 ```
@@ -571,9 +832,21 @@ npx prisma db push
 # 4. Executar migrações (se houver)
 npx prisma migrate dev
 
-# 5. Iniciar servidor de desenvolvimento
+# 5. Configurar OSRM (Sistema de Rotas)
+# Windows:
+.\scripts\setup-osrm.ps1
+
+# Linux/Mac:
+chmod +x scripts/setup-osrm.sh
+./scripts/setup-osrm.sh
+
+# 6. Iniciar servidor de desenvolvimento
 npm run dev
 ```
+
+### 📖 **Guias de Setup Específicos**
+- **Sistema de Rotas (OSRM)**: Ver [`docs/ROTAS_QUICKSTART.md`](docs/ROTAS_QUICKSTART.md) para setup rápido
+- **OSRM Detalhado**: Ver [`docs/OSRM_SETUP.md`](docs/OSRM_SETUP.md) para configuração avançada
 
 ### 🔍 **Verificação da Instalação**
 - Acesse `http://localhost:3000`
@@ -581,6 +854,11 @@ npm run dev
 - Verifique se o mapa carrega corretamente
 - Teste a busca por municípios
 - Confirme exportação de PDFs funcionando
+- **Verifique sistema de rotas multimodal**:
+  - Acesse `http://localhost:3000/rotas`
+  - Teste health check: `http://localhost:3000/api/rotas/health`
+  - Configure `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` no `.env.local`
+  - Teste cálculo de rota entre polos e periferias
 
 ---
 
@@ -684,14 +962,23 @@ npm run dev
 - **Download direto** com nomes padronizados
 - **Modal avançado** com opções de exportação
 
-#### **7. Módulo Estratégia** (`/estrategia`)
-- **Dados de polos de valores** e periferia
-- **Visualização temática** para análise estratégica
-- **Integração com dados municipais**
-- **Filtro unificado ESTADO/REGIÃO** com seleção avançada
-- **Indicadores visuais de abertura comercial**
-- **Ferramenta de raio com exportação XLSX aprimorada**
-- **Popups corrigidos** com códigos IBGE completos
+#### **8. Sistema de Rotas** (`/rotas`)
+- **Seleção inteligente de municípios**: Polos e periferias com filtros por estado (nomes completos)
+- **Configuração de velocidade**: Presets otimizados para planejamento de voos
+- **Visualização no mapa**: Marcadores numerados sequencialmente para orientação
+- **Interface moderna**: Ícones Lucide, backgrounds personalizados, formatação inteligente
+- **Layout responsivo**: Painel lateral otimizado para diferentes tamanhos de tela
+- **Tiles OSM nativos**: Mapa confiável sem dependências externas
+- **🚀 Sistema de Rotas Multimodal Completo**:
+  - **Google Routes API integrada** para cálculos terrestres precisos
+  - **Otimização TSP** global (sequência de voos) e local (visitas às periferias)
+  - **Visualização multimodal** com linhas diferenciadas (azul voos, verde terrestres)
+  - **Painel de detalhes inteligente** com 3 abas estruturadas
+  - **Cache multinível** (7 dias TSP + 24h rotas individuais)
+  - **Rate limiting avançado** (60 req/min) com proteção automática
+  - **Instruções turn-by-turn** completas em português brasileiro
+  - **Exportação JSON** estruturada para relatórios externos
+  - **Fallback inteligente** para haversine quando API indisponível
 
 ### 🔄 **Fluxo de Dados Técnicos**
 
@@ -801,6 +1088,40 @@ model municipios {
 - **Image optimization** com Next.js Image
 - **Bundle analysis** para otimização
 
+### 🛡️ **Controle Preventivo de Custos Google Maps API (2025)**
+
+#### **🎯 Sistema de Kill Switch**
+O sistema implementa um controle preventivo robusto contra custos excessivos da Google Maps API através de:
+
+- **Kill Switch Global**: Variável `MAPS_DISABLED=true` desabilita instantaneamente todas as chamadas
+- **Limites Diários Configuráveis**:
+  - `MAPS_DAILY_CAP_ROUTES`: Limite para Google Routes API (padrão: 1000)
+  - `MAPS_DAILY_CAP_GEOCODE`: Limite para Geocoding API (padrão: 1000)
+- **API Guard Middleware**: Protege todas as chamadas fetch antes da execução
+- **Contadores Automáticos**: Reset diário automático + incrementação apenas em sucesso
+- **Monitoramento em Tempo Real**: Endpoint `/api/maps/status` para acompanhar uso
+
+#### **🔄 Funcionamento do Sistema**
+```
+1. Requisição chega → API Guard verifica condições
+   ├── MAPS_DISABLED=true? → Bloqueia (HTTP 429)
+   ├── Limite diário atingido? → Bloqueia (HTTP 429)
+   └── OK → Permite chamada + incrementa contador
+```
+
+#### **📊 Respostas Padronizadas**
+- **Kill Switch Ativado**: `HTTP 429 - "Google Maps API Temporarily Disabled"`
+- **Limite Excedido**: `HTTP 429 - "Daily API Limit Exceeded"`
+- **Detalhes Completos**: Contadores atuais, limites, requisições restantes
+
+#### **🛡️ Proteções Implementadas**
+- **Verificação Pré-Fetch**: Bloqueio acontece ANTES da chamada HTTP
+- **Sem Custos Adicionais**: Evita qualquer cobrança desnecessária
+- **Fallback Seguro**: Sistema continua funcionando mesmo com API bloqueada
+- **Logs Detalhados**: Rastreamento completo de decisões de bloqueio
+
+---
+
 ### 🔧 **Correções Técnicas Recentes (2025)**
 - **Códigos IBGE Corretos**: Popups das periferias agora exibem códigos IBGE corretos
   - Adicionado `codigo_destino` nas properties do FeatureCollection de periferias
@@ -815,6 +1136,26 @@ model municipios {
   - Componente `EstadoDropdown` com Portal React
   - Seleção múltipla por regiões e estados
   - Indicadores visuais de abertura comercial em azul
+- **Sistema de Rotas Multimodal - Implementação Completa**:
+  - **Google Routes API Integrada**: Substituição completa do OSRM por Google Routes
+  - **Otimização TSP Global e Local**: Sequenciamento inteligente de voos e visitas terrestres
+  - **Visualização Multimodal**: Linhas diferenciadas (azul tracejado voos, verde rotas terrestres)
+  - **Painel de Detalhes Inteligente**: 3 abas (Resumo, Trechos, Instruções) com turn-by-turn PT-BR
+  - **Cache Multinível**: 7 dias (TSP) + 24h (rotas individuais) + localStorage
+  - **Rate Limiting Avançado**: 60 req/min com proteção automática
+  - **Controle Preventivo de Custos Google Maps API**: Kill Switch + Limites Diários
+  - **API Guard System**: Proteção automática contra custos excessivos
+  - **Correção de Imagens Duplicadas**: Limpeza automática para evitar conflitos de marcadores
+  - **Fallback Inteligente**: Haversine quando Google API indisponível
+  - **Documentação Completa**: Setup, arquitetura técnica e guia executivo
+- **Controle Preventivo de Custos Google Maps API**:
+  - **Kill Switch Global**: `MAPS_DISABLED=true` bloqueia todas as chamadas
+  - **Limites Diários Configuráveis**: `MAPS_DAILY_CAP_ROUTES` e `MAPS_DAILY_CAP_GEOCODE`
+  - **API Guard System**: Middleware que protege todas as chamadas fetch
+  - **Monitoramento em Tempo Real**: Endpoint `/api/maps/status` para acompanhar uso
+  - **Respostas Padronizadas**: HTTP 429 com mensagens claras quando bloqueado
+  - **Contadores Automáticos**: Reset diário e incrementação apenas em sucesso
+  - **Proteção Contra Race Conditions**: Verificação dupla antes de fazer chamadas
 
 ### 🔒 **Segurança Implementada**
 - **JWT tokens** com expiração de 1 hora
@@ -857,6 +1198,20 @@ npx aws s3 ls s3://your-bucket-name/ --recursive
 # Ctrl+Shift+R (hard refresh)
 ```
 
+#### **Problemas com Controle de Custos Google Maps API**
+```bash
+# Verificar status do API Guard
+curl http://localhost:3000/api/maps/status
+
+# Verificar variáveis de ambiente
+echo $MAPS_DISABLED
+echo $MAPS_DAILY_CAP_ROUTES
+echo $MAPS_DAILY_CAP_GEOCODE
+
+# Resetar contadores (reiniciar servidor)
+# Os contadores são resetados automaticamente diariamente
+```
+
 #### **Erro de Build**
 ```bash
 # Limpar cache do Next.js
@@ -883,6 +1238,24 @@ npx tsc --noEmit
 - `GET /api/municipios/[estado]` - Municípios por estado
 - `GET /api/proxy-geojson/[filename]` - Proxy para arquivos S3
 - `GET /api/estrategia/data` - Dados estratégicos
+
+#### **Sistema de Rotas Multimodal**
+- `POST /api/rotas/google-routes` - Calcular rota terrestre via Google Routes API
+  - **Body**: `{ origem: {lat, lng}, destino: {lat, lng}, travelMode: "DRIVE" }`
+  - **Response**: `{ distanciaKm, tempoMinutos, geometria, instrucoes, metadados }`
+  - **Features**: Cache (24h), rate limiting (60/min), timeout (15s), fallback haversine, **API Guard Protection**
+- `POST /api/rotas/google-routes-optimize` - Otimização TSP via Google Routes API
+  - **Body**: `{ start: {lat, lng}, waypoints: [{lat, lng}], mode: "open"|"closed" }`
+  - **Response**: `{ order: [indices], totalDistanceKm, totalDurationMin }`
+  - **Features**: Cache (7 dias), rate limiting (60/min), até 25 waypoints, field masks otimizados, **API Guard Protection**
+- `GET /api/rotas/health` - Health check do sistema de rotas multimodal
+  - **Response**: `{ status: "ok"|"warning"|"error", timestamp: string, services: { googleMaps: {available: boolean, status: string, responseTime: number}, cache: {available: boolean, size: number} }, environment: {hasApiKey: boolean, nodeEnv: string} }`
+  - **Features**: Teste de conectividade Google Maps, validação API key, status detalhado
+
+#### **Controle de Custos Google Maps API**
+- `GET /api/maps/status` - Status atual do controle preventivo de custos
+  - **Response**: `{ disabled: boolean, limits: {routes: number, geocode: number}, counters: {routes: number, geocode: number, date: string}, remaining: {routes: number, geocode: number}, canMakeRequests: {routes: boolean, geocode: boolean} }`
+  - **Features**: Monitoramento em tempo real, contadores diários, verificação de limites
 
 #### **Utilitários**
 - `GET /api/env` - Variáveis de ambiente
@@ -923,3 +1296,7 @@ Distribuído sob a **Licença MIT**. Consulte o arquivo `LICENSE` para mais deta
 ---
 
 **Desenvolvido pela equipe de Data Science da Innovatis MC** 🚀
+
+---
+
+**Última atualização**: Outubro 2025 - Sistema de Rotas Multimodal + Controle Preventivo de Custos Google Maps API implementado

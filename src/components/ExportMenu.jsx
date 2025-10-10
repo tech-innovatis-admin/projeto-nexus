@@ -3,7 +3,7 @@ import download from 'downloadjs';
 import { generateBudgetPDF } from '@/utils/pdfOrcamento';
 import ModalOrcamento from '@/components/ModalOrcamento';
 
-function ExportMenu({ city, className = '', onOpenAdvanced, mapData }) {
+function ExportMenu({ city, className = '', onOpenAdvanced, mapData, onLogExport }) {
   const [isOpen, setIsOpen] = useState(false);
   const [showAlert, setShowAlert] = useState(false);
   const dropdownRef = useRef(null);
@@ -45,10 +45,16 @@ function ExportMenu({ city, className = '', onOpenAdvanced, mapData }) {
       setShowAlert(true);
       return;
     }
-    
+
     try {
       const { fileName, bytes } = await generateBudgetPDF(city);
       download(bytes, fileName, 'application/pdf');
+
+      // Log da exportação
+      if (onLogExport) {
+        onLogExport('Download PDF', fileName, 'download');
+      }
+
       setIsOpen(false);
     } catch (error) {
       alert(error.message);
@@ -61,34 +67,49 @@ function ExportMenu({ city, className = '', onOpenAdvanced, mapData }) {
       setShowAlert(true);
       return;
     }
-    
+
     try {
       const { fileName, bytes } = await generateBudgetPDF(city);
       const blob = new Blob([bytes], { type: 'application/pdf' });
-      
+
       if (navigator.share && navigator.canShare) {
         const file = new File([blob], fileName, { type: 'application/pdf' });
-        
+
         try {
           await navigator.share({
             files: [file],
             title: 'Orçamento Innovatis',
             text: `Orçamento para ${city.nome}`
           });
+
+          // Log da exportação via Web Share API
+          if (onLogExport) {
+            onLogExport('Compartilhar PDF', fileName, 'Web Share API');
+          }
         } catch (err) {
           const tempUrl = URL.createObjectURL(blob);
           const whatsappText = encodeURIComponent(`Olá! Segue o orçamento para o município de ${city.nome}. Estou enviando o PDF em anexo.`);
           window.open(`https://wa.me/?text=${whatsappText}`, '_blank');
           setTimeout(() => URL.revokeObjectURL(tempUrl), 100);
+
+          // Log da exportação via WhatsApp
+          if (onLogExport) {
+            onLogExport('Compartilhar PDF', fileName, 'WhatsApp');
+          }
         }
       } else {
         const tempUrl = URL.createObjectURL(blob);
         const whatsappText = encodeURIComponent(`Olá! Segue o orçamento para o município de ${city.nome}. Estou enviando o PDF em anexo.`);
         window.open(`https://wa.me/?text=${whatsappText}`, '_blank');
         setTimeout(() => URL.revokeObjectURL(tempUrl), 100);
+
+        // Log da exportação via WhatsApp (fallback)
+        if (onLogExport) {
+          onLogExport('Compartilhar PDF', fileName, 'WhatsApp');
+        }
       }
-      
-  setIsOpen(false);
+
+      setIsOpen(false);
     } catch (error) {
       alert('Erro ao compartilhar PDF. Por favor, tente novamente.');
     }

@@ -6,6 +6,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import * as turf from '@turf/turf';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
+import { registerMapInstance } from '@/utils/mapRegistry';
 
 // Tipos para o sistema de exportação do raio
 export interface MunicipioRaio {
@@ -64,6 +65,9 @@ export interface FC {
 }
 
 function toGeometryFromPropsGeom(features: any[]): FeatureLike[] {
+  if (!features || !Array.isArray(features)) {
+    return [];
+  }
   return features.map((f) => {
     const props = f?.properties ?? {};
     const geom = f?.geometry ?? props?.geom ?? null;
@@ -148,6 +152,8 @@ export default function MapLibrePolygons({
   appliedMaxValor,
   onRadiusResult,
   onExportXLSX,
+  onMunicipioPerifericoClick,
+  municipioPerifericoSelecionado,
 }: {
   polos: FC;
   periferias: FC;
@@ -159,6 +165,8 @@ export default function MapLibrePolygons({
   appliedMaxValor?: number | '';
   onRadiusResult?: (payload: RadiusResultPayload) => void;
   onExportXLSX?: () => void;
+  onMunicipioPerifericoClick?: (municipioId: string) => void;
+  municipioPerifericoSelecionado?: string;
 }) {
   const mapRef = useRef<MapLibreMap | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -348,6 +356,9 @@ export default function MapLibrePolygons({
       attributionControl: false,
     });
     mapRef.current = map;
+    
+    // Registrar a instância do mapa globalmente
+    registerMapInstance(map);
 
     map.on('load', () => {
       // sources
@@ -410,6 +421,28 @@ export default function MapLibrePolygons({
         paint: {
           'line-color': '#2563EB', // Azul consistente
           'line-width': 2.5,
+          'line-opacity': 0.9
+        },
+      });
+
+      // Camada para destaque do município periférico selecionado
+      map.addSource('municipio-periferico-highlight-src', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addLayer({
+        id: 'municipio-periferico-highlight-fill',
+        type: 'fill',
+        source: 'municipio-periferico-highlight-src',
+        paint: {
+          'fill-color': '#10B981', // Verde esmeralda para destaque
+          'fill-opacity': 0.3
+        },
+      });
+      map.addLayer({
+        id: 'municipio-periferico-highlight-line',
+        type: 'line',
+        source: 'municipio-periferico-highlight-src',
+        paint: {
+          'line-color': '#10B981',
+          'line-width': 3,
           'line-opacity': 0.9
         },
       });
@@ -761,10 +794,17 @@ export default function MapLibrePolygons({
 
       map.on('click', 'peri-fill', (e) => {
         if (e.features && e.features.length > 0) {
-          closeActivePopup();
           const feature = e.features[0];
+          const municipioId = feature.properties?.codigo_destino || feature.properties?.codigo || feature.properties?.codigo_ibge || feature.properties?.municipio_destino;
+
+          // Se há callback para clique em município periférico, chama ele
+          if (onMunicipioPerifericoClick && municipioId) {
+            onMunicipioPerifericoClick(municipioId);
+          }
+
+          closeActivePopup();
           const content = createPopupContent(feature.properties, false);
-          
+
           const popup = new maplibregl.Popup({
             closeButton: false,
             closeOnClick: false,
@@ -773,7 +813,7 @@ export default function MapLibrePolygons({
             .setLngLat(e.lngLat)
             .setHTML(content)
             .addTo(map);
-          
+
           popup.addClassName('nexus-popup');
           popupRef.current = popup;
         }
@@ -811,6 +851,9 @@ export default function MapLibrePolygons({
       if (upHandlerRef.current) window.removeEventListener('mouseup', upHandlerRef.current);
       map.remove();
       mapRef.current = null;
+      
+      // Desregistrar a instância do mapa
+      registerMapInstance(null);
     };
   }, []);
 
@@ -887,10 +930,21 @@ export default function MapLibrePolygons({
     }
     
     // Atualizar source do contorno azul
-    const highlightFC = highlightGeometry 
+    const highlightFC = highlightGeometry
       ? { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: highlightGeometry, properties: {} }] }
       : { type: 'FeatureCollection', features: [] };
     try { (map.getSource('polo-highlight-src') as any)?.setData(highlightFC); } catch {}
+
+    // Atualizar source do destaque do município periférico selecionado
+    const municipioPerifericoFC = municipioPerifericoSelecionado && periferias.features.length > 0
+      ? {
+          type: 'FeatureCollection',
+          features: periferias.features.filter(f =>
+            (f.properties?.codigo_destino || f.properties?.codigo || f.properties?.codigo_ibge || f.properties?.municipio_destino) === municipioPerifericoSelecionado
+          )
+        }
+      : { type: 'FeatureCollection', features: [] };
+    try { (map.getSource('municipio-periferico-highlight-src') as any)?.setData(municipioPerifericoFC); } catch {}
     
     // Atualiza as propriedades de pintura para destacar o polo selecionado (apenas opacidade/espessura)
     if (map.isStyleLoaded()) {
@@ -959,7 +1013,7 @@ export default function MapLibrePolygons({
       // Modo geral - mostrar Brasil inteiro
       map.fitBounds([[-74, -34], [-34, 5]], { padding: 24, duration: 700 }); // Brasil aprox
     }
-  }, [polos, periferias, appliedPolo, appliedUF]);
+  }, [polos, periferias, appliedPolo, appliedUF, municipioPerifericoSelecionado]);
 
   // SINCRONIZAR refs COM STATE DE RAIO E CURSOR
   useEffect(() => {

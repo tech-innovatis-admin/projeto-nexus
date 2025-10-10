@@ -14,7 +14,8 @@ import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import { RadiusResultPayload, MunicipioRaio } from '@/components/MapLibrePolygons';
 // Removido: import { fetchGeoJSONWithCache } from '@/utils/cacheGeojson';
-import { UF_ABERTURA, isUFAbertura, REGIOES_BRASIL, TODAS_UFS, isRegiaoAbertura, PRODUCTS } from '@/utils/mapConfig';
+import { UF_ABERTURA, isUFAbertura, REGIOES_BRASIL, TODAS_UFS, isRegiaoAbertura, PRODUCTS, PROD_FIELDS, ProdFieldKey } from '@/utils/mapConfig';
+
 // Evita SSR para o mapa (MapLibre), prevenindo avisos de hidratação
 const MapLibrePolygons = dynamic(() => import('@/components/MapLibrePolygons'), { ssr: false });
 
@@ -282,6 +283,110 @@ function EstadoDropdown({
   return typeof window !== 'undefined' ? createPortal(dropdownContent, document.body) : null;
 }
 
+// Componente para dropdown de Municípios Periféricos
+function MunicipioPerifericoDropdown({
+  isOpen,
+  buttonRef,
+  dropdownRef,
+  selectedMunicipio,
+  setSelectedMunicipio,
+  periferiasDisponiveis
+}: {
+  isOpen: boolean;
+  buttonRef: React.RefObject<HTMLButtonElement | null>;
+  dropdownRef: React.RefObject<HTMLDivElement | null>;
+  selectedMunicipio: string;
+  setSelectedMunicipio: React.Dispatch<React.SetStateAction<string>>;
+  periferiasDisponiveis: PeriferiaProps[];
+}) {
+  const [position, setPosition] = useState({ top: 0, left: 0, width: 0 });
+
+  useEffect(() => {
+    if (isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setPosition({
+        top: rect.bottom + window.scrollY + 4,
+        left: rect.left + window.scrollX,
+        width: rect.width
+      });
+    }
+  }, [isOpen, buttonRef]);
+
+  if (!isOpen) return null;
+
+  // Ordenar periferias alfabeticamente por município
+  const periferiasOrdenadas = [...periferiasDisponiveis].sort((a, b) =>
+    a.municipio_destino.localeCompare(b.municipio_destino, 'pt-BR')
+  );
+
+  const dropdownContent = (
+    <div
+      ref={dropdownRef}
+      className="fixed bg-[#0f172a] border border-slate-700/70 rounded-md shadow-lg z-[9999]"
+      style={{
+        top: position.top,
+        left: position.left,
+        width: position.width,
+        minWidth: '280px',
+        maxHeight: '300px',
+        height: '300px'
+      }}
+    >
+      <div className="h-full flex flex-col">
+        {/* Header fixo */}
+        <div className="p-2 border-b border-slate-700/50 flex-shrink-0">
+          <button
+            onClick={() => setSelectedMunicipio('ALL')}
+            className="flex items-center gap-2 py-1 px-1 hover:bg-slate-800/50 rounded cursor-pointer w-full text-left"
+          >
+            <div className="w-4 h-4 flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </div>
+            <span className="text-sm text-red-400 font-semibold">Limpar Seleção</span>
+          </button>
+        </div>
+
+        {/* Área scrollável */}
+        <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
+          <div className="px-3 py-2">
+            <p className="text-[10px] tracking-wider text-slate-400 font-semibold mb-2">MUNICÍPIOS PERIFÉRICOS</p>
+            {periferiasOrdenadas.map(peri => (
+              <label key={peri.codigo_destino || peri.municipio_destino} className="flex items-center gap-2 py-1 px-1 hover:bg-slate-800/50 rounded cursor-pointer">
+                <input
+                  type="radio"
+                  name="municipio-periferico"
+                  className="w-4 h-4"
+                  checked={selectedMunicipio === (peri.codigo_destino || peri.municipio_destino)}
+                  onChange={() => setSelectedMunicipio(peri.codigo_destino || peri.municipio_destino)}
+                />
+                <div className="flex flex-col leading-tight">
+                  <span className="text-sm text-white font-medium">{peri.municipio_destino}</span>
+                  <span className="text-xs text-slate-400">{peri.UF}</span>
+                </div>
+                <div className="ml-auto text-right">
+                  <span className="text-xs text-emerald-400 font-medium">
+                    R$ {new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(peri.valor_total_destino || 0)}
+                  </span>
+                </div>
+              </label>
+            ))}
+            {periferiasOrdenadas.length === 0 && (
+              <div className="text-xs text-slate-500 text-center py-4">
+                Nenhum município periférico encontrado para este polo
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Renderizar via portal no body
+  return typeof window !== 'undefined' ? createPortal(dropdownContent, document.body) : null;
+}
+
 export default function EstrategiaPage() {
   console.log('📊 [EstrategiaPage] Componente montado');
 
@@ -294,6 +399,7 @@ export default function EstrategiaPage() {
 
   // Filtros selecionados (não aplicados ainda)
   const [selectedPolo, setSelectedPolo] = useState<string>('ALL');
+  const [selectedMunicipioPeriferico, setSelectedMunicipioPeriferico] = useState<string>('ALL');
   const [minValor, setMinValor] = useState<number | ''>('');
   const [maxValor, setMaxValor] = useState<number | ''>('');
   // Filtro de Produtos (por padrão todos selecionados)
@@ -306,10 +412,15 @@ export default function EstrategiaPage() {
   const [isEstadoOpen, setIsEstadoOpen] = useState<boolean>(false);
   const estadoButtonRef = useRef<HTMLButtonElement>(null);
   const estadoDropdownRef = useRef<HTMLDivElement>(null);
+  // Filtro de Municípios Periféricos
+  const [isPeriferiaOpen, setIsPeriferiaOpen] = useState<boolean>(false);
+  const periferiaButtonRef = useRef<HTMLButtonElement>(null);
+  const periferiaDropdownRef = useRef<HTMLDivElement>(null);
 
   // Filtros aplicados (após clicar em buscar)
   const [appliedUF, setAppliedUF] = useState<string>('ALL'); // Mantido para compatibilidade com mapa
   const [appliedPolo, setAppliedPolo] = useState<string>('ALL');
+  const [appliedMunicipioPeriferico, setAppliedMunicipioPeriferico] = useState<string>('ALL');
   const [appliedMinValor, setAppliedMinValor] = useState<number | ''>('');
   const [appliedMaxValor, setAppliedMaxValor] = useState<number | ''>('');
   const [appliedUFs, setAppliedUFs] = useState<string[]>([]); // Novo: UFs aplicadas
@@ -325,6 +436,8 @@ export default function EstrategiaPage() {
 
   // Estado para o payload do raio
   const [radiusPayload, setRadiusPayload] = useState<RadiusResultPayload | null>(null);
+
+
 
   // Normalizador de números pt-BR (aceita number ou string "1.234,56")
   const parsePtBrNumber = (v: unknown): number => {
@@ -352,29 +465,60 @@ export default function EstrategiaPage() {
       const valoresJson = estrategiaData.poloValores;
       const periferiaJson = estrategiaData.poloPeriferia;
 
+      // Agrega valores de ORIGEM por produto a partir de poloPeriferia
+      const origemAggByCodigo = new Map<string, Record<string, number>>();
+      if (Array.isArray(periferiaJson?.features)) {
+        for (const f of periferiaJson.features as any[]) {
+          const codigo = String(f?.properties?.codigo_origem ?? '');
+          if (!codigo) continue;
+          if (!origemAggByCodigo.has(codigo)) origemAggByCodigo.set(codigo, {});
+          const bucket = origemAggByCodigo.get(codigo)!;
+          for (const p of PRODUCTS as any) {
+            const origemKey = (p as any).origemvalorKey as string | null;
+            if (!origemKey) continue;
+            const raw = f?.properties?.[origemKey];
+            const val = parsePtBrNumber(raw);
+            bucket[p.key] = (bucket[p.key] || 0) + val;
+          }
+        }
+      }
+
       const valores: PoloValoresProps[] = Array.isArray(valoresJson?.features)
-        ? valoresJson.features.map((f: any) => ({
-            codigo_origem: String(f?.properties?.codigo_origem ?? ''),
-            municipio_origem: String(f?.properties?.municipio_origem ?? ''),
-            soma_valor_total_destino: parsePtBrNumber(f?.properties?.soma_valor_total_destino),
-            valor_total_origem: parsePtBrNumber(f?.properties?.valor_total_origem),
-            UF_origem: String(f?.properties?.UF_origem ?? ''),
-            UF: String(f?.properties?.UF_origem ?? ''), // normaliza para UF
-            // Preserve a geometria (prioriza feature.geometry; fallback para properties.geom)
-            geom: f?.geometry ?? f?.properties?.geom ?? null,
-            productValues: PRODUCTS.reduce((acc: Record<string, number>, p) => {
-              // Para polos, usar somente valores de ORIGEM
-              const origemvalorKey = (p as any).origemvalorKey as string;
-              const raw = f?.properties?.[origemvalorKey];
-              if ((raw === undefined || raw === null) && origemMissingSamples.length < 8) {
-                origemMissingSamples.push({ codigo: String(f?.properties?.codigo_origem ?? ''), key: origemvalorKey });
-              }
-              acc[p.key] = parsePtBrNumber(raw);
-              return acc;
-            }, {}),
-            // Preserva TODAS as propriedades originais para acesso posterior
-            propriedadesOriginais: f?.properties || {},
-          }))
+        ? valoresJson.features.map((f: any) => {
+            const codigo = String(f?.properties?.codigo_origem ?? '');
+            const agg = origemAggByCodigo.get(codigo);
+            const produtoValuesFromAgg: Record<string, number> | null = agg ? Object.keys(agg).reduce((o: Record<string, number>, k) => {
+              o[k] = Number(agg[k] || 0);
+              return o;
+            }, {}) : null;
+
+            return {
+              codigo_origem: codigo,
+              municipio_origem: String(f?.properties?.municipio_origem ?? ''),
+              soma_valor_total_destino: parsePtBrNumber(f?.properties?.soma_valor_total_destino),
+              valor_total_origem: parsePtBrNumber(f?.properties?.valor_total_origem),
+              UF_origem: String(f?.properties?.UF_origem ?? ''),
+              UF: String(f?.properties?.UF_origem ?? ''), // normaliza para UF
+              // Preserve a geometria (prioriza feature.geometry; fallback para properties.geom)
+              geom: f?.geometry ?? f?.properties?.geom ?? null,
+              // Preferir agregação vinda da periferia; fallback para ler direto de poloValores quando não houver
+              productValues: produtoValuesFromAgg ?? PRODUCTS.reduce((acc: Record<string, number>, p) => {
+                const origemvalorKey = (p as any).origemvalorKey as string | null;
+                if (origemvalorKey) {
+                  const raw = f?.properties?.[origemvalorKey];
+                  if ((raw === undefined || raw === null) && origemMissingSamples.length < 8) {
+                    origemMissingSamples.push({ codigo, key: origemvalorKey });
+                  }
+                  acc[p.key] = parsePtBrNumber(raw);
+                } else {
+                  acc[p.key] = 0;
+                }
+                return acc;
+              }, {}),
+              // Preserva TODAS as propriedades originais para acesso posterior
+              propriedadesOriginais: f?.properties || {},
+            } as PoloValoresProps;
+          })
         : [];
 
       const peri: PeriferiaProps[] = Array.isArray(periferiaJson?.features)
@@ -427,7 +571,10 @@ export default function EstrategiaPage() {
     if (!vals) return fallbackTotal || 0;
     if (!appliedProducts.length) return fallbackTotal || 0;
     let total = 0;
-    for (const key of appliedProducts) total += Number(vals[key] || 0);
+    for (const key of appliedProducts) {
+      const val = Number(vals[key] || 0);
+      total += val;
+    }
     if (total === 0 && appliedProducts.length === PRODUCTS.length) {
       console.warn('⚠️ [EstrategiaPage] Soma de produtos resultou em 0 com todos os produtos aplicados. Aplicando fallback.', {
         fallbackTotal,
@@ -506,6 +653,24 @@ export default function EstrategiaPage() {
     if (!exists) setSelectedPolo('ALL');
   }, [selectedUFs, filteredPoloOptions, selectedPolo]);
 
+  // Opções de municípios periféricos filtrados por polo selecionado
+  const filteredPeriferiaOptions = useMemo(() => {
+    if (selectedPolo === 'ALL') return [];
+    const base = selectedUFs.length
+      ? periferia.filter(p => selectedUFs.includes(String(p.UF)))
+      : periferia;
+    return base.filter(p => p.codigo_origem === selectedPolo);
+  }, [periferia, selectedPolo, selectedUFs]);
+
+  // Resetar município periférico selecionado caso o polo mude
+  useEffect(() => {
+    if (selectedMunicipioPeriferico === 'ALL') return;
+    const exists = filteredPeriferiaOptions.some(p =>
+      (p.codigo_destino || p.municipio_destino) === selectedMunicipioPeriferico
+    );
+    if (!exists) setSelectedMunicipioPeriferico('ALL');
+  }, [selectedPolo, filteredPeriferiaOptions, selectedMunicipioPeriferico]);
+
   // Click outside e ESC para fechar dropdown de Estado
   useEffect(() => {
     if (!isEstadoOpen) return;
@@ -559,6 +724,30 @@ export default function EstrategiaPage() {
       document.removeEventListener('keydown', handleEscape as any);
     };
   }, [isProdutosOpen]);
+
+  // Click outside e ESC para fechar dropdown de Municípios Periféricos
+  useEffect(() => {
+    if (!isPeriferiaOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        periferiaButtonRef.current &&
+        periferiaDropdownRef.current &&
+        !periferiaButtonRef.current.contains(event.target as Node) &&
+        !periferiaDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsPeriferiaOpen(false);
+      }
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsPeriferiaOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape as any);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape as any);
+    };
+  }, [isPeriferiaOpen]);
 
   // GeoJSON minimal para o mapa (com geometria e apenas campos usados no mapa/popup)
   const polosFCForMap = useMemo(() => {
@@ -724,7 +913,61 @@ export default function EstrategiaPage() {
     }
   };
 
-  const metrics = [
+  // Dados do município periférico selecionado
+  const municipioPerifericoSelecionado = useMemo(() => {
+    if (appliedMunicipioPeriferico === 'ALL') return null;
+
+    const periferiaFiltrada = periferia.filter(p => {
+      const match = (p.codigo_destino || p.municipio_destino) === appliedMunicipioPeriferico;
+      const poloMatch = appliedPolo === 'ALL' || p.codigo_origem === appliedPolo;
+      const ufMatch = appliedUFs.length === 0 || appliedUFs.includes(String(p.UF));
+      return match && poloMatch && ufMatch;
+    });
+
+    return periferiaFiltrada[0] || null;
+  }, [appliedMunicipioPeriferico, periferia, appliedPolo, appliedUFs]);
+
+  // Valor total do município periférico selecionado
+  const valorMunicipioPeriferico = useMemo(() => {
+    if (!municipioPerifericoSelecionado) return 0;
+    return sumSelectedProducts(municipioPerifericoSelecionado.productValues, Number(municipioPerifericoSelecionado.valor_total_destino) || 0);
+  }, [municipioPerifericoSelecionado, appliedProducts]);
+
+  // Lista detalhada de produtos do município periférico
+  const produtosMunicipioPeriferico = useMemo(() => {
+    if (!municipioPerifericoSelecionado) return [];
+
+    return Object.entries(PROD_FIELDS).map(([key, config]) => {
+      const valor = municipioPerifericoSelecionado.productValues?.[key as ProdFieldKey] || 0;
+      return {
+        key: key as ProdFieldKey,
+        label: config.label,
+        shortLabel: config.shortLabel,
+        valor: Number(valor),
+        category: config.category
+      };
+    }).filter(produto => produto.valor > 0); // Mostrar apenas produtos com valor > 0
+  }, [municipioPerifericoSelecionado]);
+
+  const metrics = appliedMunicipioPeriferico !== 'ALL' && municipioPerifericoSelecionado ? [
+    // Card 1: Valor total do município periférico
+    {
+      id: 'valor_municipio_periferico',
+      title: 'Valor Total',
+      value: valorMunicipioPeriferico,
+      subtitle: municipioPerifericoSelecionado.municipio_destino,
+      description: `${municipioPerifericoSelecionado.UF} • ${municipioPerifericoSelecionado.codigo_destino || 'Código não disponível'}`
+    },
+    // Card 2: Lista detalhada de produtos
+    {
+      id: 'produtos_municipio_periferico',
+      title: 'Produtos Detalhados',
+      value: 'produtos',
+      subtitle: `${produtosMunicipioPeriferico.length} produtos ativos`,
+      description: 'Valores individuais por produto no município'
+    }
+  ] : [
+    // Cards originais (visão agregada)
     {
       id: 'valor_polo',
       title: 'Valor do Polo',
@@ -1101,6 +1344,8 @@ export default function EstrategiaPage() {
     }
   }, [appliedUF, appliedPolo, appliedUFs, appliedMinValor, appliedMaxValor, appliedProducts, polosValores, periferia, sumSelectedProducts]);
 
+
+
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#0f172a] to-[#1e293b] text-white">
       {/* Navbar */}
@@ -1120,10 +1365,13 @@ export default function EstrategiaPage() {
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5 }}
+                className="flex justify-between items-center"
               >
                 <h1 className="text-3xl font-bold text-white mb-2">
                   Análise Estratégica de <span className="text-sky-400">Produtos</span>
                 </h1>
+                
+
               </motion.div>
             </div>
           </div>
@@ -1150,7 +1398,7 @@ export default function EstrategiaPage() {
                 transition={{ duration: 0.5, delay: 0.1 }}
               >
                 <div className="bg-[#1e293b] border border-slate-700/50 rounded-lg p-3">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                     {/* ESTADO/REGIÃO Unificado */}
                     <div className="flex flex-col">
                       <label className="text-slate-300 text-sm mb-0.5 text-center font-bold">ESTADO/REGIÃO</label>
@@ -1190,6 +1438,63 @@ export default function EstrategiaPage() {
                           <option key={opt.value} value={opt.value}>{opt.label}</option>
                         ))}
                       </select>
+                    </div>
+
+                    {/* MUNICÍPIO PERIFÉRICO */}
+                    <div className="flex flex-col">
+                      <label className="text-slate-300 text-sm mb-0.5 text-center font-bold">MUNICÍPIO PRÓXIMO</label>
+                      <div className="flex gap-2">
+                        <button
+                          ref={periferiaButtonRef}
+                          type="button"
+                          disabled={selectedPolo === 'ALL'}
+                          onClick={() => selectedPolo !== 'ALL' && setIsPeriferiaOpen(v => !v)}
+                          className={`bg-[#0f172a] text-slate-200 border border-slate-700/50 rounded-md px-3 py-1.5 text-left flex items-center justify-between min-h-[40px] flex-1 ${
+                            selectedPolo === 'ALL' ? 'opacity-50 cursor-not-allowed' : 'hover:bg-[#1a2332] cursor-pointer'
+                          }`}
+                        >
+                          <span className="text-sm truncate">
+                            {selectedMunicipioPeriferico === 'ALL'
+                              ? selectedPolo === 'ALL'
+                                ? 'Selecione um polo primeiro'
+                                : 'Todos os municípios'
+                              : (() => {
+                                  const peri = filteredPeriferiaOptions.find(p =>
+                                    (p.codigo_destino || p.municipio_destino) === selectedMunicipioPeriferico
+                                  );
+                                  return peri?.municipio_destino || selectedMunicipioPeriferico;
+                                })()
+                            }
+                          </span>
+                          <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 transition-transform ${isPeriferiaOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd"/>
+                          </svg>
+                        </button>
+                        {selectedMunicipioPeriferico !== 'ALL' && (
+                          <button
+                            onClick={() => {
+                              setSelectedMunicipioPeriferico('ALL');
+                              setAppliedMunicipioPeriferico('ALL');
+                              setIsPeriferiaOpen(false);
+                            }}
+                            className="bg-red-600/80 hover:bg-red-600 text-white px-2 py-1.5 rounded-md font-medium transition-colors duration-200 flex items-center justify-center min-h-[40px]"
+                            title="Limpar seleção do município periférico"
+                            aria-label="Limpar seleção do município periférico"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                      <MunicipioPerifericoDropdown
+                        isOpen={isPeriferiaOpen}
+                        buttonRef={periferiaButtonRef}
+                        dropdownRef={periferiaDropdownRef}
+                        selectedMunicipio={selectedMunicipioPeriferico}
+                        setSelectedMunicipio={setSelectedMunicipioPeriferico}
+                        periferiasDisponiveis={filteredPeriferiaOptions}
+                      />
                     </div>
 
                     {/* PRODUTOS (Dropdown multi-select via Portal) */}
@@ -1266,6 +1571,7 @@ export default function EstrategiaPage() {
                           onClick={() => {
                             // Aplicar filtros selecionados
                             setAppliedPolo(selectedPolo);
+                            setAppliedMunicipioPeriferico(selectedMunicipioPeriferico);
                             setAppliedMinValor(minValor);
                             setAppliedMaxValor(maxValor);
                             setAppliedUFs(selectedUFs);
@@ -1275,6 +1581,7 @@ export default function EstrategiaPage() {
                             // Fechar dropdowns
                             setIsEstadoOpen(false);
                             setIsProdutosOpen(false);
+                            setIsPeriferiaOpen(false);
                           }}
                           className="bg-sky-600 hover:bg-sky-700 text-white px-3 py-1.5 rounded-md font-medium transition-colors duration-200 flex items-center justify-center gap-1.5 min-h-[40px] flex-1"
                         >
@@ -1307,7 +1614,11 @@ export default function EstrategiaPage() {
                 transition={{ duration: 0.5, delay: 0.2 }}
                 className="mt-2 mb-2"
               >
-                <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 ${loadingData ? 'opacity-60 pointer-events-none' : ''}`}>
+                <div className={`grid grid-cols-1 ${
+                  appliedMunicipioPeriferico !== 'ALL' && municipioPerifericoSelecionado
+                    ? 'md:grid-cols-3' // 3 colunas quando município periférico selecionado (1/3 + 2/3)
+                    : 'md:grid-cols-2 lg:grid-cols-3'   // 3 cards na visão agregada
+                } gap-2 ${loadingData ? 'opacity-60 pointer-events-none' : ''}`}>
                   {metrics.map((metric, index) => (
                     <Fragment key={metric.id}>
                       {metric.id === 'municipios_polo' ? (
@@ -1418,6 +1729,14 @@ export default function EstrategiaPage() {
                         transition={{ duration: 0.5, delay: 0.2 + index * 0.1 }}
                         className={`bg-[#1e293b] rounded-lg border border-slate-700/50 hover:bg-[#233044] transition-all duration-300 group min-h-[160px] ${
                           metric.id === 'top_municipios' ? 'p-4' : metric.id === 'valor_polo' ? 'p-6' : 'p-4'
+                        } ${
+                          appliedMunicipioPeriferico !== 'ALL' && municipioPerifericoSelecionado
+                            ? metric.id === 'valor_municipio_periferico'
+                              ? 'md:col-span-1' // Primeiro card ocupa 1/3 do espaço
+                              : metric.id === 'produtos_municipio_periferico'
+                              ? 'md:col-span-2' // Segundo card ocupa 2/3 do espaço
+                              : ''
+                            : ''
                         }`}
                         onClick={() => setSelectedMetric(metric.id)}
                         tabIndex={-1}
@@ -1434,8 +1753,8 @@ export default function EstrategiaPage() {
                                 <div key={idx} className="flex items-center justify-between py-1.5 px-2 rounded-md bg-slate-800/30 border border-slate-700/20 hover:bg-slate-700/30 transition-colors">
                                   <div className="flex items-center gap-3">
                                     <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                                      idx === 0 ? 'bg-blue-800 text-white' : 
-                                      idx === 1 ? 'bg-blue-600 text-white' : 
+                                      idx === 0 ? 'bg-blue-800 text-white' :
+                                      idx === 1 ? 'bg-blue-600 text-white' :
                                       'bg-blue-400 text-white'
                                     }`}>
                                       {idx + 1}
@@ -1445,8 +1764,8 @@ export default function EstrategiaPage() {
                                     </span>
                                   </div>
                                   <span className="text-sm font-semibold text-emerald-400 tabular-nums">
-                                    R$ <AnimatedMonetaryValue 
-                                      targetValue={municipio.valor} 
+                                    R$ <AnimatedMonetaryValue
+                                      targetValue={municipio.valor}
                                       selectedPolo={selectedPolo}
                                     />
                                   </span>
@@ -1454,24 +1773,79 @@ export default function EstrategiaPage() {
                               ))}
                             </div>
                           </div>
+                        ) : metric.id === 'produtos_municipio_periferico' ? (
+                          // Layout especial para Produtos Detalhados do Município Periférico
+                          // Ocupa a altura dos dois cards anteriores (altura dobrada)
+                          <div className="flex flex-col h-full">
+                            <div className="mb-3 text-center">
+                              <h3 className="text-lg font-semibold text-white">Produtos Detalhados</h3>
+                              <p className="text-xs text-slate-400">Valores individuais por produto no município</p>
+                            </div>
+                            <div className="flex-1">
+                              {/* Grid de 5 linhas x 2 colunas para produtos */}
+                              <div className="grid grid-cols-2 grid-rows-5 gap-1 h-full">
+                                {Array.from({ length: 10 }, (_, idx) => {
+                                  const produto = produtosMunicipioPeriferico[idx];
+                                  return (
+                                    <div
+                                      key={idx}
+                                      className={`flex items-center justify-between py-1.5 px-2 rounded-md border transition-colors ${
+                                        produto
+                                          ? 'bg-slate-800/30 border-slate-700/20 hover:bg-slate-700/40'
+                                          : 'bg-slate-800/10 border-slate-700/10'
+                                      }`}
+                                    >
+                                      {produto ? (
+                                        <>
+                                          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                            <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                                              produto.category === 'educacao' ? 'bg-blue-500' :
+                                              produto.category === 'planejamento' ? 'bg-green-500' :
+                                              produto.category === 'ambiental' ? 'bg-emerald-500' :
+                                              produto.category === 'tributario' ? 'bg-yellow-500' :
+                                              produto.category === 'habitacional' ? 'bg-purple-500' :
+                                              'bg-gray-500'
+                                            }`} />
+                                            <span className="text-xs font-medium text-slate-200 truncate" title={produto.label}>
+                                              {produto.shortLabel}
+                                            </span>
+                                          </div>
+                                          <span className="text-xs font-semibold text-emerald-400 tabular-nums flex-shrink-0">
+                                            R$ {new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(produto.valor)}
+                                          </span>
+                                        </>
+                                      ) : (
+                                        <span className="text-xs text-slate-500 italic">Vazio</span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                              {produtosMunicipioPeriferico.length === 0 && (
+                                <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-sm">
+                                  Nenhum produto ativo neste município
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         ) : (
                           // Layout padrão para outros cards // card 1
                           <div className="relative flex flex-col h-full">
-                            {metric.id === 'valor_polo' ? (
-                              // Layout especial para o card de Valor do Polo
+                            {metric.id === 'valor_polo' || metric.id === 'valor_municipio_periferico' ? (
+                              // Layout especial para o card de Valor (Polo ou Município Periférico)
                               <>
                                 {/* Textos no canto superior esquerdo */}
                                 <div className="absolute top-0 left-0 text-left space-y-1">
                                   <p className="text-sm font-bold text-slate-300">{metric.subtitle}</p>
                                   <p className="text-xs text-slate-500">{metric.description}</p>
                                 </div>
-                                
+
                                 {/* Valor centralizado no meio do card */}
                                 <div className="absolute inset-0 flex items-center justify-center px-2">
                                   <p className="font-extrabold text-emerald-400 text-2xl sm:text-3xl md:text-4xl lg:text-3xl xl:text-4xl text-center leading-tight break-words">
                                     <AnimatedCurrency
                                       targetValue={metric.value as number}
-                                      selectedPolo={appliedPolo}
+                                      selectedPolo={appliedMunicipioPeriferico !== 'ALL' ? appliedMunicipioPeriferico : appliedPolo}
                                     />
                                   </p>
                                 </div>
@@ -1532,7 +1906,13 @@ export default function EstrategiaPage() {
                           appliedMaxValor={appliedMaxValor}
                           onRadiusResult={setRadiusPayload}
                           onExportXLSX={handleExportRadiusXLSX}
+                          onMunicipioPerifericoClick={(municipioId) => {
+                            setSelectedMunicipioPeriferico(municipioId);
+                            setAppliedMunicipioPeriferico(municipioId);
+                          }}
+                          municipioPerifericoSelecionado={appliedMunicipioPeriferico}
                         />
+
                       </div>
                       <AnimatePresence initial={false}>
                         {isRunwayOpen && (
@@ -1588,7 +1968,13 @@ export default function EstrategiaPage() {
                         appliedMaxValor={appliedMaxValor}
                         onRadiusResult={setRadiusPayload}
                         onExportXLSX={handleExportRadiusXLSX}
+                        onMunicipioPerifericoClick={(municipioId) => {
+                          setSelectedMunicipioPeriferico(municipioId);
+                          setAppliedMunicipioPeriferico(municipioId);
+                        }}
+                        municipioPerifericoSelecionado={appliedMunicipioPeriferico}
                       />
+
                       <AnimatePresence>
                         {isRunwayOpen && (
                           <motion.div
@@ -1641,6 +2027,8 @@ export default function EstrategiaPage() {
       
       {/* Botão scroll to top */}
       <ScrollToTopButton />
+
+
     </div>
   );
 }

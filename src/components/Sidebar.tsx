@@ -65,6 +65,12 @@ export default function Sidebar({ className = '' }: SidebarProps) {
       path: '/estrategia'
     },
     {
+      id: 'rotas',
+      label: 'Roteamento (Beta)',
+      icon: 'fa-solid fa-route',
+      path: '/rotas'
+    },
+    {
       id: 'logout',
       label: 'Logout',
       icon: 'fa-solid fa-right-from-bracket',

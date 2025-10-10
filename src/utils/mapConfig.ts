@@ -38,20 +38,98 @@ export const ABERTURA_REGIOES: Record<string, readonly string[]> = {
 };
 
 
-// Produtos disponíveis para filtro e agregação
-// Agora separando chaves por origem e destino para evitar duplicação
-export const PRODUCTS = [
-  { key: 'VALOR_PD', label: 'PD', origemvalorKey: 'valor_pd_num_origem', destinovalorKey: 'valor_pd_num_destino' },
-  { key: 'VALOR_PMBSB', label: 'PMSB', origemvalorKey: 'valor_pmsb_num_origem', destinovalorKey: 'valor_pmsb_num_destino' },
-  { key: 'VALOR_CTM', label: 'CTM', origemvalorKey: 'valor_ctm_num_origem', destinovalorKey: 'valor_ctm_num_destino' },
-  { key: 'VALOR_DEC_AMBIENTAL', label: 'Dec. Ambiental', origemvalorKey: 'VALOR_DEC_AMBIENTAL_NUM_origem', destinovalorKey: 'VALOR_DEC_AMBIENTAL_NUM_destino' },
-  { key: 'VALOR_PLHIS', label: 'PLHIS', origemvalorKey: 'PLHIS_origem', destinovalorKey: 'PLHIS_destino' },
-  { key: 'VALOR_START', label: 'Start', origemvalorKey: 'valor_start_iniciais_finais_origem', destinovalorKey: 'valor_start_iniciais_finais_destino' },
-  { key: 'VALOR_LIVRO', label: 'Livros', origemvalorKey: 'LIVRO_FUND_1_2_origem', destinovalorKey: 'LIVRO_FUND_1_2_destino' },
-  { key: 'VALOR_PVA', label: 'PVA', origemvalorKey: 'PVA_origem', destinovalorKey: 'PVA_destino' },
-  { key: 'VALOR_EDUCAGAME', label: 'EducaGame', origemvalorKey: 'educagame_origem', destinovalorKey: 'educagame_destino' },
-  { key: 'VALOR_REURB', label: 'REURB', origemvalorKey: 'valor_reurb_origem', destinovalorKey: 'valor_reurb_destino' },
-  { key: 'VALOR_DESERT', label: 'Desert.', origemvalorKey: 'VALOR_DESERT_NUM_origem', destinovalorKey: 'VALOR_DESERT_NUM_destino' },
-] as const;
+// Configuração centralizada dos campos de produtos
+// Facilita manutenção e evita ajustes manuais em múltiplos arquivos
+// origemKey pode ser null para produtos que só existem nas periferias
+export const PROD_FIELDS = {
+  VALOR_PD: {
+    label: 'Plano Diretor',
+    shortLabel: 'PD',
+    origemKey: 'valor_pd_num_origem',
+    destinoKey: 'valor_pd_num_destino',
+    category: 'planejamento'
+  },
+  VALOR_PMBSB: {
+    label: 'Plano Municipal de Saneamento Básico',
+    shortLabel: 'PMSB',
+    origemKey: 'valor_pmsb_num_origem',
+    destinoKey: 'valor_pmsb_num_destino',
+    category: 'planejamento'
+  },
+  VALOR_CTM: {
+    label: 'IPTU Legal',
+    shortLabel: 'CTM',
+    // VALOR_CTM só existe nas periferias (destinos), não nos polos (origens)
+    origemKey: null,
+    destinoKey: 'valor_ctm_num_destino',
+    category: 'tributario'
+  },
+  VALOR_DEC_AMBIENTAL: {
+    label: 'Plano Decenal do Meio Ambiente',
+    shortLabel: 'Dec. Ambiental',
+    origemKey: 'VALOR_DEC_AMBIENTAL_NUM_origem',
+    destinoKey: 'VALOR_DEC_AMBIENTAL_NUM_destino',
+    category: 'ambiental'
+  },
+  VALOR_PLHIS: {
+    label: 'Plano Habitacional',
+    shortLabel: 'PLHIS',
+    origemKey: 'PLHIS_origem',
+    destinoKey: 'PLHIS_destino',
+    category: 'habitacional'
+  },
+  VALOR_START: {
+    label: 'Start Lab',
+    shortLabel: 'Start',
+    origemKey: 'valor_start_iniciais_finais_origem',
+    destinoKey: 'valor_start_iniciais_finais_destino',
+    category: 'educacao'
+  },
+  VALOR_LIVRO: {
+    label: 'Livros Didáticos',
+    shortLabel: 'Livros',
+    origemKey: 'LIVRO_FUND_1_2_origem',
+    destinoKey: 'LIVRO_FUND_1_2_destino',
+    category: 'educacao'
+  },
+  VALOR_PVA: {
+    label: 'Procon Vai às Aulas',
+    shortLabel: 'PVA',
+    origemKey: 'PVA_origem',
+    destinoKey: 'PVA_destino',
+    category: 'educacao'
+  },
+  VALOR_EDUCAGAME: {
+    label: 'Educa Game',
+    shortLabel: 'EducaGame',
+    origemKey: 'educagame_origem',
+    destinoKey: 'educagame_destino',
+    category: 'educacao'
+  },
+  VALOR_REURB: {
+    label: 'REURB',
+    shortLabel: 'REURB',
+    origemKey: 'valor_reurb_origem',
+    destinoKey: 'valor_reurb_destino',
+    category: 'regularizacao'
+  },
+  VALOR_DESERT: {
+    label: 'Plano de Desertificação',
+    shortLabel: 'Desert.',
+    origemKey: 'VALOR_DESERT_NUM_origem',
+    destinoKey: 'VALOR_DESERT_NUM_destino',
+    category: 'ambiental'
+  }
+} as const;
+
+// Produtos disponíveis para filtro e agregação (mantido para compatibilidade)
+export const PRODUCTS = Object.entries(PROD_FIELDS).map(([key, config]) => ({
+  key: key as keyof typeof PROD_FIELDS,
+  label: config.shortLabel,
+  origemvalorKey: config.origemKey as string | null,
+  destinovalorKey: config.destinoKey
+}));
+
 export type ProductKey = typeof PRODUCTS[number]['key'];
+export type ProdFieldKey = keyof typeof PROD_FIELDS;
 

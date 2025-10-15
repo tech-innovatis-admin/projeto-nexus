@@ -30,14 +30,62 @@ export function calcularTempoVoo(distanciaKm: number, velocidadeKmh: number): nu
 
 /**
  * Cria um trecho de voo entre dois polos
+ * Usa coordenadas das pistas se estiverem selecionadas e disponíveis
  */
 export function criarTrechoVoo(
   origem: MunicipioPolo,
   destino: MunicipioPolo,
   configuracao: ConfiguracaoRota
 ): TrechoVoo {
-  const distancia = calcularDistanciaHaversine(origem.coordenadas, destino.coordenadas);
+  // Determinar coordenadas de origem
+  let coordOrigem = origem.coordenadas;
+  let usaPistaOrigem = false;
+  
+  if (origem.pistaSelecionada &&
+      origem.pistaSelecionada.latitude_pista !== 0 &&
+      origem.pistaSelecionada.longitude_pista !== 0 &&
+      origem.pistaSelecionada.coordenadas.lat !== 0 &&
+      origem.pistaSelecionada.coordenadas.lng !== 0) {
+    coordOrigem = origem.pistaSelecionada.coordenadas;
+    usaPistaOrigem = true;
+    console.log(`✈️ [criarTrechoVoo] Usando pista de origem: ${origem.pistaSelecionada.codigo_pista} em ${origem.nome}`);
+  } else if (origem.pistas && origem.pistas.length > 0 && !origem.pistaSelecionada) {
+    console.log(`⚠️ [criarTrechoVoo] ${origem.nome} tem ${origem.pistas.length} pista(s), mas nenhuma selecionada. Usando centro do município.`);
+  }
+  
+  // Determinar coordenadas de destino
+  let coordDestino = destino.coordenadas;
+  let usaPistaDestino = false;
+  
+  if (destino.pistaSelecionada &&
+      destino.pistaSelecionada.latitude_pista !== 0 &&
+      destino.pistaSelecionada.longitude_pista !== 0 &&
+      destino.pistaSelecionada.coordenadas.lat !== 0 &&
+      destino.pistaSelecionada.coordenadas.lng !== 0) {
+    coordDestino = destino.pistaSelecionada.coordenadas;
+    usaPistaDestino = true;
+    console.log(`✈️ [criarTrechoVoo] Usando pista de destino: ${destino.pistaSelecionada.codigo_pista} em ${destino.nome}`);
+  } else if (destino.pistas && destino.pistas.length > 0 && !destino.pistaSelecionada) {
+    console.log(`⚠️ [criarTrechoVoo] ${destino.nome} tem ${destino.pistas.length} pista(s), mas nenhuma selecionada. Usando centro do município.`);
+  }
+  
+  // Calcular distância usando as coordenadas determinadas
+  const distancia = calcularDistanciaHaversine(coordOrigem, coordDestino);
   const tempo = calcularTempoVoo(distancia, configuracao.velocidadeMediaVooKmh);
+  
+  // Determinar método de cálculo
+  let metodoCalculo: 'pista-pista' | 'pista-municipio' | 'municipio-pista' | 'municipio-municipio';
+  if (usaPistaOrigem && usaPistaDestino) {
+    metodoCalculo = 'pista-pista';
+  } else if (usaPistaOrigem && !usaPistaDestino) {
+    metodoCalculo = 'pista-municipio';
+  } else if (!usaPistaOrigem && usaPistaDestino) {
+    metodoCalculo = 'municipio-pista';
+  } else {
+    metodoCalculo = 'municipio-municipio';
+  }
+  
+  console.log(`📏 [criarTrechoVoo] ${origem.nome} → ${destino.nome}: ${distancia.toFixed(2)}km (método: ${metodoCalculo})`);
   
   return {
     tipo: 'voo',
@@ -46,9 +94,12 @@ export function criarTrechoVoo(
     distanciaKm: distancia,
     tempoMinutos: tempo,
     geometria: [
-      [origem.coordenadas.lng, origem.coordenadas.lat],
-      [destino.coordenadas.lng, destino.coordenadas.lat]
-    ]
+      [coordOrigem.lng, coordOrigem.lat],
+      [coordDestino.lng, coordDestino.lat]
+    ],
+    usaPistaOrigem,
+    usaPistaDestino,
+    metodoCalculo
   };
 }
 

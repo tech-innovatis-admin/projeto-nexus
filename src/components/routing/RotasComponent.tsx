@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useRotas } from '@/hooks/useRotas';
+import { useMapData } from '@/contexts/MapDataContext';
 import ConfiguracaoRotas from './ConfiguracaoRotas';
+import SeletorPistas from './SeletorPistas';
 import type { 
   MunicipioPolo, 
   MunicipioPeriferia, 
   TrechoVoo, 
   TrechoTerrestre,
-  Coordenada 
+  Coordenada,
+  PistaVoo
 } from '@/types/routing';
 import { formatarTempo, formatarDistancia } from '@/utils/routingUtils';
 
@@ -47,9 +50,56 @@ export default function RotasComponent({
   const [secaoPolosAberta, setSecaoPolosAberta] = useState(true);
   const [secaoPeriferiasAberta, setSecaoPeriferiasAberta] = useState(true);
 
+  // Obter dados de pistas do contexto
+  const { mapData } = useMapData();
+  const pistasData = mapData?.pistas || [];
+
   // Converter dados dos municípios para tipos de rota
   const { polosDisponiveis, periferiasDisponiveis } = useMemo(() => {
     console.log('🔄 [RotasComponent] Processando municípios para rotas:', municipios.length);
+    console.log('🛬 [RotasComponent] Pistas disponíveis:', pistasData.length);
+    console.log('🔗 [JOIN] Iniciando join entre municípios e pistas_s3_lat_log.json...');
+
+    // Criar mapa de pistas por código IBGE para acesso rápido
+    const pistasPorCodigo = new Map<string, PistaVoo[]>();
+    
+    if (Array.isArray(pistasData) && pistasData.length > 0) {
+      pistasData.forEach((pista: any) => {
+        // Código IBGE é tratado como string (vem como string do CSV)
+        const codigo = String(pista.codigo || pista.codigo_ibge || '').trim();
+        if (!codigo || codigo === '0' || codigo === '') return;
+
+        // Converter coordenadas de string para número com validação
+        const latStr = String(pista.latitude_pista || '').trim();
+        const lngStr = String(pista.longitude_pista || '').trim();
+
+        const lat = latStr ? parseFloat(latStr) : NaN;
+        const lng = lngStr ? parseFloat(lngStr) : NaN;
+
+        // Validar se são coordenadas geográficas válidas
+        const coordenadasValidas = !isNaN(lat) && !isNaN(lng) &&
+                                  lat >= -90 && lat <= 90 &&
+                                  lng >= -180 && lng <= 180 &&
+                                  lat !== 0 && lng !== 0; // Excluir coordenadas zeradas
+
+
+        const pistaObj: PistaVoo = {
+          codigo_pista: String(pista.codigo_pista || '').trim(),
+          nome_pista: String(pista.nome_pista || '').trim(),
+          tipo_pista: String(pista.tipo_pista || '').trim(),
+          latitude_pista: coordenadasValidas ? lat : 0,
+          longitude_pista: coordenadasValidas ? lng : 0,
+          coordenadas: coordenadasValidas ? { lat, lng } : { lat: 0, lng: 0 }
+        };
+
+        if (!pistasPorCodigo.has(codigo)) {
+          pistasPorCodigo.set(codigo, []);
+        }
+        pistasPorCodigo.get(codigo)!.push(pistaObj);
+      });
+
+      console.log('🛬 [RotasComponent] Municípios com pistas:', pistasPorCodigo.size);
+    }
     
     // Arraays vazios para armazenar os municípios classificados
     const polos: MunicipioPolo[] = [];
@@ -64,6 +114,14 @@ export default function RotasComponent({
 
       const populacao = parseInt(municipio.populacao) || 0;
       
+      // Buscar pistas para este município
+      const pistasDoMunicipio = pistasPorCodigo.get(municipio.codigo) || [];
+
+      // Log do join entre município e pistas
+      if (pistasDoMunicipio.length > 0) {
+        console.log(`🔗 [JOIN] Município ${municipio.nome} (${municipio.codigo}) ↔ ${pistasDoMunicipio.length} pista(s) encontrada(s): ${pistasDoMunicipio.map(p => p.codigo_pista).join(', ')}`);
+      }
+      
       // Usar o campo 'tipo' que já vem dos dados, não baseado em população
       if (municipio.tipo === 'polo') {
         polos.push({
@@ -74,11 +132,22 @@ export default function RotasComponent({
           coordenadas,
           populacao,
           tipo: 'polo' as const,
-          temPistaVoo: true, // Todos os polos têm capacidade de voo
-          aeroporto: true, // Todos os polos têm aeroporto disponível
-          tipoTransporteDisponivel: ['aviao', 'helicoptero'], // Todos os polos suportam ambos os transportes
-          periferias: []
+          temPistaVoo: pistasDoMunicipio.length > 0,
+          aeroporto: pistasDoMunicipio.length > 0,
+          tipoTransporteDisponivel: pistasDoMunicipio.length > 0 ? ['aviao', 'helicoptero'] : [],
+          periferias: [],
+          pistas: pistasDoMunicipio,
+          pistaSelecionada: pistasDoMunicipio.find(p =>
+            p.latitude_pista !== 0 && p.longitude_pista !== 0 &&
+            p.coordenadas.lat !== 0 && p.coordenadas.lng !== 0
+          ) || undefined
         });
+
+        // Log quando uma pista é selecionada automaticamente para cálculo
+        const pistaSelecionada = polos[polos.length - 1].pistaSelecionada;
+        if (pistaSelecionada) {
+          console.log(`🎯 [JOIN] Pista selecionada automaticamente para ${municipio.nome}: ${pistaSelecionada.codigo_pista} (${pistaSelecionada.nome_pista})`);
+        }
       } else if (municipio.tipo === 'periferia') {
         periferias.push({
           codigo: municipio.codigo,
@@ -88,20 +157,39 @@ export default function RotasComponent({
           coordenadas,
           populacao,
           tipo: 'periferia' as const,
-          poloVinculado: undefined // Será calculado automaticamente
+          poloVinculado: undefined, // Será calculado automaticamente
+          pistas: pistasDoMunicipio,
+          pistaSelecionada: pistasDoMunicipio.find(p =>
+            p.latitude_pista !== 0 && p.longitude_pista !== 0 &&
+            p.coordenadas.lat !== 0 && p.coordenadas.lng !== 0
+          ) || undefined
         });
       }
     });
+
+    // Calcular estatísticas do join
+    const municipiosComPistas = polos.filter(p => p.pistas && p.pistas.length > 0).length +
+                               periferias.filter(p => p.pistas && p.pistas.length > 0).length;
+    const totalPistasEncontradas = polos.reduce((acc, p) => acc + (p.pistas?.length || 0), 0) +
+                                  periferias.reduce((acc, p) => acc + (p.pistas?.length || 0), 0);
 
     console.log('🔄 [RotasComponent] Municípios processados:', {
       totalMunicipios: municipios.length,
       polosEncontrados: polos.length,
       periferiasEncontradas: periferias.length,
+      polosComPistas: polos.filter(p => p.pistas && p.pistas.length > 0).length,
       tiposOriginais: municipios.map(m => ({ nome: m.nome, tipo: m.tipo })).slice(0, 5)
     });
 
+    console.log('🔗 [JOIN SUMMARY] Estatísticas do join municípios ↔ pistas_s3_lat_log.json:', {
+      municipiosComPistas,
+      municipiosSemPistas: municipios.length - municipiosComPistas,
+      totalPistasEncontradas,
+      taxaSucesso: `${((municipiosComPistas / municipios.length) * 100).toFixed(1)}%`
+    });
+
     return { polosDisponiveis: polos, periferiasDisponiveis: periferias };
-  }, [municipios]);
+  }, [municipios, pistasData]);
 
   // Estados únicos disponíveis
   const estadosPolos = useMemo(() => {
@@ -266,42 +354,66 @@ export default function RotasComponent({
                   </div>
                   <div className="space-y-2 max-h-56 overflow-y-auto bg-gray-50 rounded-lg p-2">
                     {polosFiltrados.length > 0 ? (
-                      polosFiltrados.map(polo => (
-                        <div
-                          key={polo.codigo}
-                          onClick={() => togglePolo(polo)}
-                          className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                            polosSelecionados.some(p => p.codigo === polo.codigo)
-                              ? 'border-blue-500 bg-blue-50'
-                              : 'border-gray-200 hover:border-gray-300 bg-white'
-                          }`}
-                        >
-                          <div className="font-medium text-gray-800">{polo.nome}</div>
-                          <div className="text-sm text-gray-600">
-                            {polo.estado}
-                            {polo.aeroporto && (
-                              <span className="inline-flex items-center">
-                                {' • '}
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  width="16"
-                                  height="16"
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth={2}
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  className="inline-block mr-1 text-blue-600 lucide lucide-plane"
-                                >
-                                  <path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z" />
-                                </svg>
-                                Aeroporto
-                              </span>
+                      polosFiltrados.map(polo => {
+                        const poloSelecionado = polosSelecionados.find(p => p.codigo === polo.codigo);
+                        const estaSelecionado = !!poloSelecionado;
+                        
+                        return (
+                          <div
+                            key={polo.codigo}
+                            className={`p-3 border rounded-lg transition-colors ${
+                              estaSelecionado
+                                ? 'border-blue-500 bg-blue-50'
+                                : 'border-gray-200 hover:border-gray-300 bg-white'
+                            }`}
+                          >
+                            <div
+                              onClick={() => togglePolo(polo)}
+                              className="cursor-pointer"
+                            >
+                              <div className="font-medium text-gray-800">{polo.nome}</div>
+                              <div className="text-sm text-gray-600">
+                                {polo.estado}
+                                {polo.pistas && polo.pistas.length > 0 && (
+                                  <span className="inline-flex items-center">
+                                    {' • '}
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      width="16"
+                                      height="16"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth={2}
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      className="inline-block mr-1 text-blue-600 lucide lucide-plane"
+                                    >
+                                      <path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z" />
+                                    </svg>
+                                    {polo.pistas.length} pista{polo.pistas.length > 1 ? 's' : ''}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            
+                            {/* Seletor de pistas (só aparece se o polo estiver selecionado) */}
+                            {estaSelecionado && polo.pistas && polo.pistas.length > 0 && (
+                              <SeletorPistas
+                                municipio={polo}
+                                pistaSelecionada={poloSelecionado?.pistaSelecionada}
+                                onSelecionarPista={(pista) => {
+                                  // Atualizar a pista selecionada do polo
+                                  const poloAtualizado = { ...polo, pistaSelecionada: pista };
+                                  // Remover o polo antigo e adicionar o atualizado
+                                  togglePolo(polo); // Remove
+                                  setTimeout(() => togglePolo(poloAtualizado), 0); // Adiciona atualizado
+                                }}
+                              />
                             )}
                           </div>
-                        </div>
-                      ))
+                        );
+                      })
                     ) : (
                       <div className="text-center py-4 text-gray-500 bg-white rounded-lg border-2 border-dashed border-gray-300">
                         {polosDisponiveis.length === 0 
@@ -475,7 +587,7 @@ export default function RotasComponent({
                         }`}
                       >
                         <div className="flex justify-between items-start">
-                          <div>
+                          <div className="flex-1">
                             <div className="font-medium text-gray-800">
                               {trecho.origem.nome} → {trecho.destino.nome}
                             </div>
@@ -520,6 +632,32 @@ export default function RotasComponent({
                                 </>
                               )}
                             </div>
+                            
+                            {/* Indicador de uso de pistas para voos */}
+                            {trecho.tipo === 'voo' && trecho.metodoCalculo && (
+                              <div className="text-xs mt-1">
+                                {trecho.metodoCalculo === 'pista-pista' && (
+                                  <span className="text-green-700 font-medium">
+                                    ✈️ Pista → Pista (cálculo preciso)
+                                  </span>
+                                )}
+                                {trecho.metodoCalculo === 'pista-municipio' && (
+                                  <span className="text-amber-700">
+                                    ✈️ Pista → 📍 Centro (cálculo parcial)
+                                  </span>
+                                )}
+                                {trecho.metodoCalculo === 'municipio-pista' && (
+                                  <span className="text-amber-700">
+                                    📍 Centro → ✈️ Pista (cálculo parcial)
+                                  </span>
+                                )}
+                                {trecho.metodoCalculo === 'municipio-municipio' && (
+                                  <span className="text-gray-600">
+                                    📍 Centro → Centro (haversine)
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </div>
                           <div className="text-right text-sm">
                             <div className="font-medium text-gray-800">

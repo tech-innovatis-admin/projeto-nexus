@@ -1815,7 +1815,7 @@ export default function EstrategiaPage() {
                                           </span>
                                         </>
                                       ) : (
-                                        <span className="text-xs text-slate-500 italic">Vazio</span>
+                                        <span className="text-xs text-slate-500 italic">-</span>
                                       )}
                                     </div>
                                   );

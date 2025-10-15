@@ -37,6 +37,7 @@
     "lucide-react": "^0.544.0",
     "maplibre-gl": "^4.5.0",
     "next": "15.3.2",
+    "parquets": "^0.10.10",
     "pdf-lib": "^1.17.1",
     "polylabel": "^2.0.1",
     "prisma": "^6.13.0",

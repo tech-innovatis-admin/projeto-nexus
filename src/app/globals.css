@@ -358,3 +358,24 @@ button {
 .nexus-popup-line:last-child {
   margin-bottom: 0;
 }
+
+/* Estilo personalizado para o tooltip do mapa */
+.custom-tooltip {
+  background-color: rgba(15, 23, 42, 0.95) !important;
+  border: 1px solid rgba(148, 163, 184, 0.3) !important;
+  border-radius: 6px !important;
+  padding: 8px 12px !important;
+  font-size: 13px !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+  backdrop-filter: blur(4px) !important;
+}
+
+.custom-tooltip::before {
+  border-top-color: rgba(15, 23, 42, 0.95) !important;
+}
+
+.custom-tooltip b {
+  color: #38bdf8 !important;
+  font-weight: 600 !important;
+}

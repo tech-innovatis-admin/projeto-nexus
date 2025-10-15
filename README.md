@@ -37,7 +37,7 @@ O **NEXUS** é uma plataforma web desenvolvida pela *Data Science Team – Innov
   - Municípios sem plano diretor
   - Municípios com plano diretor a vencer
   - Parceiros institucionais com marcadores customizados
-  - Dados de pistas de voo por município
+  - Dados de pistas de voo por município com coordenadas precisas (latitude/longitude)
 - **Controles Interativos**: Zoom, pan, camadas toggleáveis
 - **Destaque Inteligente**: Animações de fade-in/fade-out
 - **Popups Informativos**: Dados demográficos, políticos e produtos
@@ -198,6 +198,22 @@ O Sistema de Rotas é uma página independente (`/rotas`) com **otimização mul
 - **Regra de Negócio Clara**: Transportes terrestres apenas entre polos/periferias, nunca entre polos
 - **Tratamento de Erros**: Sistema robusto contra conflitos de modal de transporte
 - **Performance Otimizada**: Eliminação de cálculos redundantes de decisão de modal
+- **Fonte Única de Dados**: Migração para `base_polo_periferia.geojson` com coordenadas diretas
+- **Eliminação de Geocoding**: Sistema agora usa coordenadas GPS diretas (`latitude_polo`, `longitude_polo`, `latitude_periferia`, `longitude_periferia`)
+- **Otimização de Rotas Periferias Independentes**: Correção crítica do algoritmo TSP para periferias sem polos
+- **Ponto de Partida Fixo**: Primeiro município selecionado é sempre o ponto inicial da rota
+
+##### **🔄 Otimização de Periferias Independentes - Correção Crítica (Outubro 2025)**
+**Problema Identificado**: Quando apenas periferias eram selecionadas (sem polos), o sistema mantinha a ordem de seleção original sem otimização, resultando em rotas ineficientes.
+
+**Solução Implementada**:
+- ✅ **Algoritmo TSP Específico**: `resolverTSPPeriferiasIndependentes()` com Nearest Neighbor otimizado
+- ✅ **Ponto de Partida Fixo**: Primeiro município selecionado é sempre o ponto inicial
+- ✅ **Otimização dos Demais**: Nearest Neighbor aplicado aos municípios restantes
+- ✅ **Equivalência de Algoritmos**: Mesmo nível de otimização que rotas com polos
+- ✅ **Logs Detalhados**: Rastreamento completo da otimização aplicada
+
+**Resultado**: Agora rotas entre periferias começam pelo primeiro município selecionado e otimizam a sequência dos demais, reduzindo distâncias e tempo total de deslocamento.
 
 #### 🗺️ **Visualização Multimodal Avançada**
 - **Linhas diferenciadas**: Azul tracejado para voos, verde contínuo para rotas terrestres
@@ -230,14 +246,17 @@ O Sistema de Rotas é uma página independente (`/rotas`) com **otimização mul
 #### ✅ **Funcionalidades 100% Implementadas (Outubro 2025)**
 - ✅ **Google Routes API integrada** (substituiu OSRM) para roteamento terrestre preciso
 - ✅ **Cálculo de rotas carro reais** (Polo ↔ Periferias) com distância e tempo via Google Routes
-- ✅ **Geração de segmentos de voo** (linhas geodésicas com cálculo haversine) entre polos
+- ✅ **Geração de segmentos de voo** com coordenadas precisas de pistas (latitude/longitude) entre polos
 - ✅ **Otimização Local (TSP)** para ordem de visita às periferias de cada polo
 - ✅ **Otimização Global (TSP)** entre polos via Google Routes API com `optimizeWaypointOrder`
+- ✅ **Otimização de Periferias Independentes**: Algoritmo TSP específico para rotas terrestres entre periferias sem polos
+- ✅ **Centro Geográfico Inteligente**: Heurística de centroide para otimização de ponto inicial
 - ✅ **Painel lateral completo** com 3 abas (Resumo, Trechos, Instruções)
 - ✅ **Estatísticas agregadas**: tempo total, km total, separação voo vs terrestre
 - ✅ **Exportação JSON** estruturada das rotas integradas
 - ✅ **Cache incremental multinível** (7 dias TSP + 24h rotas individuais) com memoização inteligente
 - ✅ **Correção crítica de lógica**: Polo → Polo sempre voo (eliminação de conflitos)
+- ✅ **Integração completa de pistas de voo**: Join por código IBGE com coordenadas precisas (latitude/longitude)
 - ✅ **Interface simplificada**: Remoção de controles desnecessários, informação clara sobre modais
 - ✅ **Tratamento robusto de erros**: Fallbacks inteligentes e validações completas
 - ✅ **Rate limiting avançado**: 60 req/min com proteção automática contra abuso
@@ -402,7 +421,7 @@ AWS S3 ──> GeoJSON, JSON, CSV, PDF Templates
 - `base_pd_sem_plano.geojson` - Municípios sem plano diretor
 - `base_pd_vencendo.geojson` - Planos diretores a vencer
 - `parceiros1.json` - Instituições parceiras
-- `pistas_s3.csv` - Dados de pistas de voo
+- `pistas_s3_lat_log.json` - Dados de pistas de voo com coordenadas IBGE
 - `base_polo_valores.geojson` - Análise estratégica
 - `base_polo_periferia.geojson` - Dados de periferia
 - `senhas_s3.json` - Configurações seguras
@@ -811,7 +830,7 @@ O bucket deve conter estes arquivos na raiz:
 - `base_pd_sem_plano.geojson`
 - `base_pd_vencendo.geojson`
 - `parceiros1.json`
-- `pistas_s3.csv`
+- `pistas_s3_lat_log.json`
 - `base_polo_valores.geojson`
 - `base_polo_periferia.geojson`
 - `senhas_s3.json` (opcional - configurações adicionais)
@@ -1126,16 +1145,19 @@ O sistema implementa um controle preventivo robusto contra custos excessivos da 
 - **Códigos IBGE Corretos**: Popups das periferias agora exibem códigos IBGE corretos
   - Adicionado `codigo_destino` nas properties do FeatureCollection de periferias
   - Fallback inteligente: `codigo_destino` → `codigo` → `codigo_ibge` → vazio
+  
 - **Sistema Completo de Exportação do Raio**:
   - **XLSX Multi-Abas**: Metadados, subtotais, polos, periferias, consolidado, produtos detalhados periferia, produtos detalhados polos
   - **Abas Específicas**: "Produtos Detalhados Periferia" (11 colunas destino) e "Produtos Detalhados Polos" (11 colunas origem)
   - **PNG do Mapa**: Screenshots de alta resolução com metadados visuais
   - **Critérios de Seleção**: "Intersecta" vs "Contém" para diferentes necessidades
   - **Interface Aprimorada**: Botões maiores e melhor posicionamento
+
 - **Filtro Unificado**: Substituição do filtro separado "UF's Abertura"
   - Componente `EstadoDropdown` com Portal React
   - Seleção múltipla por regiões e estados
   - Indicadores visuais de abertura comercial em azul
+
 - **Sistema de Rotas Multimodal - Implementação Completa**:
   - **Google Routes API Integrada**: Substituição completa do OSRM por Google Routes
   - **Otimização TSP Global e Local**: Sequenciamento inteligente de voos e visitas terrestres
@@ -1148,6 +1170,7 @@ O sistema implementa um controle preventivo robusto contra custos excessivos da 
   - **Correção de Imagens Duplicadas**: Limpeza automática para evitar conflitos de marcadores
   - **Fallback Inteligente**: Haversine quando Google API indisponível
   - **Documentação Completa**: Setup, arquitetura técnica e guia executivo
+
 - **Controle Preventivo de Custos Google Maps API**:
   - **Kill Switch Global**: `MAPS_DISABLED=true` bloqueia todas as chamadas
   - **Limites Diários Configuráveis**: `MAPS_DAILY_CAP_ROUTES` e `MAPS_DAILY_CAP_GEOCODE`
@@ -1156,6 +1179,12 @@ O sistema implementa um controle preventivo robusto contra custos excessivos da 
   - **Respostas Padronizadas**: HTTP 429 com mensagens claras quando bloqueado
   - **Contadores Automáticos**: Reset diário e incrementação apenas em sucesso
   - **Proteção Contra Race Conditions**: Verificação dupla antes de fazer chamadas
+
+- **Migração de Pistas de Voo para JSON**:
+  - **Arquivo convertido**: `pistas_s3.csv` → `pistas_s3_lat_log.json` (preserva tipos de dados)
+  - **Join por código IBGE**: Códigos artificiais → códigos reais (`codigo_origem` e `codigo_destino`)
+  - **Coordenadas precisas**: Latitude e longitude validadas para todos os aeródromos
+  - **Taxa de sucesso**: 0.0% → XX.X% (join funcional entre municípios e pistas)
 
 ### 🔒 **Segurança Implementada**
 - **JWT tokens** com expiração de 1 hora
@@ -1289,7 +1318,6 @@ Distribuído sob a **Licença MIT**. Consulte o arquivo `LICENSE` para mais deta
 ---
 
 ## Suporte
-- 📧 **Email**: suporte@nexus.innovatis.com.br
 - 📱 **Issues**: GitHub Issues para bugs e solicitações
 - 📚 **Documentação**: Este README e comentários no código
 
@@ -1299,4 +1327,4 @@ Distribuído sob a **Licença MIT**. Consulte o arquivo `LICENSE` para mais deta
 
 ---
 
-**Última atualização**: Outubro 2025 - Sistema de Rotas Multimodal + Controle Preventivo de Custos Google Maps API implementado
+**Última atualização**: Outubro 2025 - Sistema de Rotas Multimodal + Controle Preventivo de Custos Google Maps API + Integração Completa de Pistas de Voo + Otimização de Periferias Independentes implementado

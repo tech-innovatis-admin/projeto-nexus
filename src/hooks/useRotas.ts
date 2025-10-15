@@ -181,16 +181,21 @@ export function useRotas() {
 
       // Caso especial: apenas periferias selecionadas
       if (polosSelecionados.length === 0 && periferiasSelecionadas.length > 0) {
-        console.log('🔄 [useRotas] Calculando rota apenas entre periferias');
+        console.log('🔄 [useRotas] Calculando rota otimizada apenas entre periferias');
 
         if (periferiasSelecionadas.length === 1) {
           // Apenas uma periferia - rota simples
           trechos.push(await criarTrechoTerrestre(periferiasSelecionadas[0], periferiasSelecionadas[0]));
         } else {
-          // Múltiplas periferias - ordenação simples (pode ser melhorada futuramente)
-        const periferiasOrdenadas = periferiasSelecionadas; // Por enquanto, mantém ordem original
+          // Múltiplas periferias - usar algoritmo de otimização (Nearest Neighbor)
+          const periferiasOrdenadas = configuracao.otimizarOrdemPolos
+            ? resolverTSPPeriferiasIndependentes(periferiasSelecionadas)
+            : periferiasSelecionadas;
 
-          // Criar trechos terrestres entre todas as periferias
+          console.log('📋 [useRotas] Ordem selecionada:', periferiasSelecionadas.map(p => p.nome).join(', '));
+          console.log('🎯 [useRotas] Ordem otimizada:', periferiasOrdenadas.map(p => p.nome).join(' → '));
+
+          // Criar trechos terrestres entre todas as periferias na ordem otimizada
           for (let i = 0; i < periferiasOrdenadas.length - 1; i++) {
             const periferiaAtual = periferiasOrdenadas[i];
             const proximaPeriferia = periferiasOrdenadas[i + 1];
@@ -350,6 +355,86 @@ export function useRotas() {
       }
     }
 
+    return rota;
+  }, []);
+
+  // Função auxiliar para encontrar o centro geográfico de um grupo de periferias
+  const encontrarCentroGeografico = useCallback((periferias: MunicipioPeriferia[]): MunicipioPeriferia => {
+    if (periferias.length === 1) return periferias[0];
+    
+    // Calcular centroide aproximado
+    let somaLat = 0;
+    let somaLng = 0;
+    
+    for (const p of periferias) {
+      somaLat += p.coordenadas.lat;
+      somaLng += p.coordenadas.lng;
+    }
+    
+    const centroLat = somaLat / periferias.length;
+    const centroLng = somaLng / periferias.length;
+    
+    // Encontrar a periferia mais próxima do centro calculado
+    let maisProxima = periferias[0];
+    let menorDistancia = calcularDistanciaHaversine(
+      { lat: centroLat, lng: centroLng }, 
+      maisProxima.coordenadas
+    );
+    
+    for (const p of periferias) {
+      const distancia = calcularDistanciaHaversine(
+        { lat: centroLat, lng: centroLng }, 
+        p.coordenadas
+      );
+      if (distancia < menorDistancia) {
+        menorDistancia = distancia;
+        maisProxima = p;
+      }
+    }
+    
+    console.log(`📍 [useRotas] Centro geográfico: ${maisProxima.nome} (mais próximo do centroide)`);
+    return maisProxima;
+  }, []);
+
+  // Resolver TSP para periferias independentes (sem polo)
+  const resolverTSPPeriferiasIndependentes = useCallback((periferias: MunicipioPeriferia[]): MunicipioPeriferia[] => {
+    if (periferias.length <= 1) return periferias;
+
+    console.log('🔄 [useRotas] Otimizando ordem de periferias independentes...');
+
+    const visitadas = new Set<string>();
+    const rota: MunicipioPeriferia[] = [];
+
+    // Usar o PRIMEIRO município da lista como ponto de partida
+    let atual = periferias[0];
+    rota.push(atual);
+    visitadas.add(atual.codigo);
+
+    console.log(`🎯 [useRotas] Ponto de partida: ${atual.nome} (primeiro da seleção)`);
+
+    // Nearest neighbor para os demais municípios
+    while (visitadas.size < periferias.length) {
+      let proximaMaisProxima: MunicipioPeriferia | null = null;
+      let menorDist = Infinity;
+
+      for (const periferia of periferias) {
+        if (visitadas.has(periferia.codigo)) continue;
+
+        const dist = calcularDistanciaHaversine(atual.coordenadas, periferia.coordenadas);
+        if (dist < menorDist) {
+          menorDist = dist;
+          proximaMaisProxima = periferia;
+        }
+      }
+
+      if (proximaMaisProxima) {
+        rota.push(proximaMaisProxima);
+        visitadas.add(proximaMaisProxima.codigo);
+        atual = proximaMaisProxima;
+      }
+    }
+
+    console.log('✅ [useRotas] Rota otimizada:', rota.map(p => p.nome).join(' → '));
     return rota;
   }, []);
 

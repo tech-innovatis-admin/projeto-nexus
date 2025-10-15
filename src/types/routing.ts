@@ -5,6 +5,15 @@ export interface Coordenada {
   lng: number;
 }
 
+export interface PistaVoo {
+  codigo_pista: string; // Código ICAO (ex: "SBCZ")
+  nome_pista: string; // Nome oficial do aeródromo
+  tipo_pista: string; // "PUBLI" (pública) ou "PRIV" (privada)
+  latitude_pista: number;
+  longitude_pista: number;
+  coordenadas: Coordenada; // Coordenadas da pista
+}
+
 export interface MunicipioBase {
   codigo: string;
   nome: string;
@@ -13,6 +22,8 @@ export interface MunicipioBase {
   coordenadas: Coordenada;
   populacao: number;
   tipo: 'polo' | 'periferia';
+  pistas?: PistaVoo[]; // Pistas de voo disponíveis no município
+  pistaSelecionada?: PistaVoo; // Pista escolhida pelo usuário para cálculos
 }
 
 export interface MunicipioPolo extends MunicipioBase {
@@ -21,6 +32,8 @@ export interface MunicipioPolo extends MunicipioBase {
   aeroporto: boolean;
   tipoTransporteDisponivel: string[];
   periferias: MunicipioPeriferia[];
+  pistas?: PistaVoo[]; // Override para garantir tipagem
+  pistaSelecionada?: PistaVoo;
 }
 
 export interface MunicipioPeriferia extends MunicipioBase {
@@ -35,6 +48,9 @@ export interface TrechoVoo {
   distanciaKm: number;
   tempoMinutos: number;
   geometria: [number, number][]; // linha reta
+  usaPistaOrigem?: boolean; // Se true, usou coordenadas da pista na origem
+  usaPistaDestino?: boolean; // Se true, usou coordenadas da pista no destino
+  metodoCalculo?: 'pista-pista' | 'pista-municipio' | 'municipio-pista' | 'municipio-municipio'; // Método usado
 }
 
 export interface TrechoTerrestre {

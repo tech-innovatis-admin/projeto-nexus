@@ -40,16 +40,15 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
     'VALOR_PMSB',
     'VALOR_CTM',
     'VALOR_REURB',
-    'VALOR_START_INICIAIS',
-    'VALOR_START_FINAIS',
+    'VALOR_START_INICIAIS_FINAIS',
     'VALOR_DEC_AMBIENTAL',
     'VALOR_PLHIS',
     'VALOR_DESERT',
     'educagame_fmt',
     'PVA_fmt',
     'LIVRO_FUND_1_fmt',
-    'LIVRO_FUND_2_fmt',
-    'valor_vaat_mensal_fmt' // VAAT mensal (valor cheio / 12 - 5%)
+    'LIVRO_FUND_2_fmt'
+    // valor_vaat_mensal_fmt foi movido para o Container "Município e Gestão"
   ];
 
   // Função utilitária para normalizar strings (remove acentos, espaços extras e converte para minúsculas)
@@ -80,16 +79,14 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
         : "PMSB",
     VALOR_CTM: "IPTU Legal",
     VALOR_REURB: "REURB",
-    VALOR_START_INICIAIS: "Start Lab - Ensino Fund. 1",
-    VALOR_START_FINAIS: "Start Lab - Ensino Fund. 2",
+    VALOR_START_INICIAIS_FINAIS: "Start Lab - Ensino Fund. 1 e 2",
     VALOR_DEC_AMBIENTAL: "Plano Decenal do Meio Ambiente",
     VALOR_PLHIS: "PLHIS",
     VALOR_DESERT: "Plano de Desertificação",
     educagame_fmt: "Educa Game",
     PVA_fmt: "Procon Vai Às Aulas",
     LIVRO_FUND_1_fmt: "Livros - Ensino Fund. 1",
-    LIVRO_FUND_2_fmt: "Livros - Ensino Fund. 2",
-    valor_vaat_mensal_fmt: 'VAAT',
+    LIVRO_FUND_2_fmt: "Livros - Ensino Fund. 2"
   };
 
 
@@ -145,26 +142,6 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
         <path d="M10.394 2.08a1 1 0 00-.788 0l-7 3a1 1 0 000 1.84L5.25 8.051a.999.999 0 01.356-.257l4-1.714a1 1 0 11.788 1.838L7.667 9.088l1.94.831a1 1 0 00.787 0l7-3a1 1 0 000-1.838l-7-3zM3.31 9.397L5 10.12v4.102a8.969 8.969 0 00-1.05-.174 1 1 0 01-.89-.89 11.115 11.115 0 01.25-3.762zM9.3 16.573A9.026 9.026 0 007 14.935v-3.957l1.818.78a3 3 0 002.364 0l5.508-2.361a11.026 11.026 0 01.25 3.762 1 1 0 01-.89.89 8.968 8.968 0 00-5.35 2.524 1 1 0 01-1.4 0zM6 18a1 1 0 001-1v-2.065a8.935 8.935 0 00-2-.712V17a1 1 0 001 1z" />
       </svg>
     ),
-    VALOR_START_INICIAIS: (
-      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 8V4H8"/>
-        <rect width="16" height="12" x="4" y="8" rx="2"/>
-        <path d="M2 14h2"/>
-        <path d="M20 14h2"/>
-        <path d="M15 13v2"/>
-        <path d="M9 13v2"/>
-      </svg>
-    ),
-    VALOR_START_FINAIS: (
-      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M12 8V4H8"/>
-        <rect width="16" height="12" x="4" y="8" rx="2"/>
-        <path d="M2 14h2"/>
-        <path d="M20 14h2"/>
-        <path d="M15 13v2"/>
-        <path d="M9 13v2"/>
-      </svg>
-    ),
     VALOR_DEC_AMBIENTAL: (
       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/>
@@ -206,12 +183,7 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
         <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
       </svg>
-    ),
-    valor_vaat_mensal_fmt: (
-      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-        <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
-      </svg>
-    ),
+    )
   };
 
   const linksProdutos: Record<string, string> = {
@@ -219,16 +191,14 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
     VALOR_PMSB: "https://drive.google.com/drive/u/0/folders/1YSQNlu4_5SrA7GE-c7aXXWkEu7GYknyT",
     VALOR_CTM: "https://drive.google.com/drive/u/0/folders/1Jf4mLWZZzcCTP5fRh0ckx6S9sqsZxWIb",
     VALOR_REURB: "https://drive.google.com/drive/u/0/folders/1Noi7iCP9hAieSMwtoSNwExj1UdAkazss",
-    VALOR_START_INICIAIS: "https://drive.google.com/drive/u/0/folders/1UMbF1pPA2wDKfDZNC6_Pm5Jl8KswgWNi",
-    VALOR_START_FINAIS: "https://drive.google.com/drive/u/0/folders/1UMbF1pPA2wDKfDZNC6_Pm5Jl8KswgWNi",
+    VALOR_START_INICIAIS_FINAIS: "https://drive.google.com/drive/u/0/folders/1UMbF1pPA2wDKfDZNC6_Pm5Jl8KswgWNi",
     educagame_fmt: "https://drive.google.com/drive/folders/1-NjXvYeJ49Lt1Ft8QWNzy1hQ9uj4gGR7?usp=drive_link",
     PVA_fmt: "https://drive.google.com/drive/u/0/folders/1W2WZH5Za-Si_VB_lVhsC5bU2akbc59Nj",
     VALOR_DEC_AMBIENTAL: "https://drive.google.com/drive/folders/1lxN3vMm_w0zflGhQM65e3Gd_kbmJcpBb?usp=drive_link",
     VALOR_PLHIS: "https://drive.google.com/drive/folders/12Zlcn93Yfc7peeQpmJ4GPSv7I72FLyJT?usp=drive_link",
     VALOR_DESERT: "https://drive.google.com/drive/folders/1VKgFSaWnCGMI0UDmmAf2brlryK4P02wZ?usp=drive_link",
     LIVRO_FUND_1_fmt: "https://drive.google.com/drive/folders/1Zx-Q7D0tIj4uZPUp8TLEmorkA2gFiTIz?usp=drive_link",
-    LIVRO_FUND_2_fmt: "https://drive.google.com/drive/folders/1Zx-Q7D0tIj4uZPUp8TLEmorkA2gFiTIz?usp=drive_link",
-    valor_vaat_mensal_fmt: "https://drive.google.com/drive/folders/1bmzujp0eHCIN9GkswEgv-i2OJVe2qkG1?hl=pt-br"
+    LIVRO_FUND_2_fmt: "https://drive.google.com/drive/folders/1Zx-Q7D0tIj4uZPUp8TLEmorkA2gFiTIz?usp=drive_link"
   };
 
   // Removendo o objeto não utilizado
@@ -246,11 +216,6 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
   });
 
   const valoresFiltrados = chavesParaExibir.map(k => {
-    // Para o VAAT, tratamos diferente
-    if (k === 'valor_vaat_mensal_fmt') {
-      const valorVaat = municipioSelecionado.properties?.valor_vaat_mensal_fmt      ;
-      return [k, valorVaat === "N/A" ? null : valorVaat];
-    }
     // Para o REURB, exibir texto fixo
     if (k === 'VALOR_REURB') {
       return [k, 'R$ 300.000,00 (200 imóveis)'];
@@ -362,7 +327,11 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
         {/* Container flex para tabela com scroll */}
         <div className="flex flex-col h-full">
           {/* Cabeçalho fixo da tabela */}
-          <table className="w-full flex-shrink-0">
+          <table className="w-full flex-shrink-0 table-fixed">
+            <colgroup>
+              <col className="w-[45%]" />
+              <col className="w-[55%]" />
+            </colgroup>
             <thead className="bg-slate-900 border-b border-slate-700/50 sticky top-0 z-10">
               <tr>
                 <th className="text-center px-2 sm:px-3 py-3 text-xs uppercase text-white font-bold tracking-wider bg-slate-900/80">
@@ -377,20 +346,24 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
 
           {/* Corpo rolável da tabela */}
           <div className="flex-1 overflow-y-auto min-h-0 scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900">
-            <table className="w-full">
+            <table className="w-full table-fixed">
+              <colgroup>
+                <col className="w-[45%]" />
+                <col className="w-[55%]" />
+              </colgroup>
               <tbody>
             {valoresFiltrados.map(([k, valor], index) => (
               <tr key={k} className={`border-b border-slate-700/30 ${index % 2 === 0 ? 'bg-transparent' : 'bg-slate-800/20'}`}>
-                <td className="px-1 sm:px-3 py-4">
-                  <div className={`flex items-start ${k === 'VALOR_PD' ? 'justify-center' : 'justify-start ml-[calc(50%-5rem)]'} ${k !== 'VALOR_PD' ? 'pl-4' : ''}`}>
-                    <span className={`mr-2 sm:mr-3 mt-[2px] ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>
+                <td className="px-3 sm:px-4 py-4">
+                  <div className="flex items-start">
+                    <span className={`mr-2 sm:mr-3 mt-[2px] flex-shrink-0 ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>
                       {iconesProdutos[k] || (
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                           <path fillRule="evenodd" d="M4 4a2 2 0 002-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z" clipRule="evenodd" />
                         </svg>
                       )}
                     </span>
-                    <span className={`text-xs sm:text-sm font-medium text-gray-300 ${k === 'VALOR_PD' ? 'text-center' : 'text-left'}`}>
+                    <span className="text-xs sm:text-sm font-medium text-gray-300">
                       {linksProdutos[k] ? (
                         <a
                           href={linksProdutos[k]}
@@ -467,65 +440,69 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
                           )}
                         </>
                       )}
+                      {k === 'PVA_fmt' && (
+                        <div className="text-xs text-slate-400 font-medium mt-1">R$ 450,00/aluno</div>
+                      )}
                     </span>
                   </div>
                 </td>
-                <td className="px-2 sm:px-4 py-4">
-                  <div className={`flex ${k === 'VALOR_PD' ? 'justify-center' : 'justify-start ml-[calc(50%-3.5rem)]'}`}>
+                <td className="px-3 sm:px-4 py-4">
+                  <div className="flex justify-center">
                   {k === 'VALOR_REURB' ? (() => {
-                    const valorStr = valor?.toString() || '';
-                    const splitIndex = valorStr.indexOf('(');
-                    const mainValor = splitIndex !== -1 ? valorStr.substring(0, splitIndex).trim() : valorStr;
-                    const detalhe = splitIndex !== -1 ? valorStr.substring(splitIndex).trim() : '';
+                    const valorMin = 'R$ 300.000,00';
+                    const valorMaxRaw = municipioSelecionado.properties?.VALOR_REURB_MAX;
+                    const valorMax = valorMaxRaw ? formatarValor(valorMaxRaw) : 'Personalizado';
+                    const detalhe = '(200)';
                     return (
-                      <div className="flex flex-col">
-                        <span className={`text-base font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>{mainValor}</span>
-                        {detalhe && (
-                          <span className="text-xs text-slate-400 font-medium mt-1">{detalhe}</span>
-                        )}
+                      <div className="flex flex-col w-full items-center">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-xs text-slate-400 min-w-[2.5rem]">Mín.</span>
+                          <span className={`text-sm font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>
+                            {valorMin}
+                          </span>
+                          <span className="text-xs text-slate-400 font-medium">{detalhe}</span>
+                        </div>
+                        <div className="flex items-baseline gap-2 mt-1">
+                          <span className="text-xs text-slate-400 min-w-[2.5rem]">Máx.</span>
+                          <span className={`text-sm font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>
+                            {valorMax}
+                          </span>
+                        </div>
                       </div>
                     );
                   })() : k === 'educagame_fmt' ? (() => {
                     const valorPrincipal = formatarValor(valor?.toString());
                     return (
-                      <div className="flex flex-col">
+                      <div className="flex flex-col items-center">
                         <span className={`text-base font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>{valorPrincipal}</span>
                         <span className="text-xs text-slate-400 font-medium mt-1">Até 200 alunos</span>
                       </div>
                     );
                   })() : k === 'PVA_fmt' ? (() => {
-                    const valorPrincipal = formatarValor(valor?.toString());
+                    const valorMin = municipioSelecionado.properties?.PVA_minimo_fmt;
+                    const valorMax = municipioSelecionado.properties?.PVA_maximo_fmt;
                     return (
-                      <div className="flex flex-col">
-                        <span className={`text-base font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>{valorPrincipal}</span>
-                        <span className="text-xs text-slate-400 font-medium mt-1">R$ 450,00/aluno</span>
+                      <div className="flex flex-col w-full items-center">
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-xs text-slate-400 min-w-[2.5rem]">Mín.</span>
+                          <span className={`text-sm font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>
+                            {valorMin || 'N/A'}
+                          </span>
+                        </div>
+                        <div className="flex items-baseline gap-2 mt-1">
+                          <span className="text-xs text-slate-400 min-w-[2.5rem]">Máx.</span>
+                          <span className={`text-sm font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>
+                            {valorMax || 'N/A'}
+                          </span>
+                        </div>
                       </div>
                     );
-                  })() : k === 'VALOR_START_INICIAIS' ? (() => {
+                  })() : k === 'VALOR_START_INICIAIS_FINAIS' ? (() => {
                     const valorPrincipal = formatarValor(valor?.toString());
                     return (
-                      <div className="flex flex-col">
+                      <div className="flex flex-col items-center">
                         <span className={`text-base font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>{valorPrincipal}</span>
                         <span className="text-xs text-slate-400 font-medium mt-1">R$ 395,00/aluno</span>
-                      </div>
-                    );
-                  })() : k === 'VALOR_START_FINAIS' ? (() => {
-                    const valorPrincipal = formatarValor(valor?.toString());
-                    return (
-                      <div className="flex flex-col">
-                        <span className={`text-base font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>{valorPrincipal}</span>
-                        <span className="text-xs text-slate-400 font-medium mt-1">R$ 395,00/aluno</span>
-                      </div>
-                    );
-                  })() : k === 'valor_vaat_mensal_fmt' ? (() => {
-                    const valorMensal = formatarValor(valor?.toString());
-                    // Pegar o valor cheio da propriedade valor_vaat_formato
-                    const valorCheio = municipioSelecionado.properties?.valor_vaat_formato;
-                    const valorCheioFormatado = formatarValor(String(valorCheio));
-                    return (
-                      <div className="flex flex-col">
-                        <span className={`text-base font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>{valorMensal}</span>
-                        <span className="text-xs text-slate-400 font-medium mt-1">Valor: {valorCheioFormatado}</span>
                       </div>
                     );
                   })() : (

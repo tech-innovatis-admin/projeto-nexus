@@ -215,8 +215,45 @@ export default function MapaMunicipal({ municipioSelecionado }: MapaMunicipalPro
             };
           },
           onEachFeature: (feature, layer) => {
-            layer.bindPopup(popupDadosGerais(feature.properties));
-            // Nenhum efeito de hover
+            const props = feature.properties;
+            
+            // Tooltip simples ao passar o mouse
+            const codigoIBGE = props?.code_muni || props?.codigo_ibge || props?.codigo || "N/A";
+            const nomeMunicipio = props?.nome_municipio || props?.municipio || "N/A";
+            const uf = props?.name_state || "N/A";
+            
+            layer.bindTooltip(
+              `<b>UF:</b> ${uf}<br><b>Código IBGE:</b> ${codigoIBGE}<br><b>Município:</b> ${nomeMunicipio}`,
+              {
+                sticky: true,
+                className: 'custom-tooltip',
+                interactive: false,
+                permanent: false
+              }
+            );
+            
+            // Efeito de hover - destaca borda
+            layer.on({
+              mouseover: function(e) {
+                const layer = e.target;
+                layer.setStyle({
+                  color: '#ffffff', // Borda branca
+                  weight: 3, // Borda mais grossa
+                });
+                layer.bringToFront();
+              },
+              mouseout: function(e) {
+                const layer = e.target;
+                layer.setStyle({
+                  color: '#475569', // Volta à cor original
+                  weight: 0.5, // Volta ao peso original
+                });
+              },
+              click: function(e) {
+                // Fecha o tooltip ao clicar
+                e.target.closeTooltip();
+              }
+            });
           },
         });
 
@@ -235,7 +272,32 @@ export default function MapaMunicipal({ municipioSelecionado }: MapaMunicipalPro
             };
           },
           onEachFeature: (feature, layer) => {
-            layer.bindPopup(popupPDSemPlano(feature.properties));
+            const props = feature.properties;
+            
+            // Tooltip ao passar o mouse
+            const codigoIBGE = props?.code_muni || props?.codigo_ibge || props?.codigo || "N/A";
+            const nomeMunicipio = props?.nome_municipio || props?.municipio || "N/A";
+            const uf = props?.name_state || "N/A";
+            
+            layer.bindTooltip(
+              `<b>UF:</b> ${uf}<br><b>Código IBGE:</b> ${codigoIBGE}<br><b>Município:</b> ${nomeMunicipio}`,
+              { sticky: true, className: 'custom-tooltip' }
+            );
+            
+            // Efeito de hover
+            layer.on({
+              mouseover: function(e) {
+                e.target.setStyle({ color: '#ffffff', weight: 3 });
+                e.target.bringToFront();
+              },
+              mouseout: function(e) {
+                e.target.setStyle({ color: '#222', weight: 0.7 });
+              },
+              click: function(e) {
+                // Fecha o tooltip ao clicar
+                e.target.closeTooltip();
+              }
+            });
           },
         });
         
@@ -250,7 +312,32 @@ export default function MapaMunicipal({ municipioSelecionado }: MapaMunicipalPro
             };
           },
           onEachFeature: (feature, layer) => {
-            layer.bindPopup(popupProdutos(feature.properties));
+            const props = feature.properties;
+            
+            // Tooltip ao passar o mouse
+            const codigoIBGE = props?.code_muni || props?.codigo_ibge || props?.codigo || "N/A";
+            const nomeMunicipio = props?.nome_municipio || props?.municipio || "N/A";
+            const uf = props?.name_state || "N/A";
+            
+            layer.bindTooltip(
+              `<b>UF:</b> ${uf}<br><b>Código IBGE:</b> ${codigoIBGE}<br><b>Município:</b> ${nomeMunicipio}`,
+              { sticky: true, className: 'custom-tooltip' }
+            );
+            
+            // Efeito de hover
+            layer.on({
+              mouseover: function(e) {
+                e.target.setStyle({ color: '#ffffff', weight: 3 });
+                e.target.bringToFront();
+              },
+              mouseout: function(e) {
+                e.target.setStyle({ color: '#222', weight: 0.7 });
+              },
+              click: function(e) {
+                // Fecha o tooltip ao clicar
+                e.target.closeTooltip();
+              }
+            });
           },
         });
         
@@ -265,7 +352,32 @@ export default function MapaMunicipal({ municipioSelecionado }: MapaMunicipalPro
             };
           },
           onEachFeature: (feature, layer) => {
-            layer.bindPopup(popupPDVencimento(feature.properties));
+            const props = feature.properties;
+            
+            // Tooltip ao passar o mouse
+            const codigoIBGE = props?.code_muni || props?.codigo_ibge || props?.codigo || "N/A";
+            const nomeMunicipio = props?.nome_municipio || props?.municipio || "N/A";
+            const uf = props?.name_state || "N/A";
+            
+            layer.bindTooltip(
+              `<b>UF:</b> ${uf}<br><b>Código IBGE:</b> ${codigoIBGE}<br><b>Município:</b> ${nomeMunicipio}`,
+              { sticky: true, className: 'custom-tooltip' }
+            );
+            
+            // Efeito de hover
+            layer.on({
+              mouseover: function(e) {
+                e.target.setStyle({ color: '#ffffff', weight: 3 });
+                e.target.bringToFront();
+              },
+              mouseout: function(e) {
+                e.target.setStyle({ color: '#222', weight: 0.7 });
+              },
+              click: function(e) {
+                // Fecha o tooltip ao clicar
+                e.target.closeTooltip();
+              }
+            });
           },
         });
         

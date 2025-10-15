@@ -161,8 +161,21 @@ function MapaPageContent() {
   const [advancedModalOpen, setAdvancedModalOpen] = useState<boolean>(false);
   const [tooltipVisible, setTooltipVisible] = useState<boolean>(false);
   const [windowWidth, setWindowWidth] = useState<number>(typeof window !== 'undefined' ? window.innerWidth : 1024);
+  const [estadosSubmenuOpen, setEstadosSubmenuOpen] = useState<boolean>(false);
+  const [estadosExpanded, setEstadosExpanded] = useState<boolean>(false);
+  const [municipiosSubmenuOpen, setMunicipiosSubmenuOpen] = useState<boolean>(false);
+  const [selectValue, setSelectValue] = useState<string>("");
   const dadosRef = useRef<HTMLDivElement>(null);
   const planeIconRef = useRef<HTMLDivElement>(null);
+  const estadosDropdownRef = useRef<HTMLDivElement>(null);
+  const municipiosDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Estados prioritários (Nordeste + Mato Grosso - abertura comercial)
+  const estadosPrioritarios = [
+    "Alagoas", "Bahia", "Ceará", "Maranhão", "Paraíba",
+    "Pernambuco", "Piauí", "Rio Grande do Norte", "Sergipe", "Mato Grosso"
+  ];
+
 
   // Atualizar largura da tela para responsividade
   useEffect(() => {
@@ -199,6 +212,23 @@ function MapaPageContent() {
       document.removeEventListener('keydown', handleKey);
     };
   }, [tooltipVisible]);
+
+  // Fechar submenus ao clicar fora
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (estadosDropdownRef.current && !estadosDropdownRef.current.contains(event.target as Node)) {
+        setEstadosSubmenuOpen(false);
+      }
+      if (municipiosDropdownRef.current && !municipiosDropdownRef.current.contains(event.target as Node)) {
+        setMunicipiosSubmenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
   
   // Pistas de voo do município selecionado (match por code_muni)
   const pistasDoMunicipio = useMemo(() => {
@@ -278,6 +308,10 @@ function MapaPageContent() {
 
     console.log(`🏛️ [MapaPage] ${userInfo} - Municípios encontrados para ${estadoSelecionado}: ${municipiosDoEstado.length}`);
     setMunicipios([...new Set(municipiosDoEstado)] as string[]);
+    
+    // Limpar município selecionado quando trocar de estado
+    setMunicipioSelecionadoDropdown('');
+    console.log(`🧹 [MapaPage] ${userInfo} - Município limpo ao trocar estado`);
   }, [estadoSelecionado, mapData, userInfo]);
   
   // Atualizar os campos de texto quando as listas mudarem
@@ -286,6 +320,7 @@ function MapaPageContent() {
       console.log(`📍 [MapaPage] ${userInfo} - Estado selecionado na lista: ${estadoSelecionado}`);
     }
     setEstado(estadoSelecionado);
+    setSelectValue(estadoSelecionado);
   }, [estadoSelecionado, userInfo]);
 
   useEffect(() => {
@@ -294,6 +329,20 @@ function MapaPageContent() {
     }
     setMunicipio(municipioSelecionadoDropdown);
   }, [municipioSelecionadoDropdown, userInfo]);
+
+  // Busca automática APENAS quando município é selecionado no dropdown
+  useEffect(() => {
+    if (estadoSelecionado && municipioSelecionadoDropdown && mapData?.dados) {
+      console.log(`🔍 [MapaPage] ${userInfo} - Busca automática iniciada para: ${municipioSelecionadoDropdown} - ${estadoSelecionado}`);
+
+      // Simular o evento de submit para usar a lógica existente
+      const mockEvent = {
+        preventDefault: () => {},
+      } as React.FormEvent;
+
+      handleBuscarMunicipio(mockEvent);
+    }
+  }, [municipioSelecionadoDropdown, mapData, userInfo]); // Removido estadoSelecionado das dependências
 
   // Log quando um município é selecionado (por qualquer método)
   useEffect(() => {
@@ -432,57 +481,144 @@ function MapaPageContent() {
                 className="flex flex-col md:flex-row gap-3"
                 onSubmit={handleBuscarMunicipio}
               >
-              {/* Dropdown de estados */}
-              <div className="relative w-full md:w-48">
-                <select
-                  className="appearance-none rounded-md bg-[#1e293b] text-white placeholder-slate-400 border border-slate-600 px-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 w-full"
-                  value={estadoSelecionado}
-                  onChange={(e) => setEstadoSelecionado(e.target.value)}
-                  required
-                >
-                  <option value="">Selecione o estado</option>
-                  {estados.map((estado) => (
-                    <option key={estado} value={estado}>
-                      {estado}
-                    </option>
-                  ))}
-                </select>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4 text-slate-300 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                  aria-hidden="true"
-                >
-                  <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.939l3.71-3.71a.75.75 0 111.06 1.061l-4.24 4.24a.75.75 0 01-1.06 0l-4.24-4.24a.75.75 0 01.02-1.06z" clipRule="evenodd" />
-                </svg>
+              {/* Dropdown personalizado de estados */}
+              <div className="relative w-full md:w-48" ref={estadosDropdownRef}>
+                <div className="relative">
+                  <button
+                    onClick={() => setEstadosSubmenuOpen(!estadosSubmenuOpen)}
+                    className="appearance-none w-full rounded-md bg-[#1e293b] text-white placeholder-slate-400 border border-slate-600 px-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-left flex items-center"
+                    type="button"
+                  >
+                    <span className={selectValue ? 'text-white' : 'text-slate-400'}>
+                      {selectValue || 'Estado'}
+                    </span>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className={`h-4 w-4 text-slate-300 absolute right-2 top-1/2 -translate-y-1/2 transition-transform duration-200 pointer-events-none ${estadosSubmenuOpen ? 'rotate-180' : ''}`}
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      aria-hidden="true"
+                    >
+                      <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.939l3.71-3.71a.75.75 0 111.06 1.061l-4.24 4.24a.75.75 0 01-1.06 0l-4.24-4.24a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+
+                  {/* Submenu personalizado */}
+                  {estadosSubmenuOpen && (
+                    <div className="absolute top-full left-0 mt-1 w-full rounded-md shadow-lg bg-[#1e293b] border border-slate-600 z-50 max-h-80 overflow-y-auto">
+                      <div className="py-1">
+                        {/* Estados prioritários (Nordeste + Mato Grosso) */}
+                        {estadosPrioritarios.map((estado) => (
+                          <button
+                            key={estado}
+                            onClick={() => {
+                              setSelectValue(estado);
+                              setEstadoSelecionado(estado);
+                              setEstadosSubmenuOpen(false);
+                            }}
+                            className="w-full text-left px-3 py-2 text-sm text-white hover:bg-slate-600 transition-colors"
+                          >
+                            {estado}
+                          </button>
+                        ))}
+
+                        {/* Divisor */}
+                        <div className="border-t border-slate-600 my-1" />
+
+                        {/* Opção Exibir mais */}
+                        {!estadosExpanded && estados.length > estadosPrioritarios.length && (
+                          <button
+                            onClick={() => setEstadosExpanded(true)}
+                            className="w-full text-left px-3 py-2 text-sm text-sky-300 hover:bg-slate-600 transition-colors font-semibold"
+                          >
+                            ── Exibir mais ──
+                          </button>
+                        )}
+
+                        {/* Estados adicionais quando expandido */}
+                        {estadosExpanded && (
+                          <>
+                            {estados
+                              .filter(estado => !estadosPrioritarios.includes(estado))
+                              .map((estado) => (
+                                <button
+                                  key={estado}
+                                  onClick={() => {
+                                    setSelectValue(estado);
+                                    setEstadoSelecionado(estado);
+                                    setEstadosSubmenuOpen(false);
+                                  }}
+                                  className="w-full text-left px-3 py-2 text-sm text-white hover:bg-slate-600 transition-colors"
+                                >
+                                  {estado}
+                                </button>
+                              ))}
+
+                            {/* Opção Exibir menos */}
+                            <div className="border-t border-slate-600 my-1" />
+                            <button
+                              onClick={() => setEstadosExpanded(false)}
+                              className="w-full text-left px-3 py-2 text-sm text-orange-300 hover:bg-slate-600 transition-colors font-semibold"
+                            >
+                              ── Exibir menos ──
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
               
-              {/* Dropdown de municípios */}
-              <div className="relative w-full md:w-56">
-                <select
-                  className="appearance-none rounded-md bg-[#1e293b] text-white placeholder-slate-400 border border-slate-600 px-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 w-full disabled:opacity-60"
-                  value={municipioSelecionadoDropdown}
-                  onChange={(e) => setMunicipioSelecionadoDropdown(e.target.value)}
-                  required
-                  disabled={!estadoSelecionado}
-                >
-                  <option value="">Selecione o município</option>
-                  {municipios.map((municipio) => (
-                    <option key={municipio} value={municipio}>
-                      {municipio}
-                    </option>
-                  ))}
-                </select>
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4 text-slate-300 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                  aria-hidden="true"
-                >
-                  <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.939l3.71-3.71a.75.75 0 111.06 1.061l-4.24 4.24a.75.75 0 01-1.06 0l-4.24-4.24a.75.75 0 01.02-1.06z" clipRule="evenodd" />
-                </svg>
+              {/* Dropdown personalizado de municípios */}
+              <div className="relative w-full md:w-56" ref={municipiosDropdownRef}>
+                <div className="relative">
+                  <button
+                    onClick={() => {
+                      if (estadoSelecionado) {
+                        setMunicipiosSubmenuOpen(!municipiosSubmenuOpen);
+                      }
+                    }}
+                    disabled={!estadoSelecionado}
+                    className={`appearance-none w-full rounded-md bg-[#1e293b] text-white placeholder-slate-400 border border-slate-600 px-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-left flex items-center ${
+                      !estadoSelecionado ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
+                    }`}
+                    type="button"
+                  >
+                    <span className={municipioSelecionadoDropdown ? 'text-white' : 'text-slate-400'}>
+                      {municipioSelecionadoDropdown || 'Município'}
+                    </span>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className={`h-4 w-4 text-slate-300 absolute right-2 top-1/2 -translate-y-1/2 transition-transform duration-200 pointer-events-none ${municipiosSubmenuOpen ? 'rotate-180' : ''}`}
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      aria-hidden="true"
+                    >
+                      <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.939l3.71-3.71a.75.75 0 111.06 1.061l-4.24 4.24a.75.75 0 01-1.06 0l-4.24-4.24a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+
+                  {/* Submenu personalizado */}
+                  {municipiosSubmenuOpen && estadoSelecionado && (
+                    <div className="absolute top-full left-0 mt-1 w-full rounded-md shadow-lg bg-[#1e293b] border border-slate-600 z-50 max-h-80 overflow-y-auto">
+                      <div className="py-1">
+                        {municipios.map((municipio) => (
+                          <button
+                            key={municipio}
+                            onClick={() => {
+                              setMunicipioSelecionadoDropdown(municipio);
+                              setMunicipiosSubmenuOpen(false);
+                            }}
+                            className="w-full text-left px-3 py-2 text-sm text-white hover:bg-slate-600 transition-colors"
+                          >
+                            {municipio}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
               
               <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
@@ -522,6 +658,7 @@ function MapaPageContent() {
                   onClick={() => {
                     console.log(`🧹 [MapaPage] ${userInfo} - Seleção limpa`);
                     setEstadoSelecionado('');
+                    setSelectValue('');
                     setMunicipioSelecionadoDropdown('');
                     setMunicipioSelecionado(null);
                     setErroBusca(null);
@@ -651,18 +788,38 @@ function MapaPageContent() {
                             </span>
                           </div>
                           
-                          {/* Partido */}
-                          <div className="flex flex-col">
-                            <div className="flex items-center mb-1">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-sky-400 mr-1.5" viewBox="0 0 20 20" fill="currentColor">
-                                <path d="M2 5a2 2 0 012-2h8a2 2 0 012 2v10a2 2 0 002 2H4a2 2 0 01-2-2V5z" />
-                              </svg>
-                              <span className="text-sm text-gray-400">Partido</span>
+                          {/* Partido e VAAT lado a lado */}
+                          <div className="grid grid-cols-2 gap-4">
+                            {/* Partido */}
+                            <div className="flex flex-col">
+                              <div className="flex items-center mb-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-sky-400 mr-1.5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path d="M2 5a2 2 0 012-2h8a2 2 0 012 2v10a2 2 0 002 2H4a2 2 0 01-2-2V5z" />
+                                </svg>
+                                <span className="text-sm text-gray-400">Partido</span>
+                              </div>
+                              <div className="flex items-center pl-5.5">
+                                <span className="text-sm text-white font-semibold">
+                                  {municipioSelecionado.properties?.sigla_partido2024 || "N/A"}
+                                </span>
+                              </div>
                             </div>
-                            <div className="flex items-center pl-5.5">
-                              <span className="text-sm text-white font-semibold">
-                                {municipioSelecionado.properties?.sigla_partido2024 || "N/A"}
-                              </span>
+
+                            {/* VAAT - Valor Anual Aluno/Professor */}
+                            <div className="flex flex-col">
+                              <div className="flex items-center mb-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-sky-400 mr-1.5" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v4a2 2 0 002 2V6h10a2 2 0 00-2-2H4zm2 6a2 2 0 012-2h8a2 2 0 012 2v4a2 2 0 01-2 2H8a2 2 0 01-2-2v-4zm6 4a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                                </svg>
+                                <span className="text-sm text-gray-400">VAAT mensal</span>
+                              </div>
+                              <div className="flex flex-col pl-5.5">
+                                <span className="text-sm text-white font-semibold">
+                                  {municipioSelecionado.properties?.valor_vaat_mensal_fmt === "N/A" || !municipioSelecionado.properties?.valor_vaat_mensal_fmt
+                                    ? "N/A"
+                                    : municipioSelecionado.properties.valor_vaat_mensal_fmt}
+                                </span>
+                              </div>
                             </div>
                           </div>
                           
@@ -719,7 +876,7 @@ function MapaPageContent() {
                             </div>
                             <div className="flex items-center justify-center">
                               <span className="text-sm text-white font-semibold">
-                                {municipioSelecionado.properties?.alunos_iniciais || "N/A"}
+                                {municipioSelecionado.properties?.alunos_iniciais ?? "0"}
                               </span>
                             </div>
                           </div>
@@ -734,7 +891,7 @@ function MapaPageContent() {
                             </div>
                             <div className="flex items-center justify-center">
                               <span className="text-sm text-white font-semibold">
-                                {municipioSelecionado.properties?.alunos_finais || "N/A"}
+                                {municipioSelecionado.properties?.alunos_finais ?? "0"}
                               </span>
                             </div>
                           </div>
@@ -749,7 +906,7 @@ function MapaPageContent() {
                             </div>
                             <div className="flex items-center justify-center">
                               <span className="text-sm text-white font-semibold">
-                                {municipioSelecionado.properties?.alunos_medio || "N/A"}
+                                {municipioSelecionado.properties?.alunos_medio ?? "0"}
                               </span>
                             </div>
                           </div>

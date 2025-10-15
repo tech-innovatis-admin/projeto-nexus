@@ -1,4 +1,5 @@
 import { PDFDocument, rgb, StandardFonts, PDFPage } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
 import type { RotaCompleta } from '@/types/routing';
 
 export interface RoutePDFData {
@@ -163,6 +164,10 @@ export async function generateRoutePDF(routeData: RoutePDFData): Promise<{ bytes
 
   // Criar novo documento PDF
   const pdfDoc = await PDFDocument.create();
+
+  // Registrar fontkit para suportar fontes customizadas (TTF)
+  pdfDoc.registerFontkit(fontkit);
+
   let page = pdfDoc.addPage([595.28, 841.89]); // A4
   const { width, height } = page.getSize();
 

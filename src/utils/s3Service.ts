@@ -1,3 +1,4 @@
+import "server-only";
 import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { parse } from 'dotenv';
 
@@ -67,6 +68,14 @@ export async function getFileFromS3(filename: string) {
     }
 
     const buffer = Buffer.concat(chunks);
+
+    // Para arquivos binários (Parquet), retornar o Buffer diretamente
+    if (filename.endsWith('.parquet')) {
+      console.log(`✅ Loaded binary file ${filename} (${buffer.length} bytes)`);
+      return buffer;
+    }
+
+    // Para arquivos de texto, converter para string
     const fileContent = buffer.toString('utf-8');
 
     // Se for um arquivo .env, retorna como objeto
@@ -79,7 +88,20 @@ export async function getFileFromS3(filename: string) {
     // Se for um arquivo JSON ou GeoJSON, retorna o objeto parseado
     if (filename.endsWith('.json') || filename.endsWith('.geojson')) {
       const parsedJson = JSON.parse(fileContent);
-      console.log(`✅ Loaded ${filename} (${parsedJson.features?.length || 0} features)`);
+
+      // Para arquivos GeoJSON (com features)
+      if (parsedJson.type === 'FeatureCollection' && parsedJson.features) {
+        console.log(`✅ Loaded ${filename} (${parsedJson.features.length} features)`);
+      }
+      // Para arrays de dados tabulares (como pistas)
+      else if (Array.isArray(parsedJson) && parsedJson.length > 0) {
+        console.log(`✅ Loaded ${filename} (${parsedJson.length} records)`);
+      }
+      // Para outros objetos JSON
+      else {
+        console.log(`✅ Loaded ${filename} (${Object.keys(parsedJson).length} properties)`);
+      }
+
       return parsedJson;
     }
 
@@ -97,7 +119,8 @@ export async function fetchAllGeoJSONFiles() {
     'base_municipios.geojson',
     'base_pd_sem_plano.geojson',
     'base_pd_vencendo.geojson',
-    'parceiros1.json'
+    'parceiros1.json',
+    'pistas_s3_lat_log.json'
   ];
 
   console.log(`📥 Loading ${fileNames.length} GeoJSON files...`);
@@ -118,49 +141,6 @@ export async function fetchAllGeoJSONFiles() {
   } catch (error) {
     console.error(`❌ Error loading GeoJSON files:`, error instanceof Error ? error.message : error);
     throw error;
-  }
-}
-
-// Função para buscar e parsear o CSV de pistas
-export async function fetchPistasData() {
-  console.log(`📥 Loading pistas CSV...`);
-
-  try {
-    const csvContent = await getFileFromS3('pistas_s3.csv');
-
-    if (typeof csvContent !== 'string') {
-      console.error(`❌ Invalid CSV content type:`, typeof csvContent);
-      return [] as any[];
-    }
-
-    const lines = csvContent.split(/\r?\n/).filter(l => l.trim().length > 0);
-    if (lines.length === 0) return [] as any[];
-
-    const headerLine = lines[0];
-    const delimiter = (headerLine.split(';').length - 1) >= (headerLine.split(',').length - 1) ? ';' : ',';
-
-    const rawHeaders = headerLine.split(delimiter).map(h => h.trim());
-    const headers = rawHeaders.map(h => h.replace(/^"|"$/g, ''));
-
-    const records: any[] = [];
-    for (let i = 1; i < lines.length; i++) {
-      const rawRow = lines[i].split(delimiter);
-      if (rawRow.length !== headers.length) continue;
-
-      const obj: any = {};
-      headers.forEach((h, idx) => {
-        const v = (rawRow[idx] ?? '').trim().replace(/^"|"$/g, '');
-        obj[h] = v;
-      });
-
-      records.push(obj);
-    }
-
-    console.log(`✅ Loaded ${records.length} pista records from CSV`);
-    return records;
-  } catch (error) {
-    console.error(`❌ Error loading pistas CSV:`, error instanceof Error ? error.message : error);
-    return [] as any[];
   }
 }
 

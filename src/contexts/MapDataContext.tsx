@@ -83,7 +83,7 @@ export function MapDataProvider({ children }: { children: React.ReactNode }) {
             produtos: null,
             pdvencendo: files.find((f: any) => f.name === 'base_pd_vencendo.geojson')?.data || null,
             parceiros: files.find((f: any) => f.name === 'parceiros1.json')?.data || null,
-            pistas: files.find((f: any) => f.name === 'pistas_s3.csv')?.data || null,
+            pistas: files.find((f: any) => f.name === 'pistas_s3_lat_log.json')?.data || null,
           };
           setLoadingProgress(100);
           applyResult(organizedData);
@@ -96,7 +96,7 @@ export function MapDataProvider({ children }: { children: React.ReactNode }) {
           produtos: null,
           pdvencendo: files.find((f: any) => f.name === 'base_pd_vencendo.geojson')?.data || null,
           parceiros: files.find((f: any) => f.name === 'parceiros1.json')?.data || null,
-          pistas: files.find((f: any) => f.name === 'pistas_s3.csv')?.data || null,
+          pistas: files.find((f: any) => f.name === 'pistas_s3_lat_log.json')?.data || null,
         };
         applyResult(organizedData);
         // Não tocar no loading quando SWR em background

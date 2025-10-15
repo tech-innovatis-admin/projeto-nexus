@@ -180,9 +180,10 @@ export default function RotasPage() {
         longitude = -51.925;
       }
       
-      const codigoPolo = `polo_${polo.codigo_origem}_${index}`;
-      
-      if (!codigosUsados.has(codigoPolo)) {
+      // Usar código IBGE real para permitir join com pistas
+      const codigoPolo = String(polo.codigo_origem || '').trim();
+
+      if (codigoPolo && !codigosUsados.has(codigoPolo)) {
         codigosUsados.add(codigoPolo);
         municipios.push({
           codigo: codigoPolo,
@@ -256,10 +257,10 @@ export default function RotasPage() {
         longitude = -51.925;
       }
       
-      // Usar o nome do município como parte da chave para garantir unicidade
-      const codigoPeriferia = `periferia_${nomeMunicipio.replace(/\s+/g, '_').toLowerCase()}`;
-      
-      if (!codigosUsados.has(codigoPeriferia)) {
+      // Usar código IBGE real para permitir join com pistas
+      const codigoPeriferia = String(periferiaItem.codigo_destino || '').trim();
+
+      if (codigoPeriferia && !codigosUsados.has(codigoPeriferia)) {
         codigosUsados.add(codigoPeriferia);
         municipios.push({
           codigo: codigoPeriferia,

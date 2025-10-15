@@ -12,8 +12,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.rewrite(url);
   }
 
-  // Verifica se é uma rota protegida (/mapa ou /estrategia)
-  if (pathname.startsWith('/mapa') || pathname.startsWith('/estrategia')) {
+  // Verifica se é uma rota protegida (/mapa, /estrategia ou /rotas)
+  if (pathname.startsWith('/mapa') || pathname.startsWith('/estrategia') || pathname.startsWith('/rotas')) {
     const token = request.cookies.get('auth_token')?.value;
     
     // Se não houver token, redireciona para o login
@@ -72,5 +72,5 @@ export async function middleware(request: NextRequest) {
 
 // Especifica os caminhos que o middleware deve ser executado
 export const config = {
-  matcher: ['/mapa/:path*', '/estrategia/:path*', '/login', '/data/:path*']
+  matcher: ['/mapa/:path*', '/estrategia/:path*', '/rotas/:path*', '/login', '/data/:path*']
 }; 

@@ -582,10 +582,16 @@ function MapaPageContent() {
                     disabled={!estadoSelecionado}
                     className={`appearance-none w-full rounded-md bg-[#1e293b] text-white placeholder-slate-400 border border-slate-600 px-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-left flex items-center ${
                       !estadoSelecionado ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
-                    }`}
+                    } md:w-56`}
                     type="button"
                   >
-                    <span className={municipioSelecionadoDropdown ? 'text-white' : 'text-slate-400'}>
+                    <span
+                      className={
+                        (municipioSelecionadoDropdown ? 'text-white' : 'text-slate-400') +
+                        ' block overflow-hidden whitespace-nowrap text-ellipsis max-w-full flex-1'
+                      }
+                      style={{ minWidth: 0 }}
+                    >
                       {municipioSelecionadoDropdown || 'Município'}
                     </span>
                     <svg

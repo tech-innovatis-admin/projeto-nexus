@@ -570,6 +570,8 @@ export default function EstrategiaPage() {
   const sumSelectedProducts = (vals: Record<string, number> | undefined, fallbackTotal: number): number => {
     if (!vals) return fallbackTotal || 0;
     if (!appliedProducts.length) return fallbackTotal || 0;
+    // Quando todos os produtos estiverem selecionados, retorna o valor consolidado (fallbackTotal)
+    if (appliedProducts.length === PRODUCTS.length) return fallbackTotal || 0;
     let total = 0;
     for (const key of appliedProducts) {
       const val = Number(vals[key] || 0);
@@ -973,7 +975,7 @@ export default function EstrategiaPage() {
       title: 'Valor do Polo',
       value: derived.valorPolo, // valor numérico real calculado
       subtitle: derived.poloLabel,
-      description: appliedProducts.length ? 'Soma dos produtos selecionados' : 'Soma total (fallback sem seleção)'
+      description: appliedProducts.length ? 'Soma dos produtos selecionados' : 'Soma total (todos os produtos)'
     },
     {
       id: 'top_municipios',
@@ -1575,7 +1577,7 @@ export default function EstrategiaPage() {
                             setAppliedMinValor(minValor);
                             setAppliedMaxValor(maxValor);
                             setAppliedUFs(selectedUFs);
-                            setAppliedProducts(selectedProducts);
+                            setAppliedProducts(selectedProducts.length === PRODUCTS.length ? [] : selectedProducts);
                             // Manter appliedUF para compatibilidade com mapa (ALL quando múltiplas UFs)
                             setAppliedUF(selectedUFs.length === 1 ? selectedUFs[0] : 'ALL');
                             // Fechar dropdowns

@@ -7,6 +7,7 @@ import "leaflet-draw";
 import { useMapData } from "../contexts/MapDataContext";
 import * as turf from '@turf/turf';
 import polylabel from 'polylabel';
+import { attachMuniHoverHandlers, applyMuniHoverToLayer } from "../utils/mapHoverHandlers";
 
 // Interface para os dados do S3
 interface GeoJSONFile {
@@ -187,11 +188,13 @@ export default function MapaMunicipal({ municipioSelecionado }: MapaMunicipalPro
             };
           },
           onEachFeature: (feature, layer) => {
-            const props = feature.properties;
-            
-            // Removido efeitos de hover para melhor performance
+            // Inicia a criação da camada antes de usar ela mesma em attachMuniHoverHandlers
+            // Será completada no eachLayer logo abaixo
           },
         });
+
+        // Aplica handlers de hover a todos os layers da camada "Dados Gerais"
+        applyMuniHoverToLayer(layersRef.current.dados as L.GeoJSON);
 
         // Adiciona a camada de dados gerais por padrão
         layersRef.current.dados.addTo(mapRef.current);
@@ -208,11 +211,13 @@ export default function MapaMunicipal({ municipioSelecionado }: MapaMunicipalPro
             };
           },
           onEachFeature: (feature, layer) => {
-            const props = feature.properties;
-            
-            // Removido efeitos de hover para melhor performance
+            // Inicia a criação da camada antes de usar ela mesma em attachMuniHoverHandlers
+            // Será completada no eachLayer logo abaixo
           },
         });
+
+        // Aplica handlers de hover a todos os layers da camada "Produtos"
+        applyMuniHoverToLayer(layersRef.current.produtos as L.GeoJSON);
         
         // Parceiros (marcadores customizados)
         const parceirosGroup = L.layerGroup();

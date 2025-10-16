@@ -16,6 +16,16 @@
   --foreground-rgb: 255, 255, 255;
   --background-start-rgb: 0, 0, 0;
   --background-end-rgb: 0, 0, 0;
+
+  /* === Tokens de Design para Hover do Mapa === */
+  /* Cores de realce de polígonos e tooltip */
+  --map-hover-stroke: #2563eb;          /* Azul médio (blue-600) para bordas */
+  --map-hover-fill: #bfdbfe;            /* Azul claro (blue-200) para preenchimento */
+
+  /* Cores do tooltip (combinadas via CSS) */
+  --map-tooltip-bg: #f8fafc;            /* Fundo claro (slate-50) */
+  --map-tooltip-text: #0f172a;          /* Texto escuro (slate-900) */
+  --map-tooltip-border: #2563eb;        /* Borda azul (alinhada com stroke) */
 }
 
 /* Configuração global de fonte */
@@ -359,6 +369,30 @@ button {
   margin-bottom: 0;
 }
 
+/* ============================================================ */
+/* Hover tooltip (MapLibre) — classe 'muni-tooltip'             */
+/* Mantém visual consistente com Leaflet muni-tooltip           */
+/* ============================================================ */
+.maplibregl-popup.muni-tooltip .maplibregl-popup-content {
+  padding: 8px 10px;
+  border-radius: 6px;
+  font: 500 12px / 1.25 system-ui, -apple-system, 'Segoe UI', 'Roboto', 'Inter', 'Arial', sans-serif;
+
+  background: var(--map-tooltip-bg, #f8fafc);
+  color: var(--map-tooltip-text, #0f172a);
+  border: 1px solid var(--map-tooltip-border, #2563eb);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.maplibregl-popup.muni-tooltip .maplibregl-popup-tip {
+  border-top-color: var(--map-tooltip-border, #2563eb);
+}
+
+.maplibregl-popup.muni-tooltip .t-muni { display: flex; flex-direction: column; gap: 4px; }
+.maplibregl-popup.muni-tooltip .t-title { font-weight: 700; margin-bottom: 2px; color: inherit; text-align: center; }
+.maplibregl-popup.muni-tooltip .t-row { opacity: 0.9; font-size: 0.9em; display: flex; justify-content: center; gap: 4px; }
+.maplibregl-popup.muni-tooltip .t-row b { font-weight: 600; color: var(--map-hover-stroke, #2563eb); }
+
 /* Estilo personalizado para o tooltip do mapa */
 .custom-tooltip {
   background-color: rgba(15, 23, 42, 0.95) !important;
@@ -379,3 +413,109 @@ button {
   color: #38bdf8 !important;
   font-weight: 600 !important;
 }
+
+/* ============================================================ */
+/* Estilos para Hover de Municípios (muni-tooltip)             */
+/* ============================================================ */
+
+/**
+ * Tooltip de município com hover
+ * Utiliza variáveis CSS para tema centralizado
+ * 
+ * Características:
+ * - Fundo claro e contraste elevado (acessibilidade AA+)
+ * - Sem pointer-events para não interferir no hover do polígono
+ * - Suporta posicionamento dinâmico (start/end) para evitar bordas
+ * - Otimizado para leitura rápida (fonte pequena, bold nos valores)
+ */
+.leaflet-tooltip.muni-tooltip {
+  /* Layout e tipografia */
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.375rem;
+  font: 500 12px / 1.25 system-ui, -apple-system, 'Segoe UI', 'Roboto', 'Inter', 'Arial', sans-serif;
+
+  /* Cores (via tokens) */
+  background: var(--map-tooltip-bg);
+  color: var(--map-tooltip-text);
+  border: 1px solid var(--map-tooltip-border);
+
+  /* Sombra e profundidade */
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+
+  /* Interação */
+  pointer-events: none; /* Evita interferência no hover do polígono */
+
+  /* Avoid defaults do Leaflet que podem quebrar o layout */
+  white-space: nowrap;
+}
+
+/* Fallback para browsers que não suportam CSS vars */
+@supports not (background: var(--map-tooltip-bg)) {
+  .leaflet-tooltip.muni-tooltip {
+    background: #f8fafc;
+    color: #0f172a;
+    border-color: #2563eb;
+  }
+}
+
+/**
+ * Container do título do município
+ * Destaque em negrito e cor mais escura para hierarquia
+ */
+.leaflet-tooltip.muni-tooltip .t-muni {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.leaflet-tooltip.muni-tooltip .t-title {
+  font-weight: 700;
+  margin-bottom: 0.125rem;
+  color: inherit;
+  text-align: center;
+}
+
+/**
+ * Linhas de informação (UF, IBGE)
+ * Leve opacidade para reduzir hierarquia vs título
+ */
+.leaflet-tooltip.muni-tooltip .t-row {
+  opacity: 0.9;
+  font-size: 0.9em;
+  display: flex;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+.leaflet-tooltip.muni-tooltip .t-row b {
+  font-weight: 600;
+  color: var(--map-hover-stroke);
+  display: inline;
+}
+
+/**
+ * Posicionamento dinâmico (início/fim)
+ * Usado quando o tooltip se aproxima das bordas do viewport
+ * Pequeno ajuste para manter legibilidade
+ */
+.leaflet-tooltip-start.muni-tooltip {
+  transform: translateX(8px);
+}
+
+.leaflet-tooltip-end.muni-tooltip {
+  transform: translateX(-8px);
+}
+
+/**
+ * Pseudo-elemento de seta (apontador do tooltip)
+ * Customizado via classe do Leaflet
+ */
+.leaflet-tooltip.muni-tooltip::before {
+  border-top-color: var(--map-tooltip-border);
+  border-top-style: solid;
+  border-top-width: 6px;
+}
+
+/* ============================================================ */
+/* Fim de estilos de hover de municípios                        */
+/* ============================================================ */

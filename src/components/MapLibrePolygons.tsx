@@ -7,6 +7,7 @@ import * as turf from '@turf/turf';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import { registerMapInstance } from '@/utils/mapRegistry';
+import { setupMapLibreHover, removeMapLibreHover, readCssVar } from '@/utils/mapLibreHoverHandlers';
 
 // Tipos para o sistema de exportação do raio
 export interface MunicipioRaio {
@@ -220,14 +221,14 @@ export default function MapLibrePolygons({
       lineWidth: 3,
     },
     periferia: {
-      fillOpacity: 0.10,
+      fillOpacity: 0.5,
       line: '#2563EB', // Azul com baixa opacidade
-      lineWidth: 0, // Sem borda para periferia
+      lineWidth: 1, // Sem borda para periferia
     },
     periferiaHighlighted: {
-      fillOpacity: 0.8,
+      fillOpacity: 0.5,
       line: '#2563EB', // Azul com baixa opacidade
-      lineWidth: 0, // Sem borda para periferia destacada
+      lineWidth: 0.5, // Sem borda para periferia destacada
     }
   };
 
@@ -362,8 +363,18 @@ export default function MapLibrePolygons({
 
     map.on('load', () => {
       // sources
-      map.addSource('polos-src', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-      map.addSource('periferia-src', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addSource('polos-src', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+        // Garante que feature-state use o campo de código como ID
+        promoteId: 'codigo_origem',
+      });
+      map.addSource('periferia-src', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+        // Garante que feature-state use o campo de código como ID
+        promoteId: 'codigo_destino',
+      });
       // NOVO SOURCE
       map.addSource('radius-circle-src', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
 
@@ -374,8 +385,18 @@ export default function MapLibrePolygons({
         type: 'fill',
         source: 'periferia-src',
         paint: {
-      'fill-color': periFillByUF as any,
-      'fill-opacity': colors.periferia.fillOpacity,
+          'fill-color': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            readCssVar('--map-hover-fill', '#bfdbfe'), // Cor de hover
+            periFillByUF as any, // Cor normal por UF
+          ],
+          'fill-opacity': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            0.35, // Opacidade de hover
+            colors.periferia.fillOpacity, // Opacidade normal
+          ],
         },
       });
       
@@ -396,8 +417,18 @@ export default function MapLibrePolygons({
         type: 'fill',
         source: 'polos-src',
         paint: {
-      'fill-color': poloFillByUF as any,
-      'fill-opacity': colors.polo.fillOpacity,
+          'fill-color': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            readCssVar('--map-hover-fill', '#bfdbfe'), // Cor de hover
+            poloFillByUF as any, // Cor normal por UF
+          ],
+          'fill-opacity': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            0.35, // Opacidade de hover
+            colors.polo.fillOpacity, // Opacidade normal
+          ],
         },
       });
       
@@ -421,7 +452,7 @@ export default function MapLibrePolygons({
         paint: {
           'line-color': '#2563EB', // Azul consistente
           'line-width': 2.5,
-          'line-opacity': 0.9
+          'line-opacity': 0.5
         },
       });
 
@@ -771,6 +802,13 @@ export default function MapLibrePolygons({
       // map.on('mousemove', drawMove); // Removido para usar listeners globais
       // map.on('mouseup', endDraw); // Removido para usar listeners globais
 
+      // ============================================================
+      // CONFIGURAR HOVER HANDLERS (Tooltips estilo Leaflet)
+      // ============================================================
+      setupMapLibreHover(map, 'polos-fill', true);     // true = é camada de polos
+      setupMapLibreHover(map, 'peri-fill', false);     // false = é camada de periferias
+      console.log('🎯 [MapLibrePolygons] Hover handlers configurados para polos e periferias');
+
       // Eventos de clique nos polígonos
       map.on('click', 'polos-fill', (e) => {
         if (e.features && e.features.length > 0) {
@@ -849,6 +887,11 @@ export default function MapLibrePolygons({
       closeActivePopup();
       if (moveHandlerRef.current) window.removeEventListener('mousemove', moveHandlerRef.current);
       if (upHandlerRef.current) window.removeEventListener('mouseup', upHandlerRef.current);
+      
+      // Remover hover handlers antes de destruir o mapa
+      removeMapLibreHover(map, 'polos-fill');
+      removeMapLibreHover(map, 'peri-fill');
+      
       map.remove();
       mapRef.current = null;
       

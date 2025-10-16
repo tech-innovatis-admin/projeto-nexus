@@ -117,8 +117,6 @@ export async function getFileFromS3(filename: string) {
 export async function fetchAllGeoJSONFiles() {
   const fileNames = [
     'base_municipios.geojson',
-    'base_pd_sem_plano.geojson',
-    'base_pd_vencendo.geojson',
     'parceiros1.json',
     'pistas_s3_lat_log.json'
   ];

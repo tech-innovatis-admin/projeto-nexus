@@ -17,10 +17,8 @@ export async function GET(request: NextRequest) {
     // Lista de arquivos permitidos
     const allowedFiles = [
       "base_municipios.geojson",
-      "base_pd_sem_plano.geojson",
-      "base_pd_vencendo.geojson", 
-
-      "parceiros1.json"
+      "parceiros1.json",
+      "pistas_s3_lat_log.json"
     ];
     
     // Extrai apenas o nome do arquivo, sem qualquer caminho

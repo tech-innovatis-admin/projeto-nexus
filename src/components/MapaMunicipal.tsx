@@ -27,9 +27,7 @@ function removerAcentos(str: string) {
 // Cores das camadas
 const cores = {
   dados: "#56B4E9",
-  pdsemplano: "#E69F00",
   produtos: "#009E73",
-  pdvencendo: "#D55E00",
 };
 
 // Cores por estado
@@ -88,17 +86,6 @@ function popupDadosGerais(p: any) {
   `;
 }
 
-function popupPDVencimento(p: any) {
-  return `
-    <b>Estado:</b> ${p.name_state || ""}<br>
-    <b>Município:</b> ${p.municipio || ""}<br>
-    <b>Prefeito:</b> ${p.nome2024 || ""}<br>
-    <b>Partido:</b> ${p.sigla_partido2024 || ""}<br>
-    <b>Mandato:</b> ${p.mandato || ""}<br>
-    <b>Valor do Plano Diretor:</b> ${p.VALOR_PD || ""}
-  `;
-}
-
 function popupProdutos(p: any) {
   return `
     <b>Estado:</b> ${p.name_state || ""}<br>
@@ -106,19 +93,6 @@ function popupProdutos(p: any) {
     <b>Valor do PMSB:</b> ${p.VALOR_PMSB || ""}<br>
     <b>Valor do Plano Diretor:</b> ${p.VALOR_PD || ""}<br>
     <b>Valor do CTM:</b> ${p.VALOR_CTM || ""}
-  `;
-}
-
-function popupPDSemPlano(p: any) {
-  return `
-    <b>Estado:</b> ${p.name_state || ""}<br>
-    <b>Município:</b> ${p.municipio || ""}<br>
-    <b>Prefeito:</b> ${p.nome2024 || ""}<br>
-    <b>Partido:</b> ${p.sigla_partido2024 || ""}<br>
-    <b>Mandato:</b> ${p.mandato || ""}<br>
-    <b>População:</b> ${p.POPULACAO_FORMAT || ""}<br>
-    <b>Existe Plano Diretor:</b> ${p.PD_ALTERADA || ""}<br>
-    <b>Valor do Plano Diretor:</b> ${p.VALOR_PD || ""}
   `;
 }
 
@@ -131,9 +105,7 @@ export default function MapaMunicipal({ municipioSelecionado }: MapaMunicipalPro
   const alfineteMarkerRef = useRef<L.Marker | null>(null);
   const [layerState, setLayerState] = useState({
     dados: false,
-    pdsemplano: false,
     produtos: false,
-    pdvencendo: false,
     parceiros: false,
   });
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -217,89 +189,13 @@ export default function MapaMunicipal({ municipioSelecionado }: MapaMunicipalPro
           onEachFeature: (feature, layer) => {
             const props = feature.properties;
             
-            // Tooltip simples ao passar o mouse
-            const codigoIBGE = props?.code_muni || props?.codigo_ibge || props?.codigo || "N/A";
-            const nomeMunicipio = props?.nome_municipio || props?.municipio || "N/A";
-            const uf = props?.name_state || "N/A";
-            
-            layer.bindTooltip(
-              `<b>UF:</b> ${uf}<br><b>Código IBGE:</b> ${codigoIBGE}<br><b>Município:</b> ${nomeMunicipio}`,
-              {
-                sticky: true,
-                className: 'custom-tooltip',
-                interactive: false,
-                permanent: false
-              }
-            );
-            
-            // Efeito de hover - destaca borda
-            layer.on({
-              mouseover: function(e) {
-                const layer = e.target;
-                layer.setStyle({
-                  color: '#ffffff', // Borda branca
-                  weight: 3, // Borda mais grossa
-                });
-                layer.bringToFront();
-              },
-              mouseout: function(e) {
-                const layer = e.target;
-                layer.setStyle({
-                  color: '#475569', // Volta à cor original
-                  weight: 0.5, // Volta ao peso original
-                });
-              },
-              click: function(e) {
-                // Fecha o tooltip ao clicar
-                e.target.closeTooltip();
-              }
-            });
+            // Removido efeitos de hover para melhor performance
           },
         });
 
         // Adiciona a camada de dados gerais por padrão
         layersRef.current.dados.addTo(mapRef.current);
         setLayerState(prev => ({ ...prev, dados: true }));
-        
-        // PD sem plano
-        layersRef.current.pdsemplano = L.geoJSON(mapData.pdsemplano, {
-          style: function(feature) {
-            return {
-              color: "#222",
-              weight: 0.7,
-              fillOpacity: 0.7,
-              fillColor: getCorEstado(feature?.properties?.name_state || "Outro")
-            };
-          },
-          onEachFeature: (feature, layer) => {
-            const props = feature.properties;
-            
-            // Tooltip ao passar o mouse
-            const codigoIBGE = props?.code_muni || props?.codigo_ibge || props?.codigo || "N/A";
-            const nomeMunicipio = props?.nome_municipio || props?.municipio || "N/A";
-            const uf = props?.name_state || "N/A";
-            
-            layer.bindTooltip(
-              `<b>UF:</b> ${uf}<br><b>Código IBGE:</b> ${codigoIBGE}<br><b>Município:</b> ${nomeMunicipio}`,
-              { sticky: true, className: 'custom-tooltip' }
-            );
-            
-            // Efeito de hover
-            layer.on({
-              mouseover: function(e) {
-                e.target.setStyle({ color: '#ffffff', weight: 3 });
-                e.target.bringToFront();
-              },
-              mouseout: function(e) {
-                e.target.setStyle({ color: '#222', weight: 0.7 });
-              },
-              click: function(e) {
-                // Fecha o tooltip ao clicar
-                e.target.closeTooltip();
-              }
-            });
-          },
-        });
         
         // Produtos
         layersRef.current.produtos = L.geoJSON(mapData.produtos, {
@@ -314,70 +210,7 @@ export default function MapaMunicipal({ municipioSelecionado }: MapaMunicipalPro
           onEachFeature: (feature, layer) => {
             const props = feature.properties;
             
-            // Tooltip ao passar o mouse
-            const codigoIBGE = props?.code_muni || props?.codigo_ibge || props?.codigo || "N/A";
-            const nomeMunicipio = props?.nome_municipio || props?.municipio || "N/A";
-            const uf = props?.name_state || "N/A";
-            
-            layer.bindTooltip(
-              `<b>UF:</b> ${uf}<br><b>Código IBGE:</b> ${codigoIBGE}<br><b>Município:</b> ${nomeMunicipio}`,
-              { sticky: true, className: 'custom-tooltip' }
-            );
-            
-            // Efeito de hover
-            layer.on({
-              mouseover: function(e) {
-                e.target.setStyle({ color: '#ffffff', weight: 3 });
-                e.target.bringToFront();
-              },
-              mouseout: function(e) {
-                e.target.setStyle({ color: '#222', weight: 0.7 });
-              },
-              click: function(e) {
-                // Fecha o tooltip ao clicar
-                e.target.closeTooltip();
-              }
-            });
-          },
-        });
-        
-        // PD vencendo
-        layersRef.current.pdvencendo = L.geoJSON(mapData.pdvencendo, {
-          style: function(feature) {
-            return {
-              color: "#222",
-              weight: 0.7,
-              fillOpacity: 0.7,
-              fillColor: getCorEstado(feature?.properties?.name_state || "Outro")
-            };
-          },
-          onEachFeature: (feature, layer) => {
-            const props = feature.properties;
-            
-            // Tooltip ao passar o mouse
-            const codigoIBGE = props?.code_muni || props?.codigo_ibge || props?.codigo || "N/A";
-            const nomeMunicipio = props?.nome_municipio || props?.municipio || "N/A";
-            const uf = props?.name_state || "N/A";
-            
-            layer.bindTooltip(
-              `<b>UF:</b> ${uf}<br><b>Código IBGE:</b> ${codigoIBGE}<br><b>Município:</b> ${nomeMunicipio}`,
-              { sticky: true, className: 'custom-tooltip' }
-            );
-            
-            // Efeito de hover
-            layer.on({
-              mouseover: function(e) {
-                e.target.setStyle({ color: '#ffffff', weight: 3 });
-                e.target.bringToFront();
-              },
-              mouseout: function(e) {
-                e.target.setStyle({ color: '#222', weight: 0.7 });
-              },
-              click: function(e) {
-                // Fecha o tooltip ao clicar
-                e.target.closeTooltip();
-              }
-            });
+            // Removido efeitos de hover para melhor performance
           },
         });
         
@@ -414,8 +247,6 @@ export default function MapaMunicipal({ municipioSelecionado }: MapaMunicipalPro
         // Adiciona controle de camadas do Leaflet para as camadas temáticas
         const overlayMaps = {
           "Dados Gerais": layersRef.current.dados,
-          "PD - Sem Plano e +20K": layersRef.current.pdsemplano,
-          "PD em Vencimento": layersRef.current.pdvencendo,
           "Parceiros": layersRef.current.parceiros,
         };
         L.control.layers(

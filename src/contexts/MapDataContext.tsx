@@ -4,9 +4,7 @@ import type { Feature } from 'geojson';
 
 interface MapData {
   dados: any;
-  pdsemplano: any;
   produtos: any;
-  pdvencendo: any;
   parceiros: any;
   pistas: any[] | null;
 }
@@ -55,8 +53,6 @@ export function MapDataProvider({ children }: { children: React.ReactNode }) {
       const applyResult = (organizedData: MapData) => {
         try {
           console.log('[MapData] dados.features:', organizedData.dados?.features?.length ?? 0,
-            '| pdsemplano:', organizedData.pdsemplano?.features?.length ?? 0,
-            '| pdvencendo:', organizedData.pdvencendo?.features?.length ?? 0,
             '| parceiros:', Array.isArray(organizedData.parceiros) ? organizedData.parceiros.length : 0,
             '| pistas:', Array.isArray(organizedData.pistas) ? organizedData.pistas.length : 0);
           if (Array.isArray(organizedData.pistas) && organizedData.pistas.length > 0) {
@@ -79,9 +75,7 @@ export function MapDataProvider({ children }: { children: React.ReactNode }) {
           setLoadingProgress(80);
           const organizedData: MapData = {
             dados: files.find((f: any) => f.name === 'base_municipios.geojson')?.data || null,
-            pdsemplano: files.find((f: any) => f.name === 'base_pd_sem_plano.geojson')?.data || null,
             produtos: null,
-            pdvencendo: files.find((f: any) => f.name === 'base_pd_vencendo.geojson')?.data || null,
             parceiros: files.find((f: any) => f.name === 'parceiros1.json')?.data || null,
             pistas: files.find((f: any) => f.name === 'pistas_s3_lat_log.json')?.data || null,
           };
@@ -92,9 +86,7 @@ export function MapDataProvider({ children }: { children: React.ReactNode }) {
       } else {
         const organizedData: MapData = {
           dados: files.find((f: any) => f.name === 'base_municipios.geojson')?.data || null,
-          pdsemplano: files.find((f: any) => f.name === 'base_pd_sem_plano.geojson')?.data || null,
           produtos: null,
-          pdvencendo: files.find((f: any) => f.name === 'base_pd_vencendo.geojson')?.data || null,
           parceiros: files.find((f: any) => f.name === 'parceiros1.json')?.data || null,
           pistas: files.find((f: any) => f.name === 'pistas_s3_lat_log.json')?.data || null,
         };

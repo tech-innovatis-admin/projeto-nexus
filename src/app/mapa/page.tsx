@@ -165,6 +165,8 @@ function MapaPageContent() {
   const [estadosExpanded, setEstadosExpanded] = useState<boolean>(false);
   const [municipiosSubmenuOpen, setMunicipiosSubmenuOpen] = useState<boolean>(false);
   const [selectValue, setSelectValue] = useState<string>("");
+  const [estadoInputValue, setEstadoInputValue] = useState<string>("");
+  const [municipioInputValue, setMunicipioInputValue] = useState<string>("");
   const dadosRef = useRef<HTMLDivElement>(null);
   const planeIconRef = useRef<HTMLDivElement>(null);
   const estadosDropdownRef = useRef<HTMLDivElement>(null);
@@ -176,6 +178,25 @@ function MapaPageContent() {
     "Pernambuco", "Piauí", "Rio Grande do Norte", "Sergipe", "Mato Grosso"
   ];
 
+  // Estados filtrados baseado no input
+  const estadosFiltrados = useMemo(() => {
+    // Sempre filtrar com base em TODOS os estados ao digitar algo
+    if (estadoInputValue.trim()) {
+      return estados.filter(estado =>
+        estado.toLowerCase().includes(estadoInputValue.toLowerCase())
+      );
+    }
+    // Quando não há texto digitado, respeitar a opção de exibir mais/menos
+    return estadosExpanded ? estados : estadosPrioritarios;
+  }, [estados, estadosPrioritarios, estadosExpanded, estadoInputValue]);
+
+  // Municípios filtrados baseado no input
+  const municipiosFiltrados = useMemo(() => {
+    if (!municipioInputValue.trim()) return municipios;
+    return municipios.filter(municipio =>
+      municipio.toLowerCase().includes(municipioInputValue.toLowerCase())
+    );
+  }, [municipios, municipioInputValue]);
 
   // Atualizar largura da tela para responsividade
   useEffect(() => {
@@ -321,6 +342,7 @@ function MapaPageContent() {
     }
     setEstado(estadoSelecionado);
     setSelectValue(estadoSelecionado);
+    setEstadoInputValue(estadoSelecionado);
   }, [estadoSelecionado, userInfo]);
 
   useEffect(() => {
@@ -328,6 +350,7 @@ function MapaPageContent() {
       console.log(`🏛️ [MapaPage] ${userInfo} - Município selecionado na lista: ${municipioSelecionadoDropdown}`);
     }
     setMunicipio(municipioSelecionadoDropdown);
+    setMunicipioInputValue(municipioSelecionadoDropdown);
   }, [municipioSelecionadoDropdown, userInfo]);
 
   // Busca automática APENAS quando município é selecionado no dropdown
@@ -484,35 +507,41 @@ function MapaPageContent() {
               {/* Dropdown personalizado de estados */}
               <div className="relative w-full md:w-48" ref={estadosDropdownRef}>
                 <div className="relative">
-                  <button
-                    onClick={() => setEstadosSubmenuOpen(!estadosSubmenuOpen)}
-                    className="appearance-none w-full rounded-md bg-[#1e293b] text-white placeholder-slate-400 border border-slate-600 px-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-left flex items-center"
-                    type="button"
+                  <input
+                    type="text"
+                    value={estadoInputValue}
+                    onChange={(e) => {
+                      setEstadoInputValue(e.target.value);
+                      // Quando começa a digitar, mostra todos os estados (não apenas os prioritários)
+                      if (e.target.value.trim() && !estadosExpanded) {
+                        setEstadosExpanded(true);
+                      }
+                      setEstadosSubmenuOpen(true);
+                    }}
+                    onFocus={() => setEstadosSubmenuOpen(true)}
+                    placeholder="Digite o estado..."
+                    className="appearance-none w-full rounded-md bg-[#1e293b] text-white placeholder-slate-400 border border-slate-600 px-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-left"
+                  />
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className={`h-4 w-4 text-slate-300 absolute right-2 top-1/2 -translate-y-1/2 transition-transform duration-200 pointer-events-none ${estadosSubmenuOpen ? 'rotate-180' : ''}`}
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
                   >
-                    <span className={selectValue ? 'text-white' : 'text-slate-400'}>
-                      {selectValue || 'Estado'}
-                    </span>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className={`h-4 w-4 text-slate-300 absolute right-2 top-1/2 -translate-y-1/2 transition-transform duration-200 pointer-events-none ${estadosSubmenuOpen ? 'rotate-180' : ''}`}
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                      aria-hidden="true"
-                    >
-                      <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.939l3.71-3.71a.75.75 0 111.06 1.061l-4.24 4.24a.75.75 0 01-1.06 0l-4.24-4.24a.75.75 0 01.02-1.06z" clipRule="evenodd" />
-                    </svg>
-                  </button>
+                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.939l3.71-3.71a.75.75 0 111.06 1.061l-4.24 4.24a.75.75 0 01-1.06 0l-4.24-4.24a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                  </svg>
 
                   {/* Submenu personalizado */}
                   {estadosSubmenuOpen && (
                     <div className="absolute top-full left-0 mt-1 w-full rounded-md shadow-lg bg-[#1e293b] border border-slate-600 z-50 max-h-80 overflow-y-auto">
                       <div className="py-1">
-                        {/* Estados prioritários (Nordeste + Mato Grosso) */}
-                        {estadosPrioritarios.map((estado) => (
+                        {/* Estados filtrados */}
+                        {estadosFiltrados.map((estado) => (
                           <button
                             key={estado}
                             onClick={() => {
-                              setSelectValue(estado);
+                              setEstadoInputValue(estado);
                               setEstadoSelecionado(estado);
                               setEstadosSubmenuOpen(false);
                             }}
@@ -522,47 +551,58 @@ function MapaPageContent() {
                           </button>
                         ))}
 
-                        {/* Divisor */}
-                        <div className="border-t border-slate-600 my-1" />
-
-                        {/* Opção Exibir mais */}
-                        {!estadosExpanded && estados.length > estadosPrioritarios.length && (
-                          <button
-                            onClick={() => setEstadosExpanded(true)}
-                            className="w-full text-left px-3 py-2 text-sm text-sky-300 hover:bg-slate-600 transition-colors font-semibold"
-                          >
-                            ── Exibir mais ──
-                          </button>
-                        )}
-
-                        {/* Estados adicionais quando expandido */}
-                        {estadosExpanded && (
+                        {/* Divisor e opções de expansão se não houver filtro */}
+                        {!estadoInputValue.trim() && (
                           <>
-                            {estados
-                              .filter(estado => !estadosPrioritarios.includes(estado))
-                              .map((estado) => (
-                                <button
-                                  key={estado}
-                                  onClick={() => {
-                                    setSelectValue(estado);
-                                    setEstadoSelecionado(estado);
-                                    setEstadosSubmenuOpen(false);
-                                  }}
-                                  className="w-full text-left px-3 py-2 text-sm text-white hover:bg-slate-600 transition-colors"
-                                >
-                                  {estado}
-                                </button>
-                              ))}
-
-                            {/* Opção Exibir menos */}
                             <div className="border-t border-slate-600 my-1" />
-                            <button
-                              onClick={() => setEstadosExpanded(false)}
-                              className="w-full text-left px-3 py-2 text-sm text-orange-300 hover:bg-slate-600 transition-colors font-semibold"
-                            >
-                              ── Exibir menos ──
-                            </button>
+
+                            {/* Opção Exibir mais */}
+                            {!estadosExpanded && estados.length > estadosPrioritarios.length && (
+                              <button
+                                onClick={() => setEstadosExpanded(true)}
+                                className="w-full text-left px-3 py-2 text-sm text-sky-300 hover:bg-slate-600 transition-colors font-semibold"
+                              >
+                                ── Exibir mais ──
+                              </button>
+                            )}
+
+                            {/* Estados adicionais quando expandido */}
+                            {estadosExpanded && (
+                              <>
+                                {estados
+                                  .filter(estado => !estadosPrioritarios.includes(estado))
+                                  .map((estado) => (
+                                    <button
+                                      key={estado}
+                                      onClick={() => {
+                                        setEstadoInputValue(estado);
+                                        setEstadoSelecionado(estado);
+                                        setEstadosSubmenuOpen(false);
+                                      }}
+                                      className="w-full text-left px-3 py-2 text-sm text-white hover:bg-slate-600 transition-colors"
+                                    >
+                                      {estado}
+                                    </button>
+                                  ))}
+
+                                {/* Opção Exibir menos */}
+                                <div className="border-t border-slate-600 my-1" />
+                                <button
+                                  onClick={() => setEstadosExpanded(false)}
+                                  className="w-full text-left px-3 py-2 text-sm text-orange-300 hover:bg-slate-600 transition-colors font-semibold"
+                                >
+                                  ── Exibir menos ──
+                                </button>
+                              </>
+                            )}
                           </>
+                        )}
+                        
+                        {/* Mensagem quando não há resultados na busca */}
+                        {estadoInputValue.trim() && estadosFiltrados.length === 0 && (
+                          <div className="px-3 py-2 text-sm text-slate-400 text-center">
+                            Nenhum estado encontrado
+                          </div>
                         )}
                       </div>
                     </div>
@@ -573,46 +613,43 @@ function MapaPageContent() {
               {/* Dropdown personalizado de municípios */}
               <div className="relative w-full md:w-56" ref={municipiosDropdownRef}>
                 <div className="relative">
-                  <button
-                    onClick={() => {
+                  <input
+                    type="text"
+                    value={municipioInputValue}
+                    onChange={(e) => {
+                      setMunicipioInputValue(e.target.value);
+                      setMunicipiosSubmenuOpen(true);
+                    }}
+                    onFocus={() => {
                       if (estadoSelecionado) {
-                        setMunicipiosSubmenuOpen(!municipiosSubmenuOpen);
+                        setMunicipiosSubmenuOpen(true);
                       }
                     }}
                     disabled={!estadoSelecionado}
-                    className={`appearance-none w-full rounded-md bg-[#1e293b] text-white placeholder-slate-400 border border-slate-600 px-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-left flex items-center ${
-                      !estadoSelecionado ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'
+                    placeholder={estadoSelecionado ? "Digite o município..." : "Selecione um estado primeiro"}
+                    className={`appearance-none w-full rounded-md bg-[#1e293b] text-white placeholder-slate-400 border border-slate-600 px-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-left ${
+                      !estadoSelecionado ? 'opacity-60 cursor-not-allowed' : 'cursor-text'
                     } md:w-56`}
-                    type="button"
+                  />
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className={`h-4 w-4 text-slate-300 absolute right-2 top-1/2 -translate-y-1/2 transition-transform duration-200 pointer-events-none ${municipiosSubmenuOpen ? 'rotate-180' : ''}`}
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
                   >
-                    <span
-                      className={
-                        (municipioSelecionadoDropdown ? 'text-white' : 'text-slate-400') +
-                        ' block overflow-hidden whitespace-nowrap text-ellipsis max-w-full flex-1'
-                      }
-                      style={{ minWidth: 0 }}
-                    >
-                      {municipioSelecionadoDropdown || 'Município'}
-                    </span>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className={`h-4 w-4 text-slate-300 absolute right-2 top-1/2 -translate-y-1/2 transition-transform duration-200 pointer-events-none ${municipiosSubmenuOpen ? 'rotate-180' : ''}`}
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                      aria-hidden="true"
-                    >
-                      <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.939l3.71-3.71a.75.75 0 111.06 1.061l-4.24 4.24a.75.75 0 01-1.06 0l-4.24-4.24a.75.75 0 01.02-1.06z" clipRule="evenodd" />
-                    </svg>
-                  </button>
+                    <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.939l3.71-3.71a.75.75 0 111.06 1.061l-4.24 4.24a.75.75 0 01-1.06 0l-4.24-4.24a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                  </svg>
 
                   {/* Submenu personalizado */}
                   {municipiosSubmenuOpen && estadoSelecionado && (
                     <div className="absolute top-full left-0 mt-1 w-full rounded-md shadow-lg bg-[#1e293b] border border-slate-600 z-50 max-h-80 overflow-y-auto">
                       <div className="py-1">
-                        {municipios.map((municipio) => (
+                        {municipiosFiltrados.map((municipio) => (
                           <button
                             key={municipio}
                             onClick={() => {
+                              setMunicipioInputValue(municipio);
                               setMunicipioSelecionadoDropdown(municipio);
                               setMunicipiosSubmenuOpen(false);
                             }}
@@ -621,6 +658,11 @@ function MapaPageContent() {
                             {municipio}
                           </button>
                         ))}
+                        {municipioInputValue.trim() && municipiosFiltrados.length === 0 && (
+                          <div className="px-3 py-2 text-sm text-slate-400 text-center">
+                            Nenhum município encontrado
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -665,7 +707,9 @@ function MapaPageContent() {
                     console.log(`🧹 [MapaPage] ${userInfo} - Seleção limpa`);
                     setEstadoSelecionado('');
                     setSelectValue('');
+                    setEstadoInputValue('');
                     setMunicipioSelecionadoDropdown('');
+                    setMunicipioInputValue('');
                     setMunicipioSelecionado(null);
                     setErroBusca(null);
                   }}

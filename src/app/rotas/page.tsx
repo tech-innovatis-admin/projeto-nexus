@@ -40,12 +40,43 @@ interface PeriferiaProps {
   propriedadesOriginais?: Record<string, any>;
 }
 
+// Mapeamento de UF para nome completo dos estados
+const ufParaNomeCompleto: Record<string, string> = {
+  'AC': 'Acre',
+  'AL': 'Alagoas',
+  'AM': 'Amazonas',
+  'AP': 'Amapá',
+  'BA': 'Bahia',
+  'CE': 'Ceará',
+  'DF': 'Distrito Federal',
+  'ES': 'Espírito Santo',
+  'GO': 'Goiás',
+  'MA': 'Maranhão',
+  'MG': 'Minas Gerais',
+  'MS': 'Mato Grosso do Sul',
+  'MT': 'Mato Grosso',
+  'PA': 'Pará',
+  'PB': 'Paraíba',
+  'PE': 'Pernambuco',
+  'PI': 'Piauí',
+  'PR': 'Paraná',
+  'RJ': 'Rio de Janeiro',
+  'RN': 'Rio Grande do Norte',
+  'RO': 'Rondônia',
+  'RR': 'Roraima',
+  'RS': 'Rio Grande do Sul',
+  'SC': 'Santa Catarina',
+  'SE': 'Sergipe',
+  'SP': 'São Paulo',
+  'TO': 'Tocantins'
+};
+
 export default function RotasPage() {
   // Contexto de dados
-  const { 
-    estrategiaData, 
-    loading: loadingData, 
-    error: errorData 
+  const {
+    estrategiaData,
+    loading: loadingData,
+    error: errorData
   } = useEstrategiaData();
 
   // Estados para o sistema de rotas
@@ -184,12 +215,15 @@ export default function RotasPage() {
       const codigoPolo = String(polo.codigo_origem || '').trim();
 
       if (codigoPolo && !codigosUsados.has(codigoPolo)) {
+        const ufPolo = polo.UF_origem || polo.UF || 'BR';
+        const nomeEstadoCompleto = ufParaNomeCompleto[ufPolo] || ufPolo;
+
         codigosUsados.add(codigoPolo);
         municipios.push({
           codigo: codigoPolo,
           nome: polo.municipio_origem,
-          estado: polo.UF_origem || polo.UF || 'BR',
-          uf: polo.UF_origem || polo.UF || 'BR',
+          estado: nomeEstadoCompleto,
+          uf: ufPolo,
           latitude: latitude,
           longitude: longitude,
           populacao: polo.valor_total_origem || 100000, // Usar valor como proxy de população
@@ -261,12 +295,15 @@ export default function RotasPage() {
       const codigoPeriferia = String(periferiaItem.codigo_destino || '').trim();
 
       if (codigoPeriferia && !codigosUsados.has(codigoPeriferia)) {
+        const ufPeriferia = periferiaItem.UF || 'BR';
+        const nomeEstadoCompleto = ufParaNomeCompleto[ufPeriferia] || ufPeriferia;
+
         codigosUsados.add(codigoPeriferia);
         municipios.push({
           codigo: codigoPeriferia,
           nome: periferiaItem.municipio_destino,
-          estado: periferiaItem.UF || 'BR',
-          uf: periferiaItem.UF || 'BR',
+          estado: nomeEstadoCompleto,
+          uf: ufPeriferia,
           latitude: latitude,
           longitude: longitude,
           populacao: periferiaItem.valor_total_destino || 30000, // Usar valor como proxy de população

@@ -413,17 +413,17 @@ export default function RotaMapVisualization({
                 const popup = new maplibregl.Popup({ offset: 4 })
                   .setLngLat(e.lngLat)
                   .setHTML(`
-                    <div class="text-sm">
-                      <div class="font-semibold mb-1 flex items-center gap-2">
-                        <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">
+                    <div class="text-base p-2" style="color: black; min-width: 200px;">
+                      <div class="font-bold mb-2 flex items-center gap-3" style="color: black;">
+                        <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-bold">
                           ${props?.ordem}
                         </span>
-                        ${props?.tipo === 'polo' ? '🏢' : '🏘️'} ${props?.nome}
+                        <span class="text-lg">${props?.tipo === 'polo' ? '🏢' : '🏘️'}</span>
+                        <span class="text-base">${props?.nome}</span>
                       </div>
-                      <div><strong>UF:</strong> ${props?.uf}</div>
-                      <div><strong>População:</strong> ${parseInt(props?.populacao || 0).toLocaleString()} hab</div>
-                      <div><strong>Tipo:</strong> ${props?.tipo === 'polo' ? 'Polo' : 'Periferia'}</div>
-                      <div class="text-xs text-gray-500 mt-1">Parada ${props?.ordem} na rota</div>
+                      <div class="mb-1" style="color: black;"><strong class="text-sm">UF:</strong> <span class="text-base">${props?.uf}</span></div>
+                      <div class="mb-1" style="color: black;"><strong class="text-sm">Tipo:</strong> <span class="text-base">${props?.tipo === 'polo' ? 'Polo' : 'Periferia'}</span></div>
+                      <div class="text-sm mt-2 pt-1 border-t border-gray-300" style="color: #666;">Parada ${props?.ordem} na rota</div>
                     </div>
                   `)
                   .addTo(map);
@@ -544,6 +544,64 @@ export default function RotaMapVisualization({
       if (resizeCleanup) {
         resizeCleanup();
       }
+      // Remover camadas, fontes e imagens quando o componente desmonta (ex.: clique em "Limpar")
+      waitForMapReady(1000)
+        .then(map => {
+          try {
+            const layersToRemove = [
+              LAYER_IDS.labels,
+              LAYER_IDS.periferias,
+              LAYER_IDS.polos,
+              LAYER_IDS.trechosTerrestres,
+              LAYER_IDS.trechosVoo
+            ];
+
+            layersToRemove.forEach(layerId => {
+              try {
+                if (map.getLayer && map.getLayer(layerId)) {
+                  map.removeLayer(layerId);
+                  console.log(`🗺️ [RotaMapVisualization] Layer ${layerId} removida (cleanup unmount)`);
+                }
+              } catch (error) {
+                console.warn(`🗺️ [RotaMapVisualization] Erro ao remover layer ${layerId} no cleanup:`, error);
+              }
+            });
+
+            Object.values(SOURCE_IDS).forEach(sourceId => {
+              try {
+                if (map.getSource && map.getSource(sourceId)) {
+                  map.removeSource(sourceId);
+                  console.log(`🗺️ [RotaMapVisualization] Source ${sourceId} removida (cleanup unmount)`);
+                }
+              } catch (error) {
+                console.warn(`🗺️ [RotaMapVisualization] Erro ao remover source ${sourceId} no cleanup:`, error);
+              }
+            });
+
+            try {
+              const imageKeys = Object.keys((map as any).style.imageManager?.images || {});
+              imageKeys.forEach(imageId => {
+                if (imageId.startsWith('polo-marker-') || imageId.startsWith('periferia-marker-')) {
+                  try {
+                    if (map.hasImage(imageId)) {
+                      map.removeImage(imageId);
+                      console.log(`🗺️ [RotaMapVisualization] Imagem ${imageId} removida (cleanup unmount)`);
+                    }
+                  } catch (error) {
+                    console.warn(`🗺️ [RotaMapVisualization] Erro ao remover imagem ${imageId} no cleanup:`, error);
+                  }
+                }
+              });
+            } catch (error) {
+              console.warn('🗺️ [RotaMapVisualization] Erro ao listar/remover imagens no cleanup:', error);
+            }
+          } catch (error) {
+            console.warn('🗺️ [RotaMapVisualization] Erro no cleanup ao desmontar:', error);
+          }
+        })
+        .catch(() => {
+          // Sem ação se o mapa não estiver pronto
+        });
     };
   }, [rota, showLabels, cores, LAYER_IDS, SOURCE_IDS]);
 

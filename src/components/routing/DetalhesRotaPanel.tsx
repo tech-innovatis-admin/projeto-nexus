@@ -250,7 +250,7 @@ export default function DetalhesRotaPanel({
                         <span className="font-medium text-slate-900">{formatarDistancia(trecho.distanciaKm)}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-slate-600">Tempo estimado:</span>
+                        <span className="text-slate-600">Tempo</span>
                         <span className="font-medium text-slate-900">{formatarTempo(trecho.tempoMinutos)}</span>
                       </div>
                       

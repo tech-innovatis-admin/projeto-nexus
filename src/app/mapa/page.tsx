@@ -178,9 +178,14 @@ function MapaPageContent() {
     "Pernambuco", "Piauí", "Rio Grande do Norte", "Sergipe", "Mato Grosso"
   ];
 
-  // Estados filtrados baseado no input
+  // Estados filtrados baseado no input e estado do dropdown
   const estadosFiltrados = useMemo(() => {
-    // Sempre filtrar com base em TODOS os estados ao digitar algo
+    // Quando o dropdown está aberto, mostrar todos os estados (respeitando expansão)
+    if (estadosSubmenuOpen) {
+      return estadosExpanded ? estados : estadosPrioritarios;
+    }
+
+    // Quando o dropdown está fechado, filtrar baseado no input (se houver)
     if (estadoInputValue.trim()) {
       return estados.filter(estado =>
         estado.toLowerCase().includes(estadoInputValue.toLowerCase())
@@ -188,7 +193,7 @@ function MapaPageContent() {
     }
     // Quando não há texto digitado, respeitar a opção de exibir mais/menos
     return estadosExpanded ? estados : estadosPrioritarios;
-  }, [estados, estadosPrioritarios, estadosExpanded, estadoInputValue]);
+  }, [estados, estadosPrioritarios, estadosExpanded, estadoInputValue, estadosSubmenuOpen]);
 
   // Municípios filtrados baseado no input e estado do dropdown
   const municipiosFiltrados = useMemo(() => {

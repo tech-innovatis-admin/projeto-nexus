@@ -190,13 +190,17 @@ function MapaPageContent() {
     return estadosExpanded ? estados : estadosPrioritarios;
   }, [estados, estadosPrioritarios, estadosExpanded, estadoInputValue]);
 
-  // Municípios filtrados baseado no input
+  // Municípios filtrados baseado no input e estado do dropdown
   const municipiosFiltrados = useMemo(() => {
+    // Quando o dropdown está aberto, mostrar todos os municípios
+    if (municipiosSubmenuOpen) return municipios;
+
+    // Quando o dropdown está fechado, filtrar baseado no input (se houver)
     if (!municipioInputValue.trim()) return municipios;
     return municipios.filter(municipio =>
       municipio.toLowerCase().includes(municipioInputValue.toLowerCase())
     );
-  }, [municipios, municipioInputValue]);
+  }, [municipios, municipioInputValue, municipiosSubmenuOpen]);
 
   // Atualizar largura da tela para responsividade
   useEffect(() => {

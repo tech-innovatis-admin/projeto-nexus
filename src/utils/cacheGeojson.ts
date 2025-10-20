@@ -65,7 +65,7 @@ export async function fetchGeoJSONWithCache(
     return null;
   };
 
-  // 2) Try HEAD for revalidation tokens
+  // Try HEAD for revalidation tokens
   try {
     const headResp = await fetch(url, { method: 'HEAD' });
     if (headResp.ok) {

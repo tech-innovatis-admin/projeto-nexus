@@ -189,7 +189,14 @@ export async function calcularRotaTerrestre(
       throw new Error('Rotas entre polos devem ser calculadas como voo, não como rota terrestre');
     }
 
-    // Usar nova API Google Routes com geocoding
+    // Usar nova API Google Routes com coordenadas diretas (sem geocoding!)
+    // As coordenadas já vêm do município (latitude/longitude da sede municipal)
+    console.log(`🏛️ [routingUtils] 🎯 ENVIANDO COORDENADAS DA SEDE MUNICIPAL OFICIAL PARA CÁLCULO DE ROTA`);
+    console.log(`🏛️ [routingUtils] 📍 Origem: ${origem.nome} (IBGE: ${origem.codigo})`);
+    console.log(`🏛️ [routingUtils] 📍 Coordenadas sede: Lat: ${origem.coordenadas.lat}, Lng: ${origem.coordenadas.lng}`);
+    console.log(`🏛️ [routingUtils] 📍 Destino: ${destino.nome} (IBGE: ${destino.codigo})`);
+    console.log(`🏛️ [routingUtils] 📍 Coordenadas sede: Lat: ${destino.coordenadas.lat}, Lng: ${destino.coordenadas.lng}`);
+
     const response = await fetch('/api/rotas/google-routes', {
       method: 'POST',
       headers: {
@@ -197,10 +204,20 @@ export async function calcularRotaTerrestre(
       },
       body: JSON.stringify({
         origem: {
+          // Preferência 1: Usar coordenadas diretas (evita geocoding!)
+          lat: origem.coordenadas.lat,
+          lng: origem.coordenadas.lng,
+          // Fallback: código IBGE e nome/UF caso coordenadas sejam inválidas
+          codigoIBGE: origem.codigo,
           nome: origem.nome,
           uf: origem.uf
         },
         destino: {
+          // Preferência 1: Usar coordenadas diretas (evita geocoding!)
+          lat: destino.coordenadas.lat,
+          lng: destino.coordenadas.lng,
+          // Fallback: código IBGE e nome/UF caso coordenadas sejam inválidas
+          codigoIBGE: destino.codigo,
           nome: destino.nome,
           uf: destino.uf
         },

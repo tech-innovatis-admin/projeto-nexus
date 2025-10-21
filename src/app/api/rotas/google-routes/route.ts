@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withApiGuard, createApiErrorResponse, getApiStatus } from '@/utils/mapsApiGuard';
+import { buscarCoordenadasPorCodigoIBGE, inicializarCacheCoordenas, isCacheInicializado } from '@/utils/coordenadasService';
+import { getFileFromS3 } from '@/utils/s3Service';
 
 // Interface para coordenadas
 interface Coordenada {
@@ -16,12 +18,14 @@ interface InstrucaoRota {
   coordenada: Coordenada;
 }
 
-// Interface para localização (coordenadas OU nome/UF)
+// Interface para localização (coordenadas OU nome/UF OU código IBGE)
 interface Localizacao {
-  // Opção 1: Coordenadas diretas
+  // Opção 1: Coordenadas diretas (PREFERENCIAL - evita geocoding)
   lat?: number;
   lng?: number;
-  // Opção 2: Nome do município + UF (para geocoding)
+  // Opção 2: Código IBGE (busca coordenadas no cache local)
+  codigoIBGE?: string;
+  // Opção 3: Nome do município + UF (para geocoding - FALLBACK)
   nome?: string;
   uf?: string;
 }
@@ -411,15 +415,57 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Função para geocoding (converter nome + UF em coordenadas)
+// Função auxiliar para garantir que o cache está inicializado
+async function garantirCacheInicializado(): Promise<void> {
+  if (isCacheInicializado()) {
+    return; // Já está inicializado
+  }
+  
+  try {
+    console.log('📍 [Google Routes] Inicializando cache de coordenadas...');
+    const sedesMunicipais = await getFileFromS3('sedes_municipais_lat_long.json');
+    
+    if (Array.isArray(sedesMunicipais)) {
+      inicializarCacheCoordenas(sedesMunicipais);
+      console.log('✅ [Google Routes] Cache de coordenadas inicializado com sucesso');
+    } else {
+      console.warn('⚠️ [Google Routes] sedes_municipais_lat_long.json não é um array válido');
+    }
+  } catch (error) {
+    console.error('❌ [Google Routes] Erro ao inicializar cache de coordenadas:', error);
+    // Não lançar erro - permite fallback para geocoding
+  }
+}
+
+// Função para geocoding (converter nome + UF ou código IBGE em coordenadas)
 async function geocodeLocalizacao(localizacao: Localizacao): Promise<Coordenada> {
-  // Se já tem coordenadas, retorna diretamente
+  // Opção 1: Se já tem coordenadas, retorna diretamente (MAIS RÁPIDO)
   if (localizacao.lat !== undefined && localizacao.lng !== undefined) {
+    console.log('✅ [Geocoding] Coordenadas diretas fornecidas:', { lat: localizacao.lat, lng: localizacao.lng });
     return { lat: localizacao.lat, lng: localizacao.lng };
   }
 
-  // Se tem nome e UF, faz geocoding
+  // Opção 2: Se tem código IBGE, busca no cache local (RÁPIDO - SEM CUSTO)
+  if (localizacao.codigoIBGE) {
+    console.log(`🔍 [Google Routes] Tentando buscar coordenadas via código IBGE: ${localizacao.codigoIBGE}`);
+    await garantirCacheInicializado();
+    const coordenadas = buscarCoordenadasPorCodigoIBGE(localizacao.codigoIBGE);
+
+    if (coordenadas) {
+      console.log(`🎯 [Google Routes] SUCESSO: Usando coordenadas da base sedes_municipais_lat_long.json`);
+      console.log(`📍 [Google Routes] Código IBGE ${localizacao.codigoIBGE} → Lat: ${coordenadas.lat}, Lng: ${coordenadas.lng}`);
+      return coordenadas;
+    } else {
+      console.warn(`❌ [Google Routes] FALHA: Código IBGE ${localizacao.codigoIBGE} não encontrado na base sedes_municipais_lat_long.json`);
+      console.log(`⚠️ [Google Routes] Fallback: Tentará geocoding via Google Maps API`);
+      // Continua para fallback se tiver nome/UF
+    }
+  }
+
+  // Opção 3: Se tem nome e UF, faz geocoding via Google Maps API (LENTO - COM CUSTO)
   if (localizacao.nome && localizacao.uf) {
+    console.log('⚠️ [Geocoding] Usando fallback de geocoding via Google Maps API');
+
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
     if (!apiKey) {
       throw new Error('API Key não configurada para geocoding');
@@ -429,34 +475,26 @@ async function geocodeLocalizacao(localizacao: Localizacao): Promise<Coordenada>
     const geocodeUrl = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(endereco)}&key=${apiKey}&region=BR&language=pt-BR`;
 
     console.log('🗺️ [Geocoding] Fazendo geocoding para:', endereco);
-    console.log('🔑 [Geocoding] API Key presente:', !!apiKey);
-    console.log('🔑 [Geocoding] Comprimento da chave:', apiKey.length);
-    console.log('🔑 [Geocoding] Primeiros 10 caracteres:', apiKey.substring(0, 10) + '...');
-    console.log('🔑 [Geocoding] Últimos 10 caracteres:', '...' + apiKey.substring(apiKey.length - 10));
-    console.log('🔑 [Geocoding] Contém apenas caracteres válidos:', /^[A-Za-z0-9_-]+$/.test(apiKey));
-    console.log('🔑 [Geocoding] URL (sem chave):', geocodeUrl.replace(apiKey, 'API_KEY_HIDED'));
+    console.log('⚠️ [Geocoding] ATENÇÃO: Usando Google Maps Geocoding API (tem custo!)');
 
     const response = await withApiGuard('geocode', async () => {
       return await fetch(geocodeUrl);
     });
     console.log('🌐 [Geocoding] Status HTTP da resposta:', response.status);
-    console.log('🌐 [Geocoding] Headers da resposta:', Object.fromEntries(response.headers.entries()));
 
     const data = await response.json();
-    console.log('📊 [Geocoding] Resposta completa da API:', JSON.stringify(data, null, 2));
 
     if (data.status === 'OK' && data.results && data.results.length > 0) {
       const location = data.results[0].geometry.location;
-      console.log('✅ [Geocoding] Coordenadas encontradas:', location);
+      console.log('✅ [Geocoding] Coordenadas encontradas via API:', location);
       return { lat: location.lat, lng: location.lng };
     } else {
       console.log('❌ [Geocoding] Falha no geocoding:', data.status, data.error_message);
-      console.log('❌ [Geocoding] Detalhes do erro:', JSON.stringify(data, null, 2));
       throw new Error(`Não foi possível encontrar coordenadas para: ${endereco}`);
     }
   }
 
-  throw new Error('Localização inválida: deve ter coordenadas OU nome + UF');
+  throw new Error('Localização inválida: deve ter coordenadas OU código IBGE OU nome + UF');
 }
 
 // Health check

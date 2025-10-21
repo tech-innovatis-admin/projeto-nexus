@@ -12,6 +12,7 @@ import type {
   PistaVoo
 } from '@/types/routing';
 import { formatarTempo, formatarDistancia } from '@/utils/routingUtils';
+import { inicializarCacheCoordenas, isCacheInicializado } from '@/utils/coordenadasService';
 
 interface RotasComponentProps {
   municipios: any[]; // Dados dos municípios vindos da estratégia
@@ -50,15 +51,55 @@ export default function RotasComponent({
   const [secaoPolosAberta, setSecaoPolosAberta] = useState(true);
   const [secaoPeriferiasAberta, setSecaoPeriferiasAberta] = useState(true);
 
-  // Obter dados de pistas do contexto
+  // Obter dados de pistas e sedes municipais do contexto
   const { mapData } = useMapData();
   const pistasData = mapData?.pistas || [];
+  const sedesMunicipais = mapData?.sedesMunicipais || [];
+  
+  // Inicializar cache de coordenadas quando os dados estiverem disponíveis
+  useEffect(() => {
+    if (sedesMunicipais.length > 0 && !isCacheInicializado()) {
+      console.log('🚀 [RotasComponent] Inicializando cache de coordenadas municipais...');
+      console.log('📊 [RotasComponent] Dados carregados da base sedes_municipais_lat_long.json:', sedesMunicipais.length, 'municípios');
+      console.log('🏙️ [RotasComponent] Exemplo de dados da base:', sedesMunicipais.slice(0, 2));
+      inicializarCacheCoordenas(sedesMunicipais);
+      console.log('✅ [RotasComponent] Cache de coordenadas inicializado com sucesso!');
+    }
+  }, [sedesMunicipais]);
 
   // Converter dados dos municípios para tipos de rota
   const { polosDisponiveis, periferiasDisponiveis } = useMemo(() => {
     console.log('🔄 [RotasComponent] Processando municípios para rotas:', municipios.length);
     console.log('🛬 [RotasComponent] Pistas disponíveis:', pistasData.length);
-    console.log('🔗 [JOIN] Iniciando join entre municípios e pistas_s3_lat_log.json...');
+    console.log('🏛️ [RotasComponent] Sedes municipais disponíveis:', sedesMunicipais.length);
+    console.log('🔗 [JOIN] Iniciando joins: municípios + pistas + sedes municipais...');
+
+    // Criar mapa de coordenadas da sede municipal por código IBGE
+    const coordenadasSedePorCodigo = new Map<string, { lat: number; lng: number }>();
+    if (Array.isArray(sedesMunicipais) && sedesMunicipais.length > 0) {
+      sedesMunicipais.forEach((sede: any) => {
+        const codigo = String(sede.codigo_ibge || '').trim();
+        if (!codigo || codigo === '0' || codigo === '') return;
+
+        // Converter coordenadas de string para número
+        const lat = parseFloat(String(sede.latitude_munic || sede.latitude_munic || '').trim());
+        const lng = parseFloat(String(sede.longitude_munic || sede.longitude_munic || '').trim());
+
+        // Validar coordenadas
+        const coordenadasValidas = !isNaN(lat) && !isNaN(lng) &&
+                                  lat >= -90 && lat <= 90 &&
+                                  lng >= -180 && lng <= 180 &&
+                                  lat !== 0 && lng !== 0;
+
+        if (coordenadasValidas) {
+          coordenadasSedePorCodigo.set(codigo, { lat, lng });
+          console.log(`🏛️ [JOIN] Sede municipal ${sede.municipio_br} (${codigo}) → Lat: ${lat}, Lng: ${lng}`);
+        } else {
+          console.warn(`⚠️ [JOIN] Coordenadas inválidas para sede ${sede.municipio_br} (${codigo}): lat=${sede.latitude_munic}, lng=${sede.longitude_munic}`);
+        }
+      });
+      console.log(`🏛️ [RotasComponent] Sedes municipais com coordenadas válidas: ${coordenadasSedePorCodigo.size}`);
+    }
 
     // Criar mapa de pistas por código IBGE para acesso rápido
     const pistasPorCodigo = new Map<string, PistaVoo[]>();
@@ -105,12 +146,24 @@ export default function RotasComponent({
     const polos: MunicipioPolo[] = [];
     const periferias: MunicipioPeriferia[] = [];
 
-    // Extração de Coordenadas
+    // Extração de Coordenadas - AGORA USANDO SEDES MUNICIPAIS
     municipios.forEach(municipio => {
-      const coordenadas: Coordenada = {
-        lat: parseFloat(municipio.latitude) || 0,
-        lng: parseFloat(municipio.longitude) || 0
-      };
+      // Primeiro tentar obter coordenadas da sede municipal oficial
+      const coordenadasSede = coordenadasSedePorCodigo.get(municipio.codigo);
+
+      let coordenadas: Coordenada;
+      if (coordenadasSede) {
+        // Usar coordenadas da sede municipal oficial
+        coordenadas = coordenadasSede;
+        console.log(`🏛️ [COORDS] ${municipio.nome} (${municipio.codigo}) → USANDO SEDE MUNICIPAL: Lat: ${coordenadas.lat}, Lng: ${coordenadas.lng}`);
+      } else {
+        // Fallback para coordenadas antigas (caso sede não seja encontrada)
+        coordenadas = {
+          lat: parseFloat(municipio.latitude) || 0,
+          lng: parseFloat(municipio.longitude) || 0
+        };
+        console.warn(`⚠️ [COORDS] ${municipio.nome} (${municipio.codigo}) → SEDE NÃO ENCONTRADA, usando fallback: Lat: ${coordenadas.lat}, Lng: ${coordenadas.lng}`);
+      }
 
       const populacao = parseInt(municipio.populacao) || 0;
       

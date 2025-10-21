@@ -118,7 +118,8 @@ export async function fetchAllGeoJSONFiles() {
   const fileNames = [
     'base_municipios.geojson',
     'parceiros1.json',
-    'pistas_s3_lat_log.json'
+    'pistas_s3_lat_log.json',
+    'sedes_municipais_lat_long.json'
   ];
 
   console.log(`📥 Loading ${fileNames.length} GeoJSON files...`);

@@ -7,6 +7,7 @@ interface MapData {
   produtos: any;
   parceiros: any;
   pistas: any[] | null;
+  sedesMunicipais: any[] | null;
 }
 
 interface MapDataContextType {
@@ -54,9 +55,13 @@ export function MapDataProvider({ children }: { children: React.ReactNode }) {
         try {
           console.log('[MapData] dados.features:', organizedData.dados?.features?.length ?? 0,
             '| parceiros:', Array.isArray(organizedData.parceiros) ? organizedData.parceiros.length : 0,
-            '| pistas:', Array.isArray(organizedData.pistas) ? organizedData.pistas.length : 0);
+            '| pistas:', Array.isArray(organizedData.pistas) ? organizedData.pistas.length : 0,
+            '| sedesMunicipais:', Array.isArray(organizedData.sedesMunicipais) ? organizedData.sedesMunicipais.length : 0);
           if (Array.isArray(organizedData.pistas) && organizedData.pistas.length > 0) {
             console.log('[MapData] exemplo de pista:', organizedData.pistas[0]);
+          }
+          if (Array.isArray(organizedData.sedesMunicipais) && organizedData.sedesMunicipais.length > 0) {
+            console.log('[MapData] exemplo de sede municipal:', organizedData.sedesMunicipais[0]);
           }
         } catch {}
 
@@ -78,6 +83,7 @@ export function MapDataProvider({ children }: { children: React.ReactNode }) {
             produtos: null,
             parceiros: files.find((f: any) => f.name === 'parceiros1.json')?.data || null,
             pistas: files.find((f: any) => f.name === 'pistas_s3_lat_log.json')?.data || null,
+            sedesMunicipais: files.find((f: any) => f.name === 'sedes_municipais_lat_long.json')?.data || null,
           };
           setLoadingProgress(100);
           applyResult(organizedData);
@@ -89,6 +95,7 @@ export function MapDataProvider({ children }: { children: React.ReactNode }) {
           produtos: null,
           parceiros: files.find((f: any) => f.name === 'parceiros1.json')?.data || null,
           pistas: files.find((f: any) => f.name === 'pistas_s3_lat_log.json')?.data || null,
+          sedesMunicipais: files.find((f: any) => f.name === 'sedes_municipais_lat_long.json')?.data || null,
         };
         applyResult(organizedData);
         // Não tocar no loading quando SWR em background

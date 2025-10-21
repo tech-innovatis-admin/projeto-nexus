@@ -1444,7 +1444,7 @@ export default function EstrategiaPage() {
 
                     {/* MUNICÍPIO PERIFÉRICO */}
                     <div className="flex flex-col">
-                      <label className="text-slate-300 text-sm mb-0.5 text-center font-bold">MUNICÍPIO PRÓXIMO</label>
+                      <label className="text-slate-300 text-sm mb-0.5 text-center font-bold">MUNICÍPIOS PRÓXIMO</label>
                       <div className="flex gap-2">
                         <button
                           ref={periferiaButtonRef}

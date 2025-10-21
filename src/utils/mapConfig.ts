@@ -1,7 +1,6 @@
 // UFs com abertura comercial
 export const UF_ABERTURA = [
-  'AL','BA','CE','MA','PB','PE','PI','RN','SE', // Nordeste
-  'MT' // Mato Grosso
+  'MA','PB','PE','PI','RN','SE', // Nordeste
 ] as const;
 export type UFAbertura = typeof UF_ABERTURA[number];
 
@@ -36,7 +35,6 @@ export function isRegiaoAbertura(regiao: string): boolean {
 export const ABERTURA_REGIOES: Record<string, readonly string[]> = {
   Nordeste: ['AL','BA','CE','MA','PB','PE','PI','RN','SE'] as const,
 };
-
 
 // Configuração centralizada dos campos de produtos
 // Facilita manutenção e evita ajustes manuais em múltiplos arquivos

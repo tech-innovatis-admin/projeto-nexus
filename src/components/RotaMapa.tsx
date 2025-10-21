@@ -4,6 +4,7 @@ import React, { useRef, useEffect, useState } from 'react';
 import maplibregl, { Map as MapLibreMap } from 'maplibre-gl';
 import { registerMapInstance } from '@/utils/mapRegistry';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { useMapData } from '@/contexts/MapDataContext';
 
 interface RotaMapaProps {
   polos: any;
@@ -39,6 +40,7 @@ export default function RotaMapa({
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibreMap | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const { mapData } = useMapData();
 
   // Inicializar o mapa
   useEffect(() => {
@@ -111,6 +113,136 @@ export default function RotaMapa({
 
   // Mapa focado em rotas - sem auto-fit aos polígonos
   // O componente RotaMapVisualization cuidará do posicionamento quando houver rotas ativas
+
+  // Adicionar camadas de Pistas de Voo (SVG lucide plane) a partir de mapData.pistas
+  useEffect(() => {
+    if (!mapLoaded || !map.current) return;
+
+    const pistas = Array.isArray(mapData?.pistas) ? mapData!.pistas : [];
+
+    // Converter para GeoJSON
+    const features: GeoJSON.Feature[] = [];
+    for (const pista of pistas as any[]) {
+      const lat = parseFloat(String(pista.latitude_pista ?? '').trim());
+      const lng = parseFloat(String(pista.longitude_pista ?? '').trim());
+      if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) continue;
+
+      features.push({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [lng, lat] },
+        properties: {
+          codigo_pista: String(pista.codigo_pista ?? '').trim(),
+          nome_pista: String(pista.nome_pista ?? '').trim(),
+          tipo_pista: String(pista.tipo_pista ?? '').trim()
+        }
+      } as any);
+    }
+
+    const sourceId = 'pistas-voo-source';
+    const layerId = 'pistas-voo-layer';
+    const imageId = 'lucide-plane-icon';
+
+    const addOrUpdateSource = () => {
+      const data: GeoJSON.FeatureCollection = {
+        type: 'FeatureCollection',
+        features
+      };
+      const src = map.current!.getSource(sourceId) as maplibregl.GeoJSONSource | undefined;
+      if (src) {
+        src.setData(data as any);
+      } else {
+        map.current!.addSource(sourceId, {
+          type: 'geojson',
+          data
+        } as any);
+      }
+    };
+
+    const ensurePlaneImage = () => {
+      if (map.current!.hasImage(imageId)) return;
+      const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M2 22h20" />
+  <path d="M9.5 12.5 3 10l1-2 8 2 5-5 3 1-5 5 2 8-2 1-2.5-6.5-3.5 3.5v3l-2 1v-4l3.5-3.5Z" />
+</svg>`;
+      const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+      const img = new Image();
+      img.onload = () => {
+        try {
+          if (!map.current) return;
+          if (!map.current.hasImage(imageId)) {
+            map.current.addImage(imageId, img as any, { pixelRatio: 2 });
+          }
+        } catch {}
+      };
+      img.src = url;
+    };
+
+    const addOrUpdateLayer = () => {
+      if (map.current!.getLayer(layerId)) return;
+      map.current!.addLayer({
+        id: layerId,
+        type: 'symbol',
+        source: sourceId,
+        layout: {
+          'icon-image': imageId,
+          'icon-size': 0.9,
+          'icon-anchor': 'bottom',
+          'icon-allow-overlap': true,
+          'icon-ignore-placement': true
+        }
+      } as any);
+
+      // Interações: cursor e popup
+      map.current!.on('mouseenter', layerId, () => {
+        map.current!.getCanvas().style.cursor = 'pointer';
+      });
+      map.current!.on('mouseleave', layerId, () => {
+        map.current!.getCanvas().style.cursor = '';
+      });
+      map.current!.on('click', layerId, (e: any) => {
+        if (!e.features || !e.features[0]) return;
+        const f = e.features[0];
+        const props = f.properties || {};
+        const lngLat = e.lngLat;
+        new maplibregl.Popup({ offset: 6 })
+          .setLngLat(lngLat)
+          .setHTML(`
+            <div class="text-sm" style="color: black; min-width: 200px;">
+              <div><strong>Código:</strong> ${props.codigo_pista || ''}</div>
+              <div><strong>Nome:</strong> ${props.nome_pista || ''}</div>
+              <div><strong>Tipo:</strong> ${props.tipo_pista || ''}</div>
+            </div>
+          `)
+          .addTo(map.current!);
+      });
+    };
+
+    // Aplicar
+    ensurePlaneImage();
+    addOrUpdateSource();
+    addOrUpdateLayer();
+
+    // Cleanup deste efeito (remover layer/source ao atualizar ou desmontar)
+    return () => {
+      if (!map.current) return;
+      try {
+        if (map.current.getLayer(layerId)) {
+          map.current.removeLayer(layerId);
+        }
+      } catch {}
+      try {
+        if (map.current.getSource(sourceId)) {
+          map.current.removeSource(sourceId);
+        }
+      } catch {}
+      try {
+        if (map.current.hasImage(imageId)) {
+          map.current.removeImage(imageId);
+        }
+      } catch {}
+    };
+  }, [mapLoaded, mapData?.pistas]);
 
   return (
     <div className={`relative w-full h-full ${className}`}>

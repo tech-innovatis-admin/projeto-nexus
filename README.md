@@ -33,9 +33,7 @@ O **NEXUS** é uma plataforma web desenvolvida pela *Data Science Team – Innov
 
 ### 🗺️ **Mapa Interativo Avançado**
 - **Visualização de Camadas Temáticas**:
-  - Municípios (base demográfica e política)
-  - Municípios sem plano diretor
-  - Municípios com plano diretor a vencer
+  - Municípios (base demográfica, política e produtos)
   - Parceiros institucionais com marcadores customizados
   - Dados de pistas de voo por município com coordenadas precisas (latitude/longitude)
 - **Controles Interativos**: Zoom, pan, camadas toggleáveis
@@ -314,7 +312,6 @@ Além da evolução do Sistema de Rotas detalhada acima, permanecem como itens d
   - Performance otimizada (eliminação cálculos redundantes)
 
 ### 🗺️ Estratégia / Análise
-- [ ] Comparativo temporal de valores (ano vs ano)
 - [ ] Clusterização dinâmica de polos em níveis de zoom distintos
 
 ### 📊 Relatórios & Exportações
@@ -416,15 +413,19 @@ AWS S3 ──> GeoJSON, JSON, CSV, PDF Templates
 - **Sistema de Cache**: Spatial reference system integrado
 
 ### ☁️ **Integração AWS S3**
-**Arquivos Principais:**
-- `base_municipios.geojson` - Dados municipais completos
-- `base_pd_sem_plano.geojson` - Municípios sem plano diretor
-- `base_pd_vencendo.geojson` - Planos diretores a vencer
-- `parceiros1.json` - Instituições parceiras
-- `pistas_s3_lat_log.json` - Dados de pistas de voo com coordenadas IBGE
-- `base_polo_valores.geojson` - Análise estratégica
-- `base_polo_periferia.geojson` - Dados de periferia
-- `senhas_s3.json` - Configurações seguras
+**Arquivos Principais Utilizados no Sistema:**
+
+**📍 Dados Municipais (Página /mapa):**
+- `base_municipios.geojson` - Dados municipais completos com geometrias, população, políticos e produtos
+- `parceiros1.json` - Instituições parceiras com coordenadas geográficas para marcadores no mapa
+- `pistas_s3_lat_log.json` - Dados de pistas de voo com coordenadas latitude/longitude por código IBGE
+
+**🎯 Dados Estratégicos (Página /estrategia):**
+- `base_polo_valores.geojson` - Análise estratégica de polos de valores municipais
+- `base_polo_periferia.geojson` - Dados de conectividade urbana e periferias
+
+**🔐 Configurações e Segurança:**
+- `senhas_s3.json` - Configurações seguras do sistema (credenciais, APIs, etc.)
 
 ### 🔄 **Fluxo de Dados Completo**
 1. **Cliente** acessa aplicação → Animação 3D de introdução
@@ -826,14 +827,18 @@ NODE_ENV=development
 
 ### 📁 **Arquivos S3 Necessários**
 O bucket deve conter estes arquivos na raiz:
-- `base_municipios.geojson`
-- `base_pd_sem_plano.geojson`
-- `base_pd_vencendo.geojson`
-- `parceiros1.json`
-- `pistas_s3_lat_log.json`
-- `base_polo_valores.geojson`
-- `base_polo_periferia.geojson`
-- `senhas_s3.json` (opcional - configurações adicionais)
+
+**📍 Dados Municipais (Página /mapa):**
+- `base_municipios.geojson` - Dados municipais completos com geometrias
+- `parceiros1.json` - Instituições parceiras com coordenadas
+- `pistas_s3_lat_log.json` - Dados de pistas de voo com coordenadas
+
+**🎯 Dados Estratégicos (Página /estrategia):**
+- `base_polo_valores.geojson` - Análise estratégica de polos
+- `base_polo_periferia.geojson` - Dados de conectividade urbana
+
+**🔐 Configurações:**
+- `senhas_s3.json` - Configurações seguras do sistema
 
 ### 🚀 **Instalação e Inicialização**
 ```bash

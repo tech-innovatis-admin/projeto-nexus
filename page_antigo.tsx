@@ -283,130 +283,6 @@ function EstadoDropdown({
   return typeof window !== 'undefined' ? createPortal(dropdownContent, document.body) : null;
 }
 
-// Componente de Combobox para busca
-function Combobox({
-  value,
-  onChange,
-  options,
-  placeholder,
-  buttonRef,
-  dropdownRef,
-  isOpen,
-  setIsOpen,
-  label,
-  disabled = false
-}: {
-  value: string;
-  onChange: (value: string) => void;
-  options: Array<{ value: string; label: string }>;
-  placeholder: string;
-  buttonRef: React.RefObject<HTMLButtonElement | null>;
-  dropdownRef: React.RefObject<HTMLDivElement | null>;
-  isOpen: boolean;
-  setIsOpen: (open: boolean) => void;
-  label: string;
-  disabled?: boolean;
-}) {
-  const [searchTerm, setSearchTerm] = useState('');
-
-  // Filtrar opções baseado no termo de busca
-  const filteredOptions = useMemo(() => {
-    if (!searchTerm) return options;
-    return options.filter(option =>
-      option.label.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [options, searchTerm]);
-
-  // Reset search quando fecha
-  useEffect(() => {
-    if (!isOpen) {
-      setSearchTerm('');
-    }
-  }, [isOpen]);
-
-  const selectedOption = options.find(opt => opt.value === value);
-
-  return (
-    <div className="flex flex-col">
-      <label className="text-slate-300 text-sm mb-0.5 text-center font-bold">{label}</label>
-      <button
-        ref={buttonRef}
-        type="button"
-        disabled={disabled}
-        onClick={() => !disabled && setIsOpen(!isOpen)}
-        className={`bg-[#0f172a] text-slate-200 border border-slate-700/50 rounded-md px-3 py-1.5 text-left flex items-center justify-between min-h-[40px] ${
-          disabled
-            ? 'opacity-50 cursor-not-allowed'
-            : 'hover:bg-[#1a2332] cursor-pointer focus:outline-none focus:ring-2 focus:ring-sky-500'
-        }`}
-      >
-        <span className="text-sm truncate">
-          {selectedOption ? selectedOption.label : placeholder}
-        </span>
-        <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
-          <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd"/>
-        </svg>
-      </button>
-
-      {isOpen && !disabled && typeof window !== 'undefined' && createPortal((
-        <div
-          ref={dropdownRef}
-          className="fixed bg-[#0f172a] border border-slate-700/70 rounded-md shadow-lg z-[9999]"
-          style={{
-            top: ((buttonRef.current?.getBoundingClientRect()?.bottom || 0) + window.scrollY + 4),
-            left: ((buttonRef.current?.getBoundingClientRect()?.left || 0) + window.scrollX),
-            width: buttonRef.current?.getBoundingClientRect()?.width,
-            minWidth: '280px',
-            maxHeight: '300px',
-            height: '300px'
-          }}
-        >
-          <div className="h-full flex flex-col">
-            {/* Campo de busca */}
-            <div className="p-2 border-b border-slate-700/50 flex-shrink-0">
-              <input
-                type="text"
-                placeholder="Buscar..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-slate-800/50 text-slate-200 border border-slate-600/50 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-                autoFocus
-              />
-            </div>
-
-            {/* Área scrollável */}
-            <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
-              <div className="px-3 py-2">
-                <p className="text-[10px] tracking-wider text-slate-400 font-semibold mb-2">{label.toUpperCase()}</p>
-                {filteredOptions.map(option => (
-                  <label key={option.value} className="flex items-center gap-2 py-1 px-1 hover:bg-slate-800/50 rounded cursor-pointer">
-                    <input
-                      type="radio"
-                      name={`combobox-${label}`}
-                      className="w-4 h-4"
-                      checked={value === option.value}
-                      onChange={() => {
-                        onChange(option.value);
-                        setIsOpen(false);
-                      }}
-                    />
-                    <span className="text-sm text-white">{option.label}</span>
-                  </label>
-                ))}
-                {filteredOptions.length === 0 && searchTerm && (
-                  <div className="text-xs text-slate-500 text-center py-4">
-                    Nenhum resultado encontrado para "{searchTerm}"
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      ), document.body)}
-    </div>
-  );
-}
-
 // Componente para dropdown de Municípios Periféricos
 function MunicipioPerifericoDropdown({
   isOpen,
@@ -424,7 +300,6 @@ function MunicipioPerifericoDropdown({
   periferiasDisponiveis: PeriferiaProps[];
 }) {
   const [position, setPosition] = useState({ top: 0, left: 0, width: 0 });
-  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     if (isOpen && buttonRef.current) {
@@ -437,21 +312,10 @@ function MunicipioPerifericoDropdown({
     }
   }, [isOpen, buttonRef]);
 
-  // Reset search quando fecha
-  useEffect(() => {
-    if (!isOpen) {
-      setSearchTerm('');
-    }
-  }, [isOpen]);
-
   if (!isOpen) return null;
 
-  // Ordenar periferias alfabeticamente por município e filtrar por busca
-  const periferiasOrdenadas = [...periferiasDisponiveis]
-    .filter(peri =>
-      peri.municipio_destino.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    .sort((a, b) =>
+  // Ordenar periferias alfabeticamente por município
+  const periferiasOrdenadas = [...periferiasDisponiveis].sort((a, b) =>
     a.municipio_destino.localeCompare(b.municipio_destino, 'pt-BR')
   );
 
@@ -469,7 +333,7 @@ function MunicipioPerifericoDropdown({
       }}
     >
       <div className="h-full flex flex-col">
-        {/* Header fixo - Limpar Seleção */}
+        {/* Header fixo */}
         <div className="p-2 border-b border-slate-700/50 flex-shrink-0">
           <button
             onClick={() => setSelectedMunicipio('ALL')}
@@ -482,18 +346,6 @@ function MunicipioPerifericoDropdown({
             </div>
             <span className="text-sm text-red-400 font-semibold">Limpar Seleção</span>
           </button>
-        </div>
-
-        {/* Campo de busca */}
-        <div className="p-2 border-b border-slate-700/50 flex-shrink-0">
-          <input
-            type="text"
-            placeholder="Buscar município..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-slate-800/50 text-slate-200 border border-slate-600/50 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-sky-500"
-            autoFocus
-          />
         </div>
 
         {/* Área scrollável */}
@@ -522,7 +374,7 @@ function MunicipioPerifericoDropdown({
             ))}
             {periferiasOrdenadas.length === 0 && (
               <div className="text-xs text-slate-500 text-center py-4">
-                {searchTerm ? `Nenhum município encontrado para "${searchTerm}"` : 'Nenhum município periférico encontrado para este polo'}
+                Nenhum município periférico encontrado para este polo
               </div>
             )}
           </div>
@@ -561,6 +413,8 @@ export default function EstrategiaPage() {
   const estadoButtonRef = useRef<HTMLButtonElement>(null);
   const estadoDropdownRef = useRef<HTMLDivElement>(null);
   // Filtro de Municípios Periféricos
+  const [isPeriferiaOpen, setIsPeriferiaOpen] = useState<boolean>(false);
+  const periferiaButtonRef = useRef<HTMLButtonElement>(null);
   const periferiaDropdownRef = useRef<HTMLDivElement>(null);
 
   // Filtros aplicados (após clicar em buscar)
@@ -571,16 +425,6 @@ export default function EstrategiaPage() {
   const [appliedMaxValor, setAppliedMaxValor] = useState<number | ''>('');
   const [appliedUFs, setAppliedUFs] = useState<string[]>([]); // Novo: UFs aplicadas
   const [appliedProducts, setAppliedProducts] = useState<string[]>([]);
-
-  // Estados para inputs de busca
-  const [poloInputValue, setPoloInputValue] = useState<string>('');
-  const [periferiaInputValue, setPeriferiaInputValue] = useState<string>('');
-  const [isPoloDropdownOpen, setIsPoloDropdownOpen] = useState<boolean>(false);
-  const [isPeriferiaDropdownOpen, setIsPeriferiaDropdownOpen] = useState<boolean>(false);
-  const poloInputRef = useRef<HTMLDivElement>(null);
-
-  // Estado para filtro de João Pessoa (raio de 1.300km)
-  const [isJoaoPessoaFilterActive, setIsJoaoPessoaFilterActive] = useState<boolean>(false);
 
   // Estado dos dados processados do contexto
   const [polosValores, setPolosValores] = useState<PoloValoresProps[]>([]);
@@ -594,53 +438,6 @@ export default function EstrategiaPage() {
   const [radiusPayload, setRadiusPayload] = useState<RadiusResultPayload | null>(null);
 
 
-
-  // Coordenadas de João Pessoa (latitude, longitude)
-  const JOAO_PESSOA_COORDS = [-7.14804917856058, -34.95096946933421]; // [lat, lng]
-  const JOAO_PESSOA_RADIUS_KM = 1300;
-
-  // Função para calcular distância entre duas coordenadas usando fórmula de Haversine
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 6371; // Raio da Terra em km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-  };
-
-  // Função para extrair coordenadas do centroide de uma geometria
-  const getCentroid = (geom: any): [number, number] | null => {
-    if (!geom || !geom.coordinates) return null;
-    
-    try {
-      if (geom.type === 'Point') {
-        return [geom.coordinates[1], geom.coordinates[0]]; // [lat, lng]
-      } else if (geom.type === 'Polygon') {
-        const coords = geom.coordinates[0];
-        let latSum = 0, lngSum = 0;
-        for (const coord of coords) {
-          lngSum += coord[0];
-          latSum += coord[1];
-        }
-        return [latSum / coords.length, lngSum / coords.length];
-      } else if (geom.type === 'MultiPolygon') {
-        const firstPolygon = geom.coordinates[0][0];
-        let latSum = 0, lngSum = 0;
-        for (const coord of firstPolygon) {
-          lngSum += coord[0];
-          latSum += coord[1];
-        }
-        return [latSum / firstPolygon.length, lngSum / firstPolygon.length];
-      }
-    } catch (error) {
-      console.warn('Erro ao calcular centroide:', error);
-    }
-    return null;
-  };
 
   // Normalizador de números pt-BR (aceita number ou string "1.234,56")
   const parsePtBrNumber = (v: unknown): number => {
@@ -769,23 +566,6 @@ export default function EstrategiaPage() {
     }
   }, [estrategiaData, loadingData]);
 
-  // Função para filtrar municípios dentro do raio de João Pessoa
-  const filterByJoaoPessoaRadius = useCallback((municipios: (PoloValoresProps | PeriferiaProps)[]) => {
-    if (!isJoaoPessoaFilterActive) return municipios;
-    
-    return municipios.filter(municipio => {
-      const centroid = getCentroid(municipio.geom);
-      if (!centroid) return false;
-      
-      const distance = calculateDistance(
-        JOAO_PESSOA_COORDS[0], JOAO_PESSOA_COORDS[1],
-        centroid[0], centroid[1]
-      );
-      
-      return distance <= JOAO_PESSOA_RADIUS_KM;
-    });
-  }, [isJoaoPessoaFilterActive]);
-
   // Soma produtos selecionados com fallback para total quando nenhum produto aplicado
   const sumSelectedProducts = (vals: Record<string, number> | undefined, fallbackTotal: number): number => {
     if (!vals) return fallbackTotal || 0;
@@ -815,17 +595,13 @@ export default function EstrategiaPage() {
     if (appliedUFs.length) base = base.filter(p => appliedUFs.includes(String(p.UF)));
     if (inPoloMode) base = base.filter(p => p.codigo_origem === appliedPolo);
     else if (inUFMode) base = base.filter(p => String(p.UF || '').toUpperCase() === ufUpper);
-    
-    // Aplicar filtro de João Pessoa se ativo
-    base = filterByJoaoPessoaRadius(base) as PeriferiaProps[];
-    
     const map = new Map<string, number>();
     for (const f of base) {
       const agg = sumSelectedProducts(f.productValues, Number(f.valor_total_destino) || 0);
       map.set(f.codigo_origem, (map.get(f.codigo_origem) || 0) + agg);
     }
     return map;
-  }, [periferia, appliedUFs, appliedPolo, appliedUF, appliedProducts, filterByJoaoPessoaRadius]);
+  }, [periferia, appliedUFs, appliedPolo, appliedUF, appliedProducts]);
 
   // Função para formatar valores monetários
   const formatCurrency = (value: number) => {
@@ -837,16 +613,12 @@ export default function EstrategiaPage() {
     }).format(value);
   };
 
-  // Opções de polo vindas da base real (filtradas por João Pessoa se ativo)
+  // Opções de polo vindas da base real (todas)
   const poloOptions = useMemo(() => {
     const seen = new Set<string>();
-    let base = selectedUFs.length
+    const base = selectedUFs.length
       ? polosValores.filter(p => selectedUFs.includes(String(p.UF || p.UF_origem)))
       : polosValores;
-    
-    // Aplicar filtro de João Pessoa se ativo
-    base = filterByJoaoPessoaRadius(base) as PoloValoresProps[];
-    
     const opts = base
       .filter(p => {
         if (!p.codigo_origem) return false;
@@ -857,42 +629,13 @@ export default function EstrategiaPage() {
       .map(p => ({ value: p.codigo_origem, label: p.municipio_origem }));
     // Ordena alfabeticamente pelo label
     return opts.sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
-  }, [polosValores, selectedUFs, filterByJoaoPessoaRadius]);
+  }, [polosValores, selectedUFs]);
 
-  // Polos filtrados baseado no input de busca
-  const polosFiltrados = useMemo(() => {
-    if (!poloInputValue.trim()) return poloOptions;
-    return poloOptions.filter(polo =>
-      polo.label.toLowerCase().includes(poloInputValue.toLowerCase())
-    );
-  }, [poloOptions, poloInputValue]);
-
-  // Periferias filtradas baseado no input de busca e filtro de João Pessoa
-  const periferiasFiltradas = useMemo(() => {
-    let base = selectedUFs.length
-      ? periferia.filter(p => selectedUFs.includes(String(p.UF)))
-      : periferia;
-    
-    // Aplicar filtro de João Pessoa se ativo
-    base = filterByJoaoPessoaRadius(base) as PeriferiaProps[];
-    
-    const filteredByPolo = selectedPolo === 'ALL' ? base : base.filter(p => p.codigo_origem === selectedPolo);
-
-    if (!periferiaInputValue.trim()) return filteredByPolo;
-    return filteredByPolo.filter(peri =>
-      peri.municipio_destino.toLowerCase().includes(periferiaInputValue.toLowerCase())
-    );
-  }, [periferia, selectedUFs, selectedPolo, periferiaInputValue, filterByJoaoPessoaRadius]);
-
-  // Opções filtradas por UFs selecionadas e filtro de João Pessoa (para o select de POLO)
+  // Opções filtradas por UFs selecionadas (para o select de POLO)
   const filteredPoloOptions = useMemo(() => {
-    let base = selectedUFs.length
+    const base = selectedUFs.length
       ? polosValores.filter(p => selectedUFs.includes(String(p.UF || p.UF_origem)))
       : polosValores;
-    
-    // Aplicar filtro de João Pessoa se ativo
-    base = filterByJoaoPessoaRadius(base) as PoloValoresProps[];
-    
     const seen = new Set<string>();
     const opts = base
       .filter(p => {
@@ -903,7 +646,7 @@ export default function EstrategiaPage() {
       })
       .map(p => ({ value: p.codigo_origem, label: p.municipio_origem }));
     return opts.sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
-  }, [selectedUFs, polosValores, filterByJoaoPessoaRadius]);
+  }, [selectedUFs, polosValores]);
 
   // Resetar polo selecionado caso UFs mudem e o polo atual não exista mais
   useEffect(() => {
@@ -912,18 +655,14 @@ export default function EstrategiaPage() {
     if (!exists) setSelectedPolo('ALL');
   }, [selectedUFs, filteredPoloOptions, selectedPolo]);
 
-  // Opções de municípios periféricos filtrados por polo selecionado e filtro de João Pessoa
+  // Opções de municípios periféricos filtrados por polo selecionado
   const filteredPeriferiaOptions = useMemo(() => {
     if (selectedPolo === 'ALL') return [];
-    let base = selectedUFs.length
+    const base = selectedUFs.length
       ? periferia.filter(p => selectedUFs.includes(String(p.UF)))
       : periferia;
-    
-    // Aplicar filtro de João Pessoa se ativo
-    base = filterByJoaoPessoaRadius(base) as PeriferiaProps[];
-    
     return base.filter(p => p.codigo_origem === selectedPolo);
-  }, [periferia, selectedPolo, selectedUFs, filterByJoaoPessoaRadius]);
+  }, [periferia, selectedPolo, selectedUFs]);
 
   // Resetar município periférico selecionado caso o polo mude
   useEffect(() => {
@@ -933,24 +672,6 @@ export default function EstrategiaPage() {
     );
     if (!exists) setSelectedMunicipioPeriferico('ALL');
   }, [selectedPolo, filteredPeriferiaOptions, selectedMunicipioPeriferico]);
-
-  // Resetar filtros quando o filtro de João Pessoa for ativado/desativado
-  useEffect(() => {
-    // Resetar polo selecionado se não existir mais nas opções filtradas
-    if (selectedPolo !== 'ALL') {
-      const exists = poloOptions.some(o => o.value === selectedPolo);
-      if (!exists) {
-        setSelectedPolo('ALL');
-        setPoloInputValue('');
-      }
-    }
-    
-    // Resetar município periférico
-    if (selectedMunicipioPeriferico !== 'ALL') {
-      setSelectedMunicipioPeriferico('ALL');
-      setPeriferiaInputValue('');
-    }
-  }, [isJoaoPessoaFilterActive, poloOptions, selectedPolo, selectedMunicipioPeriferico]);
 
   // Click outside e ESC para fechar dropdown de Estado
   useEffect(() => {
@@ -1006,59 +727,29 @@ export default function EstrategiaPage() {
     };
   }, [isProdutosOpen]);
 
-
-
-  // Click outside e ESC para fechar dropdown de Polo (busca)
+  // Click outside e ESC para fechar dropdown de Municípios Periféricos
   useEffect(() => {
-    if (!isPoloDropdownOpen) return;
-
+    if (!isPeriferiaOpen) return;
     const handleClickOutside = (event: MouseEvent) => {
-      if (poloInputRef.current &&
-          !poloInputRef.current.contains(event.target as Node)) {
-        setIsPoloDropdownOpen(false);
+      if (
+        periferiaButtonRef.current &&
+        periferiaDropdownRef.current &&
+        !periferiaButtonRef.current.contains(event.target as Node) &&
+        !periferiaDropdownRef.current.contains(event.target as Node)
+      ) {
+        setIsPeriferiaOpen(false);
       }
     };
-
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsPoloDropdownOpen(false);
-      }
+      if (event.key === 'Escape') setIsPeriferiaOpen(false);
     };
-
     document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('keydown', handleEscape as any);
-
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleEscape as any);
     };
-  }, [isPoloDropdownOpen]);
-
-  // Click outside e ESC para fechar dropdown de Periferias (busca)
-  useEffect(() => {
-    if (!isPeriferiaDropdownOpen) return;
-
-    const handleClickOutside = (event: MouseEvent) => {
-      if (periferiaDropdownRef.current &&
-          !periferiaDropdownRef.current.contains(event.target as Node)) {
-        setIsPeriferiaDropdownOpen(false);
-      }
-    };
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsPeriferiaDropdownOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleEscape as any);
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleEscape as any);
-    };
-  }, [isPeriferiaDropdownOpen]);
+  }, [isPeriferiaOpen]);
 
   // GeoJSON minimal para o mapa (com geometria e apenas campos usados no mapa/popup)
   const polosFCForMap = useMemo(() => {
@@ -1069,10 +760,6 @@ export default function EstrategiaPage() {
     if (appliedUFs.length) base = base.filter(p => appliedUFs.includes(String(p.UF || p.UF_origem)));
     if (inPoloMode) base = base.filter(p => p.codigo_origem === appliedPolo);
     else if (inUFMode) base = base.filter(p => String(p.UF || p.UF_origem || '').toUpperCase() === ufUpper);
-    
-    // Aplicar filtro de João Pessoa se ativo
-    base = filterByJoaoPessoaRadius(base) as PoloValoresProps[];
-    
     const features = base
       .filter(p => !!p.geom)
       .map(p => ({
@@ -1093,7 +780,7 @@ export default function EstrategiaPage() {
         }
       }));
     return { type: 'FeatureCollection' as const, features };
-  }, [polosValores, appliedUF, appliedPolo, appliedUFs, periferiaAggByCodigo, filterByJoaoPessoaRadius]);
+  }, [polosValores, appliedUF, appliedPolo, appliedUFs, periferiaAggByCodigo]);
 
   const periferiasFCForMap = useMemo(() => {
     const ufUpper = String(appliedUF || '').toUpperCase();
@@ -1103,10 +790,6 @@ export default function EstrategiaPage() {
     if (appliedUFs.length) base = base.filter(p => appliedUFs.includes(String(p.UF)));
     if (inPoloMode) base = base.filter(p => p.codigo_origem === appliedPolo);
     else if (inUFMode) base = base.filter(p => String(p.UF || '').toUpperCase() === ufUpper);
-    
-    // Aplicar filtro de João Pessoa se ativo
-    base = filterByJoaoPessoaRadius(base) as PeriferiaProps[];
-    
     const features = base
       .filter(p => !!p.geom)
       .map(p => ({
@@ -1126,7 +809,7 @@ export default function EstrategiaPage() {
         } as any
       }));
     return { type: 'FeatureCollection' as const, features };
-  }, [periferia, appliedUF, appliedPolo, appliedUFs, appliedProducts, filterByJoaoPessoaRadius]);
+  }, [periferia, appliedUF, appliedPolo, appliedUFs, appliedProducts]);
 
   // Cálculos derivados para cards com base no polo aplicado
   const derived = useMemo(() => {
@@ -1142,9 +825,6 @@ export default function EstrategiaPage() {
     } else if (inUFMode) {
       valoresFiltrados = valoresFiltrados.filter(v => String(v.UF || v.UF_origem || '').toUpperCase() === ufUpper);
     }
-    
-    // Aplicar filtro de João Pessoa se ativo
-    valoresFiltrados = filterByJoaoPessoaRadius(valoresFiltrados) as PoloValoresProps[];
 
     // Card 2 e 3: base de periferias filtrada
     let periferiaFiltrada = periferia;
@@ -1154,9 +834,6 @@ export default function EstrategiaPage() {
     } else if (inUFMode) {
       periferiaFiltrada = periferiaFiltrada.filter(p => String(p.UF || '').toUpperCase() === ufUpper);
     }
-    
-    // Aplicar filtro de João Pessoa se ativo
-    periferiaFiltrada = filterByJoaoPessoaRadius(periferiaFiltrada) as PeriferiaProps[];
     if (appliedMinValor !== '' || appliedMaxValor !== '') {
       periferiaFiltrada = periferiaFiltrada.filter(p => {
         const val = Number(p.valor_total_destino) || 0;
@@ -1219,7 +896,7 @@ export default function EstrategiaPage() {
       totalMunicipios: municipiosList.length,
       poloLabel
     };
-  }, [appliedPolo, appliedUF, appliedUFs, appliedProducts, appliedMinValor, appliedMaxValor, polosValores, periferia, poloOptions, periferiaAggByCodigo, filterByJoaoPessoaRadius]);
+  }, [appliedPolo, appliedUF, appliedUFs, appliedProducts, appliedMinValor, appliedMaxValor, polosValores, periferia, poloOptions, periferiaAggByCodigo]);
 
   // Reset da lista de municípios quando o polo mudar
   useEffect(() => {
@@ -1696,36 +1373,6 @@ export default function EstrategiaPage() {
                   Análise Estratégica de <span className="text-sky-400">Produtos</span>
                 </h1>
                 
-                {/* Botão Toggle para Filtro de João Pessoa */}
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-slate-300 font-medium">Raio João Pessoa (1.300km)</span>
-                    <button
-                      onClick={() => setIsJoaoPessoaFilterActive(!isJoaoPessoaFilterActive)}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-slate-800 ${
-                        isJoaoPessoaFilterActive ? 'bg-sky-600' : 'bg-slate-600'
-                      }`}
-                      role="switch"
-                      aria-checked={isJoaoPessoaFilterActive}
-                      aria-label="Ativar filtro de raio de João Pessoa"
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          isJoaoPessoaFilterActive ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
-                    </button>
-                  </div>
-                  {isJoaoPessoaFilterActive && (
-                    <div className="flex items-center gap-1 text-xs text-sky-400 bg-sky-900/30 px-2 py-1 rounded-md border border-sky-700/50">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      <span>Filtro Ativo</span>
-                    </div>
-                  )}
-                </div>
 
               </motion.div>
             </div>
@@ -1783,172 +1430,54 @@ export default function EstrategiaPage() {
                     {/* POLO */}
                     <div className="flex flex-col">
                       <label className="text-slate-300 text-sm mb-0.5 text-center font-bold">POLO</label>
-                      <div className="relative" ref={poloInputRef}>
-                        <input
-                          type="text"
-                          value={poloInputValue}
-                          onChange={(e) => {
-                            setPoloInputValue(e.target.value);
-                            setIsPoloDropdownOpen(true);
-                          }}
-                          onFocus={() => {
-                            if (isPoloDropdownOpen) {
-                              // Se já está aberto, fecha o dropdown
-                              setIsPoloDropdownOpen(false);
-                            } else {
-                              // Se está fechado, abre e limpa o campo
-                              setIsPoloDropdownOpen(true);
-                              setPoloInputValue('');
-                            }
-                          }}
-                          placeholder="Digite o nome do polo..."
-                          className="w-full rounded-md bg-[#1e293b] text-white placeholder-slate-400 border border-slate-600 px-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-left"
-                        />
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          className={`h-4 w-4 text-slate-300 absolute right-2 top-1/2 -translate-y-1/2 transition-transform duration-200 pointer-events-none ${isPoloDropdownOpen ? 'rotate-180' : ''}`}
-                          viewBox="0 0 20 20"
-                          fill="currentColor"
-                          aria-hidden="true"
-                        >
-                          <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.939l3.71-3.71a.75.75 0 111.06 1.061l-4.24 4.24a.75.75 0 01-1.06 0l-4.24-4.24a.75.75 0 01.02-1.06z" clipRule="evenodd" />
-                        </svg>
-
-                        {/* Dropdown personalizado */}
-                        {isPoloDropdownOpen && (
-                          <div className="absolute top-full left-0 mt-1 w-full rounded-md shadow-lg bg-[#1e293b] border border-slate-600 z-50 max-h-80 overflow-y-auto">
-                            <div className="py-1">
-                              {/* Opção "Todos os Polos" */}
-                              <button
-                                onClick={() => {
-                                  setSelectedPolo('ALL');
-                                  setPoloInputValue('Todos os Polos');
-                                  setIsPoloDropdownOpen(false);
-                                }}
-                                className="w-full text-left px-3 py-2 text-sm text-white hover:bg-slate-600 transition-colors"
-                              >
-                                Todos os Polos
-                              </button>
-
-                              {/* Polos filtrados */}
-                              {polosFiltrados.map((polo) => (
-                                <button
-                                  key={polo.value}
-                                  onClick={() => {
-                                    setSelectedPolo(polo.value);
-                                    setPoloInputValue(polo.label);
-                                    setIsPoloDropdownOpen(false);
-                                  }}
-                                  className="w-full text-left px-3 py-2 text-sm text-white hover:bg-slate-600 transition-colors"
-                                >
-                                  {polo.label}
-                                </button>
-                              ))}
-
-                              {/* Mensagem quando não há resultados na busca */}
-                              {poloInputValue.trim() && polosFiltrados.length === 0 && (
-                                <div className="px-3 py-2 text-sm text-slate-400 text-center">
-                                  Nenhum polo encontrado
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                      <select
+                        value={selectedPolo}
+                        onChange={(e) => setSelectedPolo(e.target.value)}
+                        className="bg-[#0f172a] text-slate-200 border border-slate-700/50 rounded-md px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-colors min-h-[40px]"
+                      >
+                        <option value="ALL">Todos os Polos</option>
+                        {filteredPoloOptions.map(opt => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
                     </div>
 
                     {/* MUNICÍPIO PERIFÉRICO */}
                     <div className="flex flex-col">
                       <label className="text-slate-300 text-sm mb-0.5 text-center font-bold">MUNICÍPIOS PRÓXIMO</label>
                       <div className="flex gap-2">
-                        <div className="relative flex-1" ref={periferiaDropdownRef}>
-                          <input
-                            type="text"
-                            value={periferiaInputValue}
-                            onChange={(e) => {
-                              setPeriferiaInputValue(e.target.value);
-                              setIsPeriferiaDropdownOpen(true);
-                            }}
-                            onFocus={() => {
-                              if (selectedPolo !== 'ALL') {
-                                if (isPeriferiaDropdownOpen) {
-                                  // Se já está aberto, fecha o dropdown
-                                  setIsPeriferiaDropdownOpen(false);
-                                } else {
-                                  // Se está fechado, abre e limpa o campo
-                                  setIsPeriferiaDropdownOpen(true);
-                                  setPeriferiaInputValue('');
-                                }
-                              }
-                            }}
+                        <button
+                          ref={periferiaButtonRef}
+                          type="button"
                           disabled={selectedPolo === 'ALL'}
-                            placeholder={selectedPolo === 'ALL' ? 'Selecione um polo primeiro' : 'Digite o nome do município...'}
-                            className={`appearance-none w-full rounded-md bg-[#1e293b] text-white placeholder-slate-400 border border-slate-600 px-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-left ${
-                              selectedPolo === 'ALL' ? 'opacity-60 cursor-not-allowed' : 'cursor-text'
-                            }`}
-                          />
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className={`h-4 w-4 text-slate-300 absolute right-2 top-1/2 -translate-y-1/2 transition-transform duration-200 pointer-events-none ${isPeriferiaDropdownOpen ? 'rotate-180' : ''}`}
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                            aria-hidden="true"
-                          >
-                            <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.939l3.71-3.71a.75.75 0 111.06 1.061l-4.24 4.24a.75.75 0 01-1.06 0l-4.24-4.24a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                          onClick={() => selectedPolo !== 'ALL' && setIsPeriferiaOpen(v => !v)}
+                          className={`bg-[#0f172a] text-slate-200 border border-slate-700/50 rounded-md px-3 py-1.5 text-left flex items-center justify-between min-h-[40px] flex-1 ${
+                            selectedPolo === 'ALL' ? 'opacity-50 cursor-not-allowed' : 'hover:bg-[#1a2332] cursor-pointer'
+                          }`}
+                        >
+                          <span className="text-sm truncate">
+                            {selectedMunicipioPeriferico === 'ALL'
+                              ? selectedPolo === 'ALL'
+                                ? 'Selecione um polo primeiro'
+                                : 'Todos os municípios'
+                              : (() => {
+                                  const peri = filteredPeriferiaOptions.find(p =>
+                                    (p.codigo_destino || p.municipio_destino) === selectedMunicipioPeriferico
+                                  );
+                                  return peri?.municipio_destino || selectedMunicipioPeriferico;
+                                })()
+                            }
+                          </span>
+                          <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 transition-transform ${isPeriferiaOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd"/>
                           </svg>
-
-                          {/* Dropdown personalizado */}
-                          {isPeriferiaDropdownOpen && selectedPolo !== 'ALL' && (
-                            <div className="absolute top-full left-0 mt-1 w-full rounded-md shadow-lg bg-[#1e293b] border border-slate-600 z-50 max-h-80 overflow-y-auto">
-                              <div className="py-1">
-                                {/* Opção "Todos os municípios" */}
-                                <button
-                                  onClick={() => {
-                                    setSelectedMunicipioPeriferico('ALL');
-                                    setAppliedMunicipioPeriferico('ALL');
-                                    setPeriferiaInputValue('Todos os municípios');
-                                    setIsPeriferiaDropdownOpen(false);
-                                  }}
-                                  className="w-full text-left px-3 py-2 text-sm text-white hover:bg-slate-600 transition-colors"
-                                >
-                                  Todos os municípios
-                                </button>
-
-                                {/* Periferias filtradas */}
-                                {periferiasFiltradas.map((peri) => (
-                                  <button
-                                    key={peri.codigo_destino || peri.municipio_destino}
-                                    onClick={() => {
-                                      const municipioId = peri.codigo_destino || peri.municipio_destino;
-                                      setSelectedMunicipioPeriferico(municipioId);
-                                      setAppliedMunicipioPeriferico(municipioId);
-                                      setPeriferiaInputValue(peri.municipio_destino);
-                                      setIsPeriferiaDropdownOpen(false);
-                                    }}
-                                    className="w-full text-left px-3 py-2 text-sm text-white hover:bg-slate-600 transition-colors"
-                                  >
-                                    {peri.municipio_destino}
-                                  </button>
-                                ))}
-
-                                {/* Mensagem quando não há resultados na busca */}
-                                {periferiaInputValue.trim() && periferiasFiltradas.length === 0 && (
-                                  <div className="px-3 py-2 text-sm text-slate-400 text-center">
-                                    Nenhum município encontrado
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
+                        </button>
                         {selectedMunicipioPeriferico !== 'ALL' && (
                           <button
                             onClick={() => {
                               setSelectedMunicipioPeriferico('ALL');
                               setAppliedMunicipioPeriferico('ALL');
-                              setPeriferiaInputValue('');
-                              setIsPeriferiaDropdownOpen(false);
+                              setIsPeriferiaOpen(false);
                             }}
                             className="bg-red-600/80 hover:bg-red-600 text-white px-2 py-1.5 rounded-md font-medium transition-colors duration-200 flex items-center justify-center min-h-[40px]"
                             title="Limpar seleção do município periférico"
@@ -1960,6 +1489,14 @@ export default function EstrategiaPage() {
                           </button>
                         )}
                       </div>
+                      <MunicipioPerifericoDropdown
+                        isOpen={isPeriferiaOpen}
+                        buttonRef={periferiaButtonRef}
+                        dropdownRef={periferiaDropdownRef}
+                        selectedMunicipio={selectedMunicipioPeriferico}
+                        setSelectedMunicipio={setSelectedMunicipioPeriferico}
+                        periferiasDisponiveis={filteredPeriferiaOptions}
+                      />
                     </div>
 
                     {/* PRODUTOS (Dropdown multi-select via Portal) */}
@@ -2046,8 +1583,7 @@ export default function EstrategiaPage() {
                             // Fechar dropdowns
                             setIsEstadoOpen(false);
                             setIsProdutosOpen(false);
-                            setIsPoloDropdownOpen(false);
-                            setIsPeriferiaDropdownOpen(false);
+                            setIsPeriferiaOpen(false);
                           }}
                           className="bg-sky-600 hover:bg-sky-700 text-white px-3 py-1.5 rounded-md font-medium transition-colors duration-200 flex items-center justify-center gap-1.5 min-h-[40px] flex-1"
                         >

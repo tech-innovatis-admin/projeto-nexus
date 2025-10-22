@@ -49,6 +49,7 @@ O **NEXUS** é uma plataforma web desenvolvida pela *Data Science Team – Innov
 - **Integração com Dados Municipais** para insights estratégicos
 - **Filtro Unificado ESTADO/REGIÃO** com seleção por regiões e estados
 - **Indicadores Visuais de Abertura** comercial por estado/região
+- **Filtro de Raio Estratégico de João Pessoa** (1.300km)
 - **Ferramenta de Raio Interativo** para análise de cobertura de valores
 
 ### 🔍 **Ferramenta de Raio Interativo**
@@ -120,6 +121,76 @@ ESTADOS:
 - **Visibilidade de Oportunidades**: Indicadores claros de abertura comercial
 - **UX Otimizada**: Interface unificada substituindo filtros separados
 - **Performance**: Aplicação em tempo real nos dados estratégicos
+
+### 🎯 **Filtro de Raio Estratégico de João Pessoa**
+O filtro estratégico permite visualizar apenas os polos e periferias dentro de um raio de 1.300km de João Pessoa, facilitando análises focadas na região Nordeste/Nordeste do Brasil.
+
+#### **Como Funciona:**
+1. **Ativação**: Clique no toggle "Raio João Pessoa (1.300km)" no header da página
+2. **Filtragem Automática**: Sistema calcula distância geodésica para todos os municípios
+3. **Visualização Filtrada**: Mapa, dropdowns e métricas mostram apenas municípios dentro do raio
+4. **Desativação**: Clique novamente no toggle para voltar à visualização completa
+
+#### **Tecnologia de Cálculo:**
+- **Fórmula de Haversine**: Cálculo preciso de distâncias na superfície terrestre
+- **Centro Geográfico**: João Pessoa (latitude: -7.14804917856058, longitude: -34.95096946933421)
+- **Raio Estratégico**: 1.300 km exatos
+- **Centroide Inteligente**: Cálculo automático do centro geométrico de cada município
+
+#### **Componentes Filtrados:**
+- **Mapa Interativo**: Polígonos de polos e periferias dentro do raio
+- **Dropdown POLO**: Apenas polos dentro do raio de 1.300km
+- **Dropdown MUNICÍPIOS PRÓXIMOS**: Apenas periferias dentro do raio
+- **Cards de Métricas**: Cálculos baseados apenas nos dados filtrados
+- **Busca por Texto**: Resultados filtrados pelos municípios dentro do raio
+
+#### **Interface do Usuário:**
+```
+┌─────────────────────────────────────────────────────────┐
+│ [Toggle: Raio João Pessoa (1.300km)] [Filtro Ativo]     │
+└─────────────────────────────────────────────────────────┘
+```
+
+- **Toggle Visual**: Switch com estados ativos/inativos distintos
+- **Indicador Ativo**: Badge azul "Filtro Ativo" quando ativado
+- **Feedback Imediato**: Filtragem aplicada instantaneamente
+- **Reset Inteligente**: Seleções inválidas são automaticamente removidas
+
+#### **Lógica de Filtragem:**
+```typescript
+// Função de cálculo de distância
+const calculateDistance = (lat1, lon1, lat2, lon2) => {
+  const R = 6371; // Raio da Terra em km
+  // Implementação da fórmula de Haversine
+};
+
+// Filtragem condicional
+const filterByJoaoPessoaRadius = (municipios) => {
+  if (!isJoaoPessoaFilterActive) return municipios;
+
+  return municipios.filter(municipio => {
+    const centroid = getCentroid(municipio.geom);
+    const distance = calculateDistance(
+      JOAO_PESSOA_COORDS[0], JOAO_PESSOA_COORDS[1],
+      centroid[0], centroid[1]
+    );
+    return distance <= JOAO_PESSOA_RADIUS_KM;
+  });
+};
+```
+
+#### **Casos de Uso Estratégicos:**
+- **Análise Regional**: Foco na região Nordeste/Nordeste
+- **Planejamento de Visitas**: Municípios estratégicos acessíveis
+- **Avaliação de Mercado**: Potencial comercial na região
+- **Comparativo Regional**: Performance vs resto do Brasil
+
+#### **Benefícios:**
+- **Foco Estratégico**: Visualização direcionada para área de interesse
+- **Performance Otimizada**: Menos dados para processar e renderizar
+- **Experiência Fluida**: Transições suaves entre modos
+- **Flexibilidade Total**: Alternância fácil entre visão completa e filtrada
+- **Análise Estratégica**: Insights específicos para região Nordeste
 
 ### 🎯 **Sistema Avançado de Exportação do Raio**
 O Raio agora oferece um sistema completo de exportação profissional com múltiplos formatos para análise estratégica avançada.
@@ -1163,6 +1234,16 @@ O sistema implementa um controle preventivo robusto contra custos excessivos da 
   - Seleção múltipla por regiões e estados
   - Indicadores visuais de abertura comercial em azul
 
+- **Filtro de Raio Estratégico de João Pessoa**: Implementação completa (Outubro 2025)
+  - Toggle visual no header da página com indicador de status ativo
+  - Cálculo de distâncias usando fórmula de Haversine (precisão geodésica)
+  - Centro geográfico: João Pessoa (latitude: -7.14804917856058, longitude: -34.95096946933421)
+  - Raio estratégico: 1.300 km exatos
+  - Filtragem automática: Mapa, dropdowns POLO/MUNICÍPIOS, métricas e buscas
+  - Centroide inteligente para geometrias Point/Polygon/MultiPolygon
+  - Reset automático de seleções inválidas quando filtro ativado/desativado
+  - Performance otimizada com memoização e useCallback
+
 - **Sistema de Rotas Multimodal - Implementação Completa**:
   - **Google Routes API Integrada**: Substituição completa do OSRM por Google Routes
   - **Otimização TSP Global e Local**: Sequenciamento inteligente de voos e visitas terrestres
@@ -1332,4 +1413,4 @@ Distribuído sob a **Licença MIT**. Consulte o arquivo `LICENSE` para mais deta
 
 ---
 
-**Última atualização**: Outubro 2025 - Sistema de Rotas Multimodal + Controle Preventivo de Custos Google Maps API + Integração Completa de Pistas de Voo + Otimização de Periferias Independentes implementado
+**Última atualização**: Outubro 2025 - Sistema de Rotas Multimodal + Controle Preventivo de Custos Google Maps API + Integração Completa de Pistas de Voo + Otimização de Periferias Independentes + Filtro de Raio Estratégico de João Pessoa implementado

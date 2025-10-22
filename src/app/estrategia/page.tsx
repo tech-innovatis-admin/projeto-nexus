@@ -580,6 +580,9 @@ export default function EstrategiaPage() {
   const [isPeriferiaDropdownOpen, setIsPeriferiaDropdownOpen] = useState<boolean>(false);
   const poloInputRef = useRef<HTMLDivElement>(null);
 
+  // Estado para filtro de João Pessoa (raio de 1.300km)
+  const [isJoaoPessoaFilterActive, setIsJoaoPessoaFilterActive] = useState<boolean>(false);
+
   // Estado dos dados processados do contexto
   const [polosValores, setPolosValores] = useState<PoloValoresProps[]>([]);
   const [periferia, setPeriferia] = useState<PeriferiaProps[]>([]);
@@ -592,6 +595,53 @@ export default function EstrategiaPage() {
   const [radiusPayload, setRadiusPayload] = useState<RadiusResultPayload | null>(null);
 
 
+
+  // Coordenadas de João Pessoa (latitude, longitude)
+  const JOAO_PESSOA_COORDS = [-7.14804917856058, -34.95096946933421]; // [lat, lng]
+  const JOAO_PESSOA_RADIUS_KM = 1300;
+
+  // Função para calcular distância entre duas coordenadas usando fórmula de Haversine
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 6371; // Raio da Terra em km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
+
+  // Função para extrair coordenadas do centroide de uma geometria
+  const getCentroid = (geom: any): [number, number] | null => {
+    if (!geom || !geom.coordinates) return null;
+    
+    try {
+      if (geom.type === 'Point') {
+        return [geom.coordinates[1], geom.coordinates[0]]; // [lat, lng]
+      } else if (geom.type === 'Polygon') {
+        const coords = geom.coordinates[0];
+        let latSum = 0, lngSum = 0;
+        for (const coord of coords) {
+          lngSum += coord[0];
+          latSum += coord[1];
+        }
+        return [latSum / coords.length, lngSum / coords.length];
+      } else if (geom.type === 'MultiPolygon') {
+        const firstPolygon = geom.coordinates[0][0];
+        let latSum = 0, lngSum = 0;
+        for (const coord of firstPolygon) {
+          lngSum += coord[0];
+          latSum += coord[1];
+        }
+        return [latSum / firstPolygon.length, lngSum / firstPolygon.length];
+      }
+    } catch (error) {
+      console.warn('Erro ao calcular centroide:', error);
+    }
+    return null;
+  };
 
   // Normalizador de números pt-BR (aceita number ou string "1.234,56")
   const parsePtBrNumber = (v: unknown): number => {
@@ -720,6 +770,23 @@ export default function EstrategiaPage() {
     }
   }, [estrategiaData, loadingData]);
 
+  // Função para filtrar municípios dentro do raio de João Pessoa
+  const filterByJoaoPessoaRadius = useCallback((municipios: (PoloValoresProps | PeriferiaProps)[]) => {
+    if (!isJoaoPessoaFilterActive) return municipios;
+    
+    return municipios.filter(municipio => {
+      const centroid = getCentroid(municipio.geom);
+      if (!centroid) return false;
+      
+      const distance = calculateDistance(
+        JOAO_PESSOA_COORDS[0], JOAO_PESSOA_COORDS[1],
+        centroid[0], centroid[1]
+      );
+      
+      return distance <= JOAO_PESSOA_RADIUS_KM;
+    });
+  }, [isJoaoPessoaFilterActive]);
+
   // Soma produtos selecionados com fallback para total quando nenhum produto aplicado
   const sumSelectedProducts = (vals: Record<string, number> | undefined, fallbackTotal: number): number => {
     if (!vals) return fallbackTotal || 0;
@@ -749,13 +816,17 @@ export default function EstrategiaPage() {
     if (appliedUFs.length) base = base.filter(p => appliedUFs.includes(String(p.UF)));
     if (inPoloMode) base = base.filter(p => p.codigo_origem === appliedPolo);
     else if (inUFMode) base = base.filter(p => String(p.UF || '').toUpperCase() === ufUpper);
+    
+    // Aplicar filtro de João Pessoa se ativo
+    base = filterByJoaoPessoaRadius(base) as PeriferiaProps[];
+    
     const map = new Map<string, number>();
     for (const f of base) {
       const agg = sumSelectedProducts(f.productValues, Number(f.valor_total_destino) || 0);
       map.set(f.codigo_origem, (map.get(f.codigo_origem) || 0) + agg);
     }
     return map;
-  }, [periferia, appliedUFs, appliedPolo, appliedUF, appliedProducts]);
+  }, [periferia, appliedUFs, appliedPolo, appliedUF, appliedProducts, filterByJoaoPessoaRadius]);
 
   // Função para formatar valores monetários
   const formatCurrency = (value: number) => {
@@ -767,12 +838,16 @@ export default function EstrategiaPage() {
     }).format(value);
   };
 
-  // Opções de polo vindas da base real (todas)
+  // Opções de polo vindas da base real (filtradas por João Pessoa se ativo)
   const poloOptions = useMemo(() => {
     const seen = new Set<string>();
-    const base = selectedUFs.length
+    let base = selectedUFs.length
       ? polosValores.filter(p => selectedUFs.includes(String(p.UF || p.UF_origem)))
       : polosValores;
+    
+    // Aplicar filtro de João Pessoa se ativo
+    base = filterByJoaoPessoaRadius(base) as PoloValoresProps[];
+    
     const opts = base
       .filter(p => {
         if (!p.codigo_origem) return false;
@@ -783,7 +858,7 @@ export default function EstrategiaPage() {
       .map(p => ({ value: p.codigo_origem, label: p.municipio_origem }));
     // Ordena alfabeticamente pelo label
     return opts.sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
-  }, [polosValores, selectedUFs]);
+  }, [polosValores, selectedUFs, filterByJoaoPessoaRadius]);
 
   // Polos filtrados baseado no input de busca
   const polosFiltrados = useMemo(() => {
@@ -793,24 +868,32 @@ export default function EstrategiaPage() {
     );
   }, [poloOptions, poloInputValue]);
 
-  // Periferias filtradas baseado no input de busca
+  // Periferias filtradas baseado no input de busca e filtro de João Pessoa
   const periferiasFiltradas = useMemo(() => {
-    const base = selectedUFs.length
+    let base = selectedUFs.length
       ? periferia.filter(p => selectedUFs.includes(String(p.UF)))
       : periferia;
+    
+    // Aplicar filtro de João Pessoa se ativo
+    base = filterByJoaoPessoaRadius(base) as PeriferiaProps[];
+    
     const filteredByPolo = selectedPolo === 'ALL' ? base : base.filter(p => p.codigo_origem === selectedPolo);
 
     if (!periferiaInputValue.trim()) return filteredByPolo;
     return filteredByPolo.filter(peri =>
       peri.municipio_destino.toLowerCase().includes(periferiaInputValue.toLowerCase())
     );
-  }, [periferia, selectedUFs, selectedPolo, periferiaInputValue]);
+  }, [periferia, selectedUFs, selectedPolo, periferiaInputValue, filterByJoaoPessoaRadius]);
 
-  // Opções filtradas por UFs selecionadas (para o select de POLO)
+  // Opções filtradas por UFs selecionadas e filtro de João Pessoa (para o select de POLO)
   const filteredPoloOptions = useMemo(() => {
-    const base = selectedUFs.length
+    let base = selectedUFs.length
       ? polosValores.filter(p => selectedUFs.includes(String(p.UF || p.UF_origem)))
       : polosValores;
+    
+    // Aplicar filtro de João Pessoa se ativo
+    base = filterByJoaoPessoaRadius(base) as PoloValoresProps[];
+    
     const seen = new Set<string>();
     const opts = base
       .filter(p => {
@@ -821,7 +904,7 @@ export default function EstrategiaPage() {
       })
       .map(p => ({ value: p.codigo_origem, label: p.municipio_origem }));
     return opts.sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
-  }, [selectedUFs, polosValores]);
+  }, [selectedUFs, polosValores, filterByJoaoPessoaRadius]);
 
   // Resetar polo selecionado caso UFs mudem e o polo atual não exista mais
   useEffect(() => {
@@ -830,14 +913,18 @@ export default function EstrategiaPage() {
     if (!exists) setSelectedPolo('ALL');
   }, [selectedUFs, filteredPoloOptions, selectedPolo]);
 
-  // Opções de municípios periféricos filtrados por polo selecionado
+  // Opções de municípios periféricos filtrados por polo selecionado e filtro de João Pessoa
   const filteredPeriferiaOptions = useMemo(() => {
     if (selectedPolo === 'ALL') return [];
-    const base = selectedUFs.length
+    let base = selectedUFs.length
       ? periferia.filter(p => selectedUFs.includes(String(p.UF)))
       : periferia;
+    
+    // Aplicar filtro de João Pessoa se ativo
+    base = filterByJoaoPessoaRadius(base) as PeriferiaProps[];
+    
     return base.filter(p => p.codigo_origem === selectedPolo);
-  }, [periferia, selectedPolo, selectedUFs]);
+  }, [periferia, selectedPolo, selectedUFs, filterByJoaoPessoaRadius]);
 
   // Resetar município periférico selecionado caso o polo mude
   useEffect(() => {
@@ -847,6 +934,24 @@ export default function EstrategiaPage() {
     );
     if (!exists) setSelectedMunicipioPeriferico('ALL');
   }, [selectedPolo, filteredPeriferiaOptions, selectedMunicipioPeriferico]);
+
+  // Resetar filtros quando o filtro de João Pessoa for ativado/desativado
+  useEffect(() => {
+    // Resetar polo selecionado se não existir mais nas opções filtradas
+    if (selectedPolo !== 'ALL') {
+      const exists = poloOptions.some(o => o.value === selectedPolo);
+      if (!exists) {
+        setSelectedPolo('ALL');
+        setPoloInputValue('');
+      }
+    }
+    
+    // Resetar município periférico
+    if (selectedMunicipioPeriferico !== 'ALL') {
+      setSelectedMunicipioPeriferico('ALL');
+      setPeriferiaInputValue('');
+    }
+  }, [isJoaoPessoaFilterActive, poloOptions, selectedPolo, selectedMunicipioPeriferico]);
 
   // Click outside e ESC para fechar dropdown de Estado
   useEffect(() => {
@@ -984,6 +1089,10 @@ export default function EstrategiaPage() {
     if (appliedUFs.length) base = base.filter(p => appliedUFs.includes(String(p.UF || p.UF_origem)));
     if (inPoloMode) base = base.filter(p => p.codigo_origem === appliedPolo);
     else if (inUFMode) base = base.filter(p => String(p.UF || p.UF_origem || '').toUpperCase() === ufUpper);
+    
+    // Aplicar filtro de João Pessoa se ativo
+    base = filterByJoaoPessoaRadius(base) as PoloValoresProps[];
+    
     const features = base
       .filter(p => !!p.geom)
       .map(p => ({
@@ -1004,7 +1113,7 @@ export default function EstrategiaPage() {
         }
       }));
     return { type: 'FeatureCollection' as const, features };
-  }, [polosValores, appliedUF, appliedPolo, appliedUFs, periferiaAggByCodigo]);
+  }, [polosValores, appliedUF, appliedPolo, appliedUFs, periferiaAggByCodigo, filterByJoaoPessoaRadius]);
 
   const periferiasFCForMap = useMemo(() => {
     const ufUpper = String(appliedUF || '').toUpperCase();
@@ -1014,6 +1123,10 @@ export default function EstrategiaPage() {
     if (appliedUFs.length) base = base.filter(p => appliedUFs.includes(String(p.UF)));
     if (inPoloMode) base = base.filter(p => p.codigo_origem === appliedPolo);
     else if (inUFMode) base = base.filter(p => String(p.UF || '').toUpperCase() === ufUpper);
+    
+    // Aplicar filtro de João Pessoa se ativo
+    base = filterByJoaoPessoaRadius(base) as PeriferiaProps[];
+    
     const features = base
       .filter(p => !!p.geom)
       .map(p => ({
@@ -1033,7 +1146,7 @@ export default function EstrategiaPage() {
         } as any
       }));
     return { type: 'FeatureCollection' as const, features };
-  }, [periferia, appliedUF, appliedPolo, appliedUFs, appliedProducts]);
+  }, [periferia, appliedUF, appliedPolo, appliedUFs, appliedProducts, filterByJoaoPessoaRadius]);
 
   // Cálculos derivados para cards com base no polo aplicado
   const derived = useMemo(() => {
@@ -1049,6 +1162,9 @@ export default function EstrategiaPage() {
     } else if (inUFMode) {
       valoresFiltrados = valoresFiltrados.filter(v => String(v.UF || v.UF_origem || '').toUpperCase() === ufUpper);
     }
+    
+    // Aplicar filtro de João Pessoa se ativo
+    valoresFiltrados = filterByJoaoPessoaRadius(valoresFiltrados) as PoloValoresProps[];
 
     // Card 2 e 3: base de periferias filtrada
     let periferiaFiltrada = periferia;
@@ -1058,6 +1174,9 @@ export default function EstrategiaPage() {
     } else if (inUFMode) {
       periferiaFiltrada = periferiaFiltrada.filter(p => String(p.UF || '').toUpperCase() === ufUpper);
     }
+    
+    // Aplicar filtro de João Pessoa se ativo
+    periferiaFiltrada = filterByJoaoPessoaRadius(periferiaFiltrada) as PeriferiaProps[];
     if (appliedMinValor !== '' || appliedMaxValor !== '') {
       periferiaFiltrada = periferiaFiltrada.filter(p => {
         const val = Number(p.valor_total_destino) || 0;
@@ -1120,7 +1239,7 @@ export default function EstrategiaPage() {
       totalMunicipios: municipiosList.length,
       poloLabel
     };
-  }, [appliedPolo, appliedUF, appliedUFs, appliedProducts, appliedMinValor, appliedMaxValor, polosValores, periferia, poloOptions, periferiaAggByCodigo]);
+  }, [appliedPolo, appliedUF, appliedUFs, appliedProducts, appliedMinValor, appliedMaxValor, polosValores, periferia, poloOptions, periferiaAggByCodigo, filterByJoaoPessoaRadius]);
 
   // Reset da lista de municípios quando o polo mudar
   useEffect(() => {
@@ -1597,6 +1716,36 @@ export default function EstrategiaPage() {
                   Análise Estratégica de <span className="text-sky-400">Produtos</span>
                 </h1>
                 
+                {/* Botão Toggle para Filtro de João Pessoa */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-slate-300 font-medium">Raio João Pessoa (1.300km)</span>
+                    <button
+                      onClick={() => setIsJoaoPessoaFilterActive(!isJoaoPessoaFilterActive)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-slate-800 ${
+                        isJoaoPessoaFilterActive ? 'bg-sky-600' : 'bg-slate-600'
+                      }`}
+                      role="switch"
+                      aria-checked={isJoaoPessoaFilterActive}
+                      aria-label="Ativar filtro de raio de João Pessoa"
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          isJoaoPessoaFilterActive ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  {isJoaoPessoaFilterActive && (
+                    <div className="flex items-center gap-1 text-xs text-sky-400 bg-sky-900/30 px-2 py-1 rounded-md border border-sky-700/50">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <span>Filtro Ativo</span>
+                    </div>
+                  )}
+                </div>
 
               </motion.div>
             </div>

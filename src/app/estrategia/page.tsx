@@ -561,6 +561,7 @@ export default function EstrategiaPage() {
   const estadoButtonRef = useRef<HTMLButtonElement>(null);
   const estadoDropdownRef = useRef<HTMLDivElement>(null);
   // Filtro de Municípios Periféricos
+  const [isPeriferiaOpen, setIsPeriferiaOpen] = useState<boolean>(false);
   const periferiaDropdownRef = useRef<HTMLDivElement>(null);
 
   // Filtros aplicados (após clicar em buscar)
@@ -581,6 +582,10 @@ export default function EstrategiaPage() {
 
   // Estado para filtro de João Pessoa (raio de 1.300km)
   const [isJoaoPessoaFilterActive, setIsJoaoPessoaFilterActive] = useState<boolean>(false);
+
+  // 🆕 Estados para controlar periferias com múltiplos polos
+  const [showPoloSelectionWarning, setShowPoloSelectionWarning] = useState<boolean>(false);
+  const [filteredPolosByPeriferia, setFilteredPolosByPeriferia] = useState<string[]>([]);
 
   // Estado dos dados processados do contexto
   const [polosValores, setPolosValores] = useState<PoloValoresProps[]>([]);
@@ -859,30 +864,106 @@ export default function EstrategiaPage() {
     return opts.sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
   }, [polosValores, selectedUFs, filterByJoaoPessoaRadius]);
 
+  // 🆕 Mapa de periferias para seus polos (pre-computado para performance) - SIMPLIFICADO
+  const periferiaToPolosMap = useMemo(() => {
+    const map = new Map<string, Array<{ codigo_origem: string; municipio_origem: string }>>();
+
+    let base = selectedUFs.length
+      ? periferia.filter(p => selectedUFs.includes(String(p.UF)))
+      : periferia;
+
+    // Aplicar filtro de João Pessoa se ativo
+    base = filterByJoaoPessoaRadius(base) as PeriferiaProps[];
+
+    for (const peri of base) {
+      const codigoDestino = peri.codigo_destino || peri.municipio_destino;
+      if (!codigoDestino) continue;
+
+      if (!map.has(codigoDestino)) {
+        map.set(codigoDestino, []);
+      }
+
+      // Encontrar o município polo correspondente
+      const polo = polosValores.find(p => p.codigo_origem === peri.codigo_origem);
+      if (polo) {
+        const existingPolo = map.get(codigoDestino)!.find(p => p.codigo_origem === peri.codigo_origem);
+        if (!existingPolo) {
+          map.get(codigoDestino)!.push({
+            codigo_origem: peri.codigo_origem,
+            municipio_origem: polo.municipio_origem
+          });
+        }
+      }
+    }
+
+    return map;
+  }, [periferia, polosValores, selectedUFs, filterByJoaoPessoaRadius]);
+
+  // 🆕 Lista única de municípios periféricos (sem duplicatas)
+  const municipiosPerifericosUnicos = useMemo(() => {
+    const uniqueMunicipios = new Map<string, PeriferiaProps>();
+
+    let base = selectedUFs.length
+      ? periferia.filter(p => selectedUFs.includes(String(p.UF)))
+      : periferia;
+
+    // Aplicar filtro de João Pessoa se ativo
+    base = filterByJoaoPessoaRadius(base) as PeriferiaProps[];
+
+    // Quando "Todos os Polos" está selecionado, mostrar TODAS as periferias (sem duplicatas)
+    if (selectedPolo === 'ALL') {
+      for (const peri of base) {
+        const codigoDestino = peri.codigo_destino || peri.municipio_destino;
+        if (!codigoDestino) continue;
+
+        // Mantém apenas a primeira ocorrência de cada município
+        if (!uniqueMunicipios.has(codigoDestino)) {
+          uniqueMunicipios.set(codigoDestino, peri);
+        }
+      }
+    } else {
+      // Quando um polo específico está selecionado, mostrar apenas periferias desse polo
+      for (const peri of base) {
+        if (peri.codigo_origem === selectedPolo) {
+          const codigoDestino = peri.codigo_destino || peri.municipio_destino;
+          if (!codigoDestino) continue;
+
+          if (!uniqueMunicipios.has(codigoDestino)) {
+            uniqueMunicipios.set(codigoDestino, peri);
+          }
+        }
+      }
+    }
+
+    return Array.from(uniqueMunicipios.values());
+  }, [periferia, selectedUFs, selectedPolo, filterByJoaoPessoaRadius]);
+
   // Polos filtrados baseado no input de busca
   const polosFiltrados = useMemo(() => {
+    // 🆕 Se há um aviso de seleção de polo ativo, filtrar apenas pelos polos relacionados à periferia
+    if (showPoloSelectionWarning && filteredPolosByPeriferia.length > 0) {
+      const filtered = poloOptions.filter(polo => filteredPolosByPeriferia.includes(polo.value));
+      if (!poloInputValue.trim()) return filtered;
+      return filtered.filter(polo =>
+        polo.label.toLowerCase().includes(poloInputValue.toLowerCase())
+      );
+    }
+    
     if (!poloInputValue.trim()) return poloOptions;
     return poloOptions.filter(polo =>
       polo.label.toLowerCase().includes(poloInputValue.toLowerCase())
     );
-  }, [poloOptions, poloInputValue]);
+  }, [poloOptions, poloInputValue, showPoloSelectionWarning, filteredPolosByPeriferia]);
 
-  // Periferias filtradas baseado no input de busca e filtro de João Pessoa
+  // Periferias filtradas baseado no input de busca e filtro de João Pessoa - SIMPLIFICADO
   const periferiasFiltradas = useMemo(() => {
-    let base = selectedUFs.length
-      ? periferia.filter(p => selectedUFs.includes(String(p.UF)))
-      : periferia;
-    
-    // Aplicar filtro de João Pessoa se ativo
-    base = filterByJoaoPessoaRadius(base) as PeriferiaProps[];
-    
-    const filteredByPolo = selectedPolo === 'ALL' ? base : base.filter(p => p.codigo_origem === selectedPolo);
+    let base = municipiosPerifericosUnicos;
 
-    if (!periferiaInputValue.trim()) return filteredByPolo;
-    return filteredByPolo.filter(peri =>
+    if (!periferiaInputValue.trim()) return base;
+    return base.filter(peri =>
       peri.municipio_destino.toLowerCase().includes(periferiaInputValue.toLowerCase())
     );
-  }, [periferia, selectedUFs, selectedPolo, periferiaInputValue, filterByJoaoPessoaRadius]);
+  }, [municipiosPerifericosUnicos, periferiaInputValue]);
 
   // Opções filtradas por UFs selecionadas e filtro de João Pessoa (para o select de POLO)
   const filteredPoloOptions = useMemo(() => {
@@ -944,13 +1025,25 @@ export default function EstrategiaPage() {
         setPoloInputValue('');
       }
     }
-    
+
     // Resetar município periférico
     if (selectedMunicipioPeriferico !== 'ALL') {
       setSelectedMunicipioPeriferico('ALL');
       setPeriferiaInputValue('');
     }
-  }, [isJoaoPessoaFilterActive, poloOptions, selectedPolo, selectedMunicipioPeriferico]);
+
+    // 🆕 Resetar aviso de seleção de polo
+    setShowPoloSelectionWarning(false);
+    setFilteredPolosByPeriferia([]);
+  }, [isJoaoPessoaFilterActive, poloOptions]);
+
+  // 🆕 Resetar aviso quando UFs ou polo mudarem
+  useEffect(() => {
+    if (selectedPolo !== 'ALL') {
+      setShowPoloSelectionWarning(false);
+      setFilteredPolosByPeriferia([]);
+    }
+  }, [selectedPolo, selectedUFs]);
 
   // Click outside e ESC para fechar dropdown de Estado
   useEffect(() => {
@@ -1006,6 +1099,25 @@ export default function EstrategiaPage() {
     };
   }, [isProdutosOpen]);
 
+  // Click outside e ESC para fechar dropdown de Municípios Periféricos
+  useEffect(() => {
+    if (!isPeriferiaOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (periferiaDropdownRef.current &&
+          !periferiaDropdownRef.current.contains(event.target as Node)) {
+        setIsPeriferiaOpen(false);
+      }
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsPeriferiaOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape as any);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape as any);
+    };
+  }, [isPeriferiaOpen]);
 
 
   // Click outside e ESC para fechar dropdown de Polo (busca)
@@ -1783,6 +1895,12 @@ export default function EstrategiaPage() {
                     {/* POLO */}
                     <div className="flex flex-col">
                       <label className="text-slate-300 text-sm mb-0.5 text-center font-bold">POLO</label>
+                      {/* 🆕 Aviso sutil quando há múltiplos polos */}
+                      {showPoloSelectionWarning && (
+                        <div className="text-[10px] text-amber-400 text-center mb-0.5 animate-pulse">
+                          Selecionar um dos polos
+                        </div>
+                      )}
                       <div className="relative" ref={poloInputRef}>
                         <input
                           type="text"
@@ -1802,11 +1920,17 @@ export default function EstrategiaPage() {
                             }
                           }}
                           placeholder="Digite o nome do polo..."
-                          className="w-full rounded-md bg-[#1e293b] text-white placeholder-slate-400 border border-slate-600 px-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-left"
+                          className={`w-full rounded-md bg-[#1e293b] text-white placeholder-slate-400 border px-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:border-sky-500 text-left ${
+                            showPoloSelectionWarning 
+                              ? 'border-amber-500/70 focus:ring-amber-500' 
+                              : 'border-slate-600 focus:ring-sky-500'
+                          }`}
                         />
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
-                          className={`h-4 w-4 text-slate-300 absolute right-2 top-1/2 -translate-y-1/2 transition-transform duration-200 pointer-events-none ${isPoloDropdownOpen ? 'rotate-180' : ''}`}
+                          className={`h-4 w-4 absolute right-2 top-1/2 -translate-y-1/2 transition-transform duration-200 pointer-events-none ${
+                            isPoloDropdownOpen ? 'rotate-180' : ''
+                          } ${showPoloSelectionWarning ? 'text-amber-400' : 'text-slate-300'}`}
                           viewBox="0 0 20 20"
                           fill="currentColor"
                           aria-hidden="true"
@@ -1824,6 +1948,9 @@ export default function EstrategiaPage() {
                                   setSelectedPolo('ALL');
                                   setPoloInputValue('Todos os Polos');
                                   setIsPoloDropdownOpen(false);
+                                  // 🆕 Limpar aviso ao selecionar "Todos os Polos"
+                                  setShowPoloSelectionWarning(false);
+                                  setFilteredPolosByPeriferia([]);
                                 }}
                                 className="w-full text-left px-3 py-2 text-sm text-white hover:bg-slate-600 transition-colors"
                               >
@@ -1838,6 +1965,9 @@ export default function EstrategiaPage() {
                                     setSelectedPolo(polo.value);
                                     setPoloInputValue(polo.label);
                                     setIsPoloDropdownOpen(false);
+                                    // 🆕 Limpar aviso ao selecionar um polo específico
+                                    setShowPoloSelectionWarning(false);
+                                    setFilteredPolosByPeriferia([]);
                                   }}
                                   className="w-full text-left px-3 py-2 text-sm text-white hover:bg-slate-600 transition-colors"
                                 >
@@ -1870,22 +2000,15 @@ export default function EstrategiaPage() {
                               setIsPeriferiaDropdownOpen(true);
                             }}
                             onFocus={() => {
-                              if (selectedPolo !== 'ALL') {
-                                if (isPeriferiaDropdownOpen) {
-                                  // Se já está aberto, fecha o dropdown
-                                  setIsPeriferiaDropdownOpen(false);
-                                } else {
-                                  // Se está fechado, abre e limpa o campo
-                                  setIsPeriferiaDropdownOpen(true);
-                                  setPeriferiaInputValue('');
-                                }
+                              if (isPeriferiaDropdownOpen) {
+                                setIsPeriferiaDropdownOpen(false);
+                              } else {
+                                setIsPeriferiaDropdownOpen(true);
+                                setPeriferiaInputValue('');
                               }
                             }}
-                          disabled={selectedPolo === 'ALL'}
-                            placeholder={selectedPolo === 'ALL' ? 'Selecione um polo primeiro' : 'Digite o nome do município...'}
-                            className={`appearance-none w-full rounded-md bg-[#1e293b] text-white placeholder-slate-400 border border-slate-600 px-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-left ${
-                              selectedPolo === 'ALL' ? 'opacity-60 cursor-not-allowed' : 'cursor-text'
-                            }`}
+                            placeholder="Digite o nome do município..."
+                            className="appearance-none w-full rounded-md bg-[#1e293b] text-white placeholder-slate-400 border border-slate-600 px-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-left cursor-text"
                           />
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
@@ -1897,39 +2020,69 @@ export default function EstrategiaPage() {
                             <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.939l3.71-3.71a.75.75 0 111.06 1.061l-4.24 4.24a.75.75 0 01-1.06 0l-4.24-4.24a.75.75 0 01.02-1.06z" clipRule="evenodd" />
                           </svg>
 
-                          {/* Dropdown personalizado */}
-                          {isPeriferiaDropdownOpen && selectedPolo !== 'ALL' && (
+                          {/* Dropdown personalizado - 🆕 SIMPLIFICADO */}
+                          {isPeriferiaDropdownOpen && (
                             <div className="absolute top-full left-0 mt-1 w-full rounded-md shadow-lg bg-[#1e293b] border border-slate-600 z-50 max-h-80 overflow-y-auto">
                               <div className="py-1">
                                 {/* Opção "Todos os municípios" */}
                                 <button
                                   onClick={() => {
                                     setSelectedMunicipioPeriferico('ALL');
-                                    setAppliedMunicipioPeriferico('ALL');
                                     setPeriferiaInputValue('Todos os municípios');
                                     setIsPeriferiaDropdownOpen(false);
+                                    // 🆕 Limpar aviso ao selecionar "Todos"
+                                    setShowPoloSelectionWarning(false);
+                                    setFilteredPolosByPeriferia([]);
                                   }}
                                   className="w-full text-left px-3 py-2 text-sm text-white hover:bg-slate-600 transition-colors"
                                 >
                                   Todos os municípios
                                 </button>
 
-                                {/* Periferias filtradas */}
-                                {periferiasFiltradas.map((peri) => (
-                                  <button
-                                    key={peri.codigo_destino || peri.municipio_destino}
-                                    onClick={() => {
-                                      const municipioId = peri.codigo_destino || peri.municipio_destino;
-                                      setSelectedMunicipioPeriferico(municipioId);
-                                      setAppliedMunicipioPeriferico(municipioId);
-                                      setPeriferiaInputValue(peri.municipio_destino);
-                                      setIsPeriferiaDropdownOpen(false);
-                                    }}
-                                    className="w-full text-left px-3 py-2 text-sm text-white hover:bg-slate-600 transition-colors"
-                                  >
-                                    {peri.municipio_destino}
-                                  </button>
-                                ))}
+                                {/* 🆕 Municípios únicos filtrados por busca */}
+                                {periferiasFiltradas.map((peri) => {
+                                  const codigoDestino = peri.codigo_destino || peri.municipio_destino;
+                                  const polosRelacionados = periferiaToPolosMap.get(codigoDestino) || [];
+
+                                  return (
+                                    <button
+                                      key={codigoDestino}
+                                      onClick={() => {
+                                        const municipioId = codigoDestino;
+
+                                        // 🆕 Verificar se há múltiplos polos para esta periferia
+                                        if (polosRelacionados.length > 1) {
+                                          // Múltiplos polos: ativar aviso e filtrar lista de polos
+                                          setShowPoloSelectionWarning(true);
+                                          setFilteredPolosByPeriferia(polosRelacionados.map(p => p.codigo_origem));
+
+                                          // Selecionar o município (não muda o polo automaticamente)
+                                          setSelectedMunicipioPeriferico(municipioId);
+                                          setPeriferiaInputValue(peri.municipio_destino);
+                                        } else {
+                                          // Polo único: comportamento normal
+                                          if (selectedPolo === 'ALL' && polosRelacionados.length === 1) {
+                                            // Ajustar polo automaticamente apenas se "Todos os Polos" estiver selecionado
+                                            setSelectedPolo(polosRelacionados[0].codigo_origem);
+                                            setPoloInputValue(polosRelacionados[0].municipio_origem);
+                                          }
+                                          setSelectedMunicipioPeriferico(municipioId);
+                                          setPeriferiaInputValue(peri.municipio_destino);
+                                          setShowPoloSelectionWarning(false);
+                                          setFilteredPolosByPeriferia([]);
+                                        }
+
+                                        setIsPeriferiaDropdownOpen(false);
+                                      }}
+                                      className="w-full text-left px-3 py-2 text-sm text-white hover:bg-slate-600 transition-colors"
+                                    >
+                                      <div className="flex items-center gap-1">
+                                        <span>{peri.municipio_destino}</span>
+                                        {/* 🆕 Removido: não mostra mais o nome do polo entre parênteses */}
+                                      </div>
+                                    </button>
+                                  );
+                                })}
 
                                 {/* Mensagem quando não há resultados na busca */}
                                 {periferiaInputValue.trim() && periferiasFiltradas.length === 0 && (
@@ -1949,6 +2102,9 @@ export default function EstrategiaPage() {
                               setAppliedMunicipioPeriferico('ALL');
                               setPeriferiaInputValue('');
                               setIsPeriferiaDropdownOpen(false);
+                              // 🆕 Limpar aviso ao limpar seleção
+                              setShowPoloSelectionWarning(false);
+                              setFilteredPolosByPeriferia([]);
                             }}
                             className="bg-red-600/80 hover:bg-red-600 text-white px-2 py-1.5 rounded-md font-medium transition-colors duration-200 flex items-center justify-center min-h-[40px]"
                             title="Limpar seleção do município periférico"
@@ -2046,6 +2202,7 @@ export default function EstrategiaPage() {
                             // Fechar dropdowns
                             setIsEstadoOpen(false);
                             setIsProdutosOpen(false);
+                            setIsPeriferiaOpen(false);
                             setIsPoloDropdownOpen(false);
                             setIsPeriferiaDropdownOpen(false);
                           }}

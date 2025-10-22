@@ -560,8 +560,7 @@ export default function EstrategiaPage() {
   const [isEstadoOpen, setIsEstadoOpen] = useState<boolean>(false);
   const estadoButtonRef = useRef<HTMLButtonElement>(null);
   const estadoDropdownRef = useRef<HTMLDivElement>(null);
-  // Filtro de Municípios Periféricos
-  const [isPeriferiaOpen, setIsPeriferiaOpen] = useState<boolean>(false);
+  // Filtro de Municípios Periféricos (agora igual ao POLO)
   const periferiaDropdownRef = useRef<HTMLDivElement>(null);
 
   // Filtros aplicados (após clicar em buscar)
@@ -575,10 +574,13 @@ export default function EstrategiaPage() {
 
   // Estados para inputs de busca
   const [poloInputValue, setPoloInputValue] = useState<string>('');
-  const [periferiaInputValue, setPeriferiaInputValue] = useState<string>('');
   const [isPoloDropdownOpen, setIsPoloDropdownOpen] = useState<boolean>(false);
-  const [isPeriferiaDropdownOpen, setIsPeriferiaDropdownOpen] = useState<boolean>(false);
   const poloInputRef = useRef<HTMLDivElement>(null);
+
+  // Estados para MUNICÍPIOS PRÓXIMOS (igual ao POLO)
+  const [periferiaInputValue, setPeriferiaInputValue] = useState<string>('');
+  const [isPeriferiaDropdownOpen, setIsPeriferiaDropdownOpen] = useState<boolean>(false);
+  const periferiaInputRef = useRef<HTMLDivElement>(null);
 
   // Estado para filtro de João Pessoa (raio de 1.300km)
   const [isJoaoPessoaFilterActive, setIsJoaoPessoaFilterActive] = useState<boolean>(false);
@@ -868,15 +870,15 @@ export default function EstrategiaPage() {
     );
   }, [poloOptions, poloInputValue]);
 
-  // Periferias filtradas baseado no input de busca e filtro de João Pessoa
+  // Periferias filtradas baseado no input de busca e filtro de João Pessoa (igual ao POLO)
   const periferiasFiltradas = useMemo(() => {
     let base = selectedUFs.length
       ? periferia.filter(p => selectedUFs.includes(String(p.UF)))
       : periferia;
-    
+
     // Aplicar filtro de João Pessoa se ativo
     base = filterByJoaoPessoaRadius(base) as PeriferiaProps[];
-    
+
     const filteredByPolo = selectedPolo === 'ALL' ? base : base.filter(p => p.codigo_origem === selectedPolo);
 
     if (!periferiaInputValue.trim()) return filteredByPolo;
@@ -949,7 +951,6 @@ export default function EstrategiaPage() {
     // Resetar município periférico
     if (selectedMunicipioPeriferico !== 'ALL') {
       setSelectedMunicipioPeriferico('ALL');
-      setPeriferiaInputValue('');
     }
   }, [isJoaoPessoaFilterActive, poloOptions, selectedPolo, selectedMunicipioPeriferico]);
 
@@ -1007,25 +1008,6 @@ export default function EstrategiaPage() {
     };
   }, [isProdutosOpen]);
 
-  // Click outside e ESC para fechar dropdown de Municípios Periféricos
-  useEffect(() => {
-    if (!isPeriferiaOpen) return;
-    const handleClickOutside = (event: MouseEvent) => {
-      if (periferiaDropdownRef.current &&
-          !periferiaDropdownRef.current.contains(event.target as Node)) {
-        setIsPeriferiaOpen(false);
-      }
-    };
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setIsPeriferiaOpen(false);
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleEscape as any);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleEscape as any);
-    };
-  }, [isPeriferiaOpen]);
 
 
   // Click outside e ESC para fechar dropdown de Polo (busca)
@@ -1054,13 +1036,13 @@ export default function EstrategiaPage() {
     };
   }, [isPoloDropdownOpen]);
 
-  // Click outside e ESC para fechar dropdown de Periferias (busca)
+  // Click outside e ESC para fechar dropdown de Periferias
   useEffect(() => {
     if (!isPeriferiaDropdownOpen) return;
 
     const handleClickOutside = (event: MouseEvent) => {
-      if (periferiaDropdownRef.current &&
-          !periferiaDropdownRef.current.contains(event.target as Node)) {
+      if (periferiaInputRef.current &&
+          !periferiaInputRef.current.contains(event.target as Node)) {
         setIsPeriferiaDropdownOpen(false);
       }
     };
@@ -1880,102 +1862,81 @@ export default function EstrategiaPage() {
                     {/* MUNICÍPIO PERIFÉRICO */}
                     <div className="flex flex-col">
                       <label className="text-slate-300 text-sm mb-0.5 text-center font-bold">MUNICÍPIOS PRÓXIMO</label>
-                      <div className="flex gap-2">
-                        <div className="relative flex-1" ref={periferiaDropdownRef}>
-                          <input
-                            type="text"
-                            value={periferiaInputValue}
-                            onChange={(e) => {
-                              setPeriferiaInputValue(e.target.value);
+                      <div className="relative" ref={periferiaInputRef}>
+                        <input
+                          type="text"
+                          value={periferiaInputValue}
+                          onChange={(e) => {
+                            setPeriferiaInputValue(e.target.value);
+                            setIsPeriferiaDropdownOpen(true);
+                          }}
+                          onFocus={() => {
+                            if (selectedPolo === 'ALL') return; // Não abrir se não há polo selecionado
+                            if (isPeriferiaDropdownOpen) {
+                              // Se já está aberto, fecha o dropdown
+                              setIsPeriferiaDropdownOpen(false);
+                            } else {
+                              // Se está fechado, abre e limpa o campo
                               setIsPeriferiaDropdownOpen(true);
-                            }}
-                            onFocus={() => {
-                              if (selectedPolo !== 'ALL') {
-                                if (isPeriferiaDropdownOpen) {
-                                  // Se já está aberto, fecha o dropdown
-                                  setIsPeriferiaDropdownOpen(false);
-                                } else {
-                                  // Se está fechado, abre e limpa o campo
-                                  setIsPeriferiaDropdownOpen(true);
-                                  setPeriferiaInputValue('');
-                                }
-                              }
-                            }}
+                              setPeriferiaInputValue('');
+                            }
+                          }}
                           disabled={selectedPolo === 'ALL'}
-                            placeholder={selectedPolo === 'ALL' ? 'Selecione um polo primeiro' : 'Digite o nome do município...'}
-                            className={`appearance-none w-full rounded-md bg-[#1e293b] text-white placeholder-slate-400 border border-slate-600 px-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-left ${
-                              selectedPolo === 'ALL' ? 'opacity-60 cursor-not-allowed' : 'cursor-text'
-                            }`}
-                          />
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className={`h-4 w-4 text-slate-300 absolute right-2 top-1/2 -translate-y-1/2 transition-transform duration-200 pointer-events-none ${isPeriferiaDropdownOpen ? 'rotate-180' : ''}`}
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                            aria-hidden="true"
-                          >
-                            <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.939l3.71-3.71a.75.75 0 111.06 1.061l-4.24 4.24a.75.75 0 01-1.06 0l-4.24-4.24a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+                          placeholder={selectedPolo === 'ALL' ? 'Selecione um polo primeiro' : 'Digite o nome do município...'}
+                          className={`w-full rounded-md bg-[#1e293b] text-white placeholder-slate-400 border border-slate-600 px-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-left ${
+                            selectedPolo === 'ALL' ? 'opacity-60 cursor-not-allowed' : 'cursor-text'
+                          }`}
+                        />
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          className={`h-4 w-4 text-slate-300 absolute right-2 top-1/2 -translate-y-1/2 transition-transform duration-200 pointer-events-none ${isPeriferiaDropdownOpen ? 'rotate-180' : ''}`}
+                          viewBox="0 0 20 20"
+                          fill="currentColor"
+                          aria-hidden="true"
+                        >
+                          <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.939l3.71-3.71a.75.75 0 111.06 1.061l-4.24 4.24a.75.75 0 01-1.06 0l-4.24-4.24a.75.75 0 01.02-1.06z" clipRule="evenodd" />
                           </svg>
 
-                          {/* Dropdown personalizado */}
-                          {isPeriferiaDropdownOpen && selectedPolo !== 'ALL' && (
-                            <div className="absolute top-full left-0 mt-1 w-full rounded-md shadow-lg bg-[#1e293b] border border-slate-600 z-50 max-h-80 overflow-y-auto">
-                              <div className="py-1">
-                                {/* Opção "Todos os municípios" */}
+                        {/* Dropdown personalizado */}
+                        {isPeriferiaDropdownOpen && selectedPolo !== 'ALL' && (
+                          <div className="absolute top-full left-0 mt-1 w-full rounded-md shadow-lg bg-[#1e293b] border border-slate-600 z-50 max-h-80 overflow-y-auto">
+                            <div className="py-1">
+                              {/* Opção "Todos os municípios" */}
+                          <button
+                            onClick={() => {
+                              setSelectedMunicipioPeriferico('ALL');
+                                  setPeriferiaInputValue('Todos os municípios');
+                                  setIsPeriferiaDropdownOpen(false);
+                            }}
+                                className="w-full text-left px-3 py-2 text-sm text-white hover:bg-slate-600 transition-colors"
+                          >
+                                Todos os municípios
+                          </button>
+
+                              {/* Periferias filtradas */}
+                              {periferiasFiltradas.map((peri) => (
                                 <button
+                                  key={peri.codigo_destino || peri.municipio_destino}
                                   onClick={() => {
-                                    setSelectedMunicipioPeriferico('ALL');
-                                    setPeriferiaInputValue('Todos os municípios');
+                                    const municipioId = peri.codigo_destino || peri.municipio_destino;
+                                    setSelectedMunicipioPeriferico(municipioId);
+                                    setPeriferiaInputValue(peri.municipio_destino);
                                     setIsPeriferiaDropdownOpen(false);
                                   }}
                                   className="w-full text-left px-3 py-2 text-sm text-white hover:bg-slate-600 transition-colors"
                                 >
-                                  Todos os municípios
-                        </button>
+                                  {peri.municipio_destino}
+                                </button>
+                              ))}
 
-                                {/* Periferias filtradas */}
-                                {periferiasFiltradas.map((peri) => (
-                                  <button
-                                    key={peri.codigo_destino || peri.municipio_destino}
-                                    onClick={() => {
-                                      const municipioId = peri.codigo_destino || peri.municipio_destino;
-                                      setSelectedMunicipioPeriferico(municipioId);
-                                      setPeriferiaInputValue(peri.municipio_destino);
-                                      setIsPeriferiaDropdownOpen(false);
-                                    }}
-                                    className="w-full text-left px-3 py-2 text-sm text-white hover:bg-slate-600 transition-colors"
-                                  >
-                                    {peri.municipio_destino}
-                                  </button>
-                                ))}
-
-                                {/* Mensagem quando não há resultados na busca */}
-                                {periferiaInputValue.trim() && periferiasFiltradas.length === 0 && (
-                                  <div className="px-3 py-2 text-sm text-slate-400 text-center">
-                                    Nenhum município encontrado
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {selectedMunicipioPeriferico !== 'ALL' && (
-                          <button
-                            onClick={() => {
-                              setSelectedMunicipioPeriferico('ALL');
-                              setAppliedMunicipioPeriferico('ALL');
-                              setPeriferiaInputValue('');
-                              setIsPeriferiaDropdownOpen(false);
-                            }}
-                            className="bg-red-600/80 hover:bg-red-600 text-white px-2 py-1.5 rounded-md font-medium transition-colors duration-200 flex items-center justify-center min-h-[40px]"
-                            title="Limpar seleção do município periférico"
-                            aria-label="Limpar seleção do município periférico"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          </button>
+                              {/* Mensagem quando não há resultados na busca */}
+                              {periferiaInputValue.trim() && periferiasFiltradas.length === 0 && (
+                                <div className="px-3 py-2 text-sm text-slate-400 text-center">
+                                  Nenhum município encontrado
+                                </div>
+                        )}
+                      </div>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -2064,7 +2025,6 @@ export default function EstrategiaPage() {
                             // Fechar dropdowns
                             setIsEstadoOpen(false);
                             setIsProdutosOpen(false);
-                            setIsPeriferiaOpen(false);
                             setIsPoloDropdownOpen(false);
                             setIsPeriferiaDropdownOpen(false);
                           }}

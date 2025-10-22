@@ -55,10 +55,11 @@ function ExportAdvancedModal({ isOpen, onClose, mapData }) {
     { id: 'valor_start_iniciais_', label: 'Valor Start Lab - Fund 1', checked: false },
     { id: 'valor_start_finais_', label: 'Valor Start Lab - Fund 2', checked: false },
     { id: 'valor_start_iniciais_finais_', label: 'Valor Start Lab - Fund 1 e 2', checked: false },
-    { id: 'PVA', label: 'Valor PVA (Procon Vai Ás Aulas)', checked: false },
-    { id: 'LIVRO_FUND_1', label: 'Valor Livros - Fundamental 1', checked: false },
-    { id: 'LIVRO_FUND_2', label: 'Valor Livros - Fundamental 2', checked: false },
-    { id: 'LIVRO_FUND_1_2', label: 'Valor Livros - Fundamental 1 e 2', checked: false }
+    { id: 'PVA_minimo', label: 'PVA Mínimo (Procon Vai Ás Aulas)', checked: false },
+    { id: 'PVA_maximo', label: 'PVA Máximo (Procon Vai Ás Aulas)', checked: false },
+    { id: 'LIVRO_FUND_1', label: 'Valor Saber+ - Fundamental 1', checked: false },
+    { id: 'LIVRO_FUND_2', label: 'Valor Saber+ - Fundamental 2', checked: false },
+    { id: 'LIVRO_FUND_1_2', label: 'Valor Saber+ - Fundamental 1 e 2', checked: false }
   ];
 
   // Extrair estados e municípios dos dados
@@ -204,7 +205,8 @@ function ExportAdvancedModal({ isOpen, onClose, mapData }) {
       case 'valor_start_iniciais_':
       case 'valor_start_finais_':
       case 'valor_start_iniciais_finais_':
-      case 'PVA':
+      case 'PVA_minimo':
+      case 'PVA_maximo':
       case 'LIVRO_FUND_1':
       case 'LIVRO_FUND_2':
       case 'LIVRO_FUND_1_2':
@@ -378,7 +380,8 @@ function ExportAdvancedModal({ isOpen, onClose, mapData }) {
         case 'valor_start_iniciais_':
         case 'valor_start_finais_':
         case 'valor_start_iniciais_finais_':
-        case 'PVA':
+        case 'PVA_minimo':
+        case 'PVA_maximo':
         case 'LIVRO_FUND_1':
         case 'LIVRO_FUND_2':
         case 'LIVRO_FUND_1_2':
@@ -952,7 +955,8 @@ function ExportAdvancedModal({ isOpen, onClose, mapData }) {
                 if (colId === 'valor_start_iniciais_') return renderNumeric(colId, 'Start Lab - Fund 1', false, 'Valor do Start Lab para Fundamental 1 (ex.: 4785).');
                 if (colId === 'valor_start_finais_') return renderNumeric(colId, 'Start Lab - Fund 2', false, 'Valor do Start Lab para Fundamental 2 (ex.: 4785).');
                 if (colId === 'valor_start_iniciais_finais_') return renderNumeric(colId, 'Start Lab - Fund 1 e 2', false, 'Valor do Start Lab para Fundamental 1 e 2 (ex.: 4785).');
-                if (colId === 'PVA') return renderNumeric(colId, 'PVA (Procon Vai Ás Aulas)', false, 'Valor do produto PVA (ex.: 4785).');
+                if (colId === 'PVA_minimo') return renderNumeric(colId, 'PVA Mínimo (Procon Vai Ás Aulas)', false, 'Valor mínimo do produto PVA (ex.: 4785).');
+                if (colId === 'PVA_maximo') return renderNumeric(colId, 'PVA Máximo (Procon Vai Ás Aulas)', false, 'Valor máximo do produto PVA (ex.: 4785).');
                 if (colId === 'LIVRO_FUND_1') return renderNumeric(colId, 'Livros - Fundamental 1', false, 'Valor do envio de livros do Fundamental 1 (ex.: 4785).');
                 if (colId === 'LIVRO_FUND_2') return renderNumeric(colId, 'Livros - Fundamental 2', false, 'Valor do envio de livros do Fundamental 2 (ex.: 4785).');
                 if (colId === 'LIVRO_FUND_1_2') return renderNumeric(colId, 'Livros - Fundamental 1 e 2', false, 'Valor do envio de livros do Fundamental 1 e 2 (ex.: 4785).');

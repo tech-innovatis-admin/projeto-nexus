@@ -1,6 +1,6 @@
 // UFs com abertura comercial
 export const UF_ABERTURA = [
-  'MA','PB','PE','PI','RN','SE', // Nordeste
+  'MA', 'PB', 'PE', 'PI', 'RN', 'SE', 'AL', 'BA','CE', 'MT' // Nordeste
 ] as const;
 export type UFAbertura = typeof UF_ABERTURA[number];
 
@@ -27,7 +27,7 @@ export const TODAS_UFS = [
 // Função para verificar se uma região tem abertura comercial
 export function isRegiaoAbertura(regiao: string): boolean {
   if (regiao === 'Nordeste') return true;
-  if (regiao === 'Centro-Oeste') return true; // MT tem abertura
+  if (regiao === 'Centro-Oeste') return true; // MT tem  abertura
   return false;
 }
 
@@ -42,7 +42,7 @@ export const ABERTURA_REGIOES: Record<string, readonly string[]> = {
 export const PROD_FIELDS = {
   VALOR_PD: {
     label: 'Plano Diretor',
-    shortLabel: 'PD',
+    shortLabel: 'Plano Diretor',
     origemKey: 'valor_pd_num_origem',
     destinoKey: 'valor_pd_num_destino',
     category: 'planejamento'
@@ -56,7 +56,7 @@ export const PROD_FIELDS = {
   },
   VALOR_CTM: {
     label: 'IPTU Legal',
-    shortLabel: 'CTM',
+    shortLabel: 'IPTU Legal',
     // VALOR_CTM só existe nas periferias (destinos), não nos polos (origens)
     origemKey: null,
     destinoKey: 'valor_ctm_num_destino',
@@ -64,7 +64,7 @@ export const PROD_FIELDS = {
   },
   VALOR_DEC_AMBIENTAL: {
     label: 'Plano Decenal do Meio Ambiente',
-    shortLabel: 'Dec. Ambiental',
+    shortLabel: 'Plano Decenal do Meio Ambiente',
     origemKey: 'VALOR_DEC_AMBIENTAL_NUM_origem',
     destinoKey: 'VALOR_DEC_AMBIENTAL_NUM_destino',
     category: 'ambiental'
@@ -78,21 +78,21 @@ export const PROD_FIELDS = {
   },
   VALOR_START: {
     label: 'Start Lab',
-    shortLabel: 'Start',
+    shortLabel: 'Start Lab',
     origemKey: 'valor_start_iniciais_finais_origem',
     destinoKey: 'valor_start_iniciais_finais_destino',
     category: 'educacao'
   },
   VALOR_LIVRO: {
-    label: 'Livros Didáticos',
-    shortLabel: 'Livros',
+    label: 'Programa Saber+',
+    shortLabel: 'Saber+',
     origemKey: 'LIVRO_FUND_1_2_origem',
     destinoKey: 'LIVRO_FUND_1_2_destino',
     category: 'educacao'
   },
   VALOR_PVA: {
     label: 'Procon Vai às Aulas',
-    shortLabel: 'PVA',
+    shortLabel: 'Procon Vai às Aulas',
     origemKey: 'PVA_origem',
     destinoKey: 'PVA_destino',
     category: 'educacao'
@@ -113,7 +113,7 @@ export const PROD_FIELDS = {
   },
   VALOR_DESERT: {
     label: 'Plano de Desertificação',
-    shortLabel: 'Desert.',
+    shortLabel: 'Plano de Desertificação',
     origemKey: 'VALOR_DESERT_NUM_origem',
     destinoKey: 'VALOR_DESERT_NUM_destino',
     category: 'ambiental'

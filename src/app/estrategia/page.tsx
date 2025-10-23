@@ -1861,7 +1861,7 @@ export default function EstrategiaPage() {
                 {/* Botão Toggle para Filtro de João Pessoa */}
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-slate-300 font-medium">Raio João Pessoa (1.300km)</span>
+                    <span className="text-sm text-slate-300 font-medium">Radar (1.300km)</span>
                     <button
                       onClick={() => setIsJoaoPessoaFilterActive(!isJoaoPessoaFilterActive)}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-slate-800 ${

@@ -1,11 +1,15 @@
 import type { Feature } from "geojson";
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
+import { 
+  classificarElegibilidade
+} from '@/utils/produtos';
 
 interface InformacoesMunicipioProps {
   municipioSelecionado: Feature | null;
+  modoVendas?: boolean;
 }
 
-export default function InformacoesMunicipio({ municipioSelecionado }: InformacoesMunicipioProps) {
+export default function InformacoesMunicipio({ municipioSelecionado, modoVendas = false }: InformacoesMunicipioProps) {
   // Estado para controlar a visibilidade do popover de status na versão mobile
   const [showStatusPopover, setShowStatusPopover] = useState(false);
   // Referência para o timer do popover
@@ -247,6 +251,61 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
     return `R$ ${numero.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
+  // Filtrar produtos quando em modo vendas
+  const produtosParaExibir = useMemo(() => {
+    if (!modoVendas || !municipioSelecionado?.properties) {
+      return valoresFiltrados; // Modo normal: mostra todos
+    }
+
+    // Modo vendas: filtrar por regras de elegibilidade
+    const classificacao = classificarElegibilidade(municipioSelecionado.properties);
+    
+    // Mapear chaves de produtos para suas chaves de elegibilidade
+    // VALOR_EDUCAGAME -> educagame_fmt
+    const mapeamentoChaes: Record<string, string> = {
+      'VALOR_PD': 'VALOR_PD',
+      'VALOR_PMSB': 'VALOR_PMSB',
+      'VALOR_EDUCAGAME': 'educagame_fmt' // Mapear VALOR_EDUCAGAME para educagame_fmt
+    };
+
+    const chavesVendaveis = new Set(classificacao.vender.map(item => item.chave));
+    
+    // Produtos que sempre aparecem no modo vendas (não têm regras de elegibilidade específicas)
+    const produtosSempreVendaveis = ['VALOR_CTM', 'VALOR_REURB', 'VALOR_START_INICIAIS_FINAIS', 'VALOR_DEC_AMBIENTAL', 'VALOR_PLHIS', 'VALOR_DESERT', 'PVA_fmt', 'LIVRO_FUND_COMBINADO'];
+
+    // Filtrar: Educagame e produtos com regras só se podemos vender, outros sempre aparecem
+    const produtosFiltrados = valoresFiltrados.filter(([chave]) => {
+      // Se é um produto que sempre aparece, mostrar
+      if (produtosSempreVendaveis.includes(chave)) {
+        return true;
+      }
+      
+      // Para educagame_fmt, verificar se VALOR_EDUCAGAME está em vendáveis
+      if (chave === 'educagame_fmt') {
+        return chavesVendaveis.has('VALOR_EDUCAGAME');
+      }
+      
+      // Para PD e PMSB, verificar suas chaves diretamente
+      if (chave === 'VALOR_PD' || chave === 'VALOR_PMSB') {
+        return chavesVendaveis.has(chave);
+      }
+      
+      return false;
+    });
+
+    // Telemetria: log quando filtra em modo vendas
+    console.log('💼 [InformacoesMunicipio] Modo vendas - produtos filtrados:', {
+      total_original: valoresFiltrados.length,
+      filtrados: produtosFiltrados.length,
+      vendaveis: Array.from(chavesVendaveis),
+      municipio: municipioSelecionado.properties.code_muni,
+      populacao: municipioSelecionado.properties.POPULACAO
+    });
+
+    return produtosFiltrados;
+  }, [modoVendas, valoresFiltrados, municipioSelecionado]);
+
+  // Renderização com a lista filtrada
   return (
     <div className="flex flex-col w-full h-full min-h-0">
       {/* Container da tabela com scroll */}
@@ -350,7 +409,7 @@ export default function InformacoesMunicipio({ municipioSelecionado }: Informaco
                 <col className="w-[55%]" />
               </colgroup>
               <tbody>
-            {valoresFiltrados.map(([k, valor], index) => (
+            {produtosParaExibir.map(([k, valor], index) => (
               <tr key={k} className={`border-b border-slate-700/30 ${index % 2 === 0 ? 'bg-transparent' : 'bg-slate-800/20'}`}>
                 <td className="px-3 sm:px-4 py-4">
                   <div className="flex items-start">

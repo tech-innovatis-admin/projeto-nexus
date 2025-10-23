@@ -119,13 +119,15 @@ function EstadoDropdown({
   buttonRef, 
   dropdownRef, 
   selectedUFs, 
-  setSelectedUFs
+  setSelectedUFs,
+  availableUFs = new Set(TODAS_UFS)
 }: {
   isOpen: boolean;
   buttonRef: React.RefObject<HTMLButtonElement | null>;
   dropdownRef: React.RefObject<HTMLDivElement | null>;
   selectedUFs: string[];
   setSelectedUFs: React.Dispatch<React.SetStateAction<string[]>>;
+  availableUFs?: Set<string>;
 }) {
   const [position, setPosition] = useState({ top: 0, left: 0, width: 0 });
 
@@ -212,8 +214,14 @@ function EstadoDropdown({
           <div className="px-3 py-2">
             <p className="text-[10px] tracking-wider text-slate-400 font-semibold mb-2">REGIÕES</p>
             {Object.entries(REGIOES_BRASIL).map(([regiao, ufs]) => {
-              const allSelected = ufs.every(uf => selectedUFs.includes(uf));
-              const someSelected = ufs.some(uf => selectedUFs.includes(uf));
+              // 🆕 Filtrar apenas UFs disponíveis nesta região
+              const ufsDisponiveis = ufs.filter(uf => availableUFs.has(uf));
+              
+              // Se não há UFs disponíveis nesta região, não renderizar
+              if (ufsDisponiveis.length === 0) return null;
+
+              const allSelected = ufsDisponiveis.every(uf => selectedUFs.includes(uf));
+              const someSelected = ufsDisponiveis.some(uf => selectedUFs.includes(uf));
               const temAbertura = isRegiaoAbertura(regiao);
           return (
             <label key={regiao} className="flex items-center gap-2 py-1 px-1 hover:bg-slate-800/50 rounded cursor-pointer">
@@ -229,9 +237,9 @@ function EstadoDropdown({
                       setSelectedUFs((prev: string[]) => {
                     const setPrev = new Set(prev);
                     if (checked) {
-                      ufs.forEach(uf => setPrev.add(uf));
+                      ufsDisponiveis.forEach(uf => setPrev.add(uf));
                     } else {
-                      ufs.forEach(uf => setPrev.delete(uf));
+                      ufsDisponiveis.forEach(uf => setPrev.delete(uf));
                     }
                     return Array.from(setPrev);
                   });
@@ -251,6 +259,9 @@ function EstadoDropdown({
           <div className="px-3 py-2">
             <p className="text-[10px] tracking-wider text-slate-400 font-semibold mb-2">ESTADOS</p>
             {TODAS_UFS.map(uf => {
+              // 🆕 Filtrar apenas UFs disponíveis
+              if (!availableUFs.has(uf)) return null;
+
               const temAbertura = isUFAbertura(uf);
               return (
           <label key={uf} className="flex items-center gap-2 py-1 px-1 hover:bg-slate-800/50 rounded cursor-pointer">
@@ -864,6 +875,34 @@ export default function EstrategiaPage() {
     return opts.sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
   }, [polosValores, selectedUFs, filterByJoaoPessoaRadius]);
 
+  // 🆕 UFs disponíveis quando o filtro de João Pessoa está ativo
+  const availableUFsWithRadiusFilter = useMemo(() => {
+    if (!isJoaoPessoaFilterActive) {
+      // Se o raio não está ativo, retornar todos os UFs
+      return new Set(TODAS_UFS);
+    }
+
+    // Se o raio está ativo, retornar apenas os UFs que têm polos dentro do raio
+    const ufsWithinRadius = new Set<string>();
+    
+    for (const polo of polosValores) {
+      const centroid = getCentroid(polo.geom);
+      if (!centroid) continue;
+
+      const distance = calculateDistance(
+        JOAO_PESSOA_COORDS[0], JOAO_PESSOA_COORDS[1],
+        centroid[0], centroid[1]
+      );
+
+      if (distance <= JOAO_PESSOA_RADIUS_KM) {
+        const uf = String(polo.UF || polo.UF_origem || '').toUpperCase();
+        if (uf) ufsWithinRadius.add(uf);
+      }
+    }
+
+    return ufsWithinRadius;
+  }, [polosValores, isJoaoPessoaFilterActive]);
+
   // 🆕 Mapa de periferias para seus polos (pre-computado para performance) - SIMPLIFICADO
   const periferiaToPolosMap = useMemo(() => {
     const map = new Map<string, Array<{ codigo_origem: string; municipio_origem: string }>>();
@@ -1307,6 +1346,15 @@ export default function EstrategiaPage() {
     const municipiosSet = new Set(periferiaFiltrada.map(p => p.municipio_destino).filter(Boolean));
     const municipiosList = Array.from(municipiosSet).sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
+    // 🆕 Criar mapa de municipio_destino para codigo_destino para o card
+    const municipiosCodigoMap = new Map<string, string>();
+    for (const p of periferiaFiltrada) {
+      const codigoDestino = p.codigo_destino || p.municipio_destino;
+      if (p.municipio_destino && codigoDestino) {
+        municipiosCodigoMap.set(p.municipio_destino, codigoDestino);
+      }
+    }
+
     // Subtítulo com label de contexto
     const poloLabel = inPoloMode
       ? (poloOptions.find(o => o.value === appliedPolo)?.label || appliedPolo)
@@ -1328,6 +1376,7 @@ export default function EstrategiaPage() {
       valorPolo,
       top3,
       municipiosList,
+      municipiosCodigoMap,
       totalMunicipios: municipiosList.length,
       poloLabel
     };
@@ -1337,6 +1386,7 @@ export default function EstrategiaPage() {
   useEffect(() => {
     setShowMunicipiosList(false);
     setIsCardFlipped(false);
+    setCurrentPage(0); // 🆕 Resetar página ao trocar polo
   }, [appliedPolo]);
 
   // Handler para eventos de teclado nos cards
@@ -1889,6 +1939,7 @@ export default function EstrategiaPage() {
                         dropdownRef={estadoDropdownRef}
                         selectedUFs={selectedUFs}
                         setSelectedUFs={setSelectedUFs}
+                        availableUFs={availableUFsWithRadiusFilter}
                       />
                     </div>
 
@@ -2307,19 +2358,19 @@ export default function EstrategiaPage() {
 
                           {/* Verso do Card */}
                           <div
-                            className="absolute inset-0 w-full h-full bg-[#1e293b] rounded-lg border border-slate-700/50 p-4 flex flex-col"
+                            className="absolute inset-0 w-full h-full bg-[#1e293b] rounded-lg border border-slate-700/50 p-3 flex flex-col"
                             style={{
                               backfaceVisibility: 'hidden',
                               transform: 'rotateX(180deg)'
                             }}
                           >
-                            <div className="flex justify-end mb-1">
+                            <div className="flex justify-end mb-0.5">
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setIsCardFlipped(false);
                                 }}
-                                className="text-slate-400 hover:text-white transition-colors"
+                                className="text-slate-400 hover:text-white transition-colors text-sm"
                                 aria-label="Fechar lista de municípios"
                               >
                                 ✕
@@ -2327,18 +2378,91 @@ export default function EstrategiaPage() {
                             </div>
 
                             {/* Área compacta: todos os municípios cabem sem rolagem */}
-                            <div className="flex-1">
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 sm:gap-1.5 justify-items-stretch content-start auto-rows-min">
-                                {derived.municipiosList.slice(0, 10).map((municipio, idx) => (
-                                  <div
-                                    key={idx}
-                                    className="w-full text-[9px] text-slate-300 py-1 px-1.5 truncate leading-tight bg-slate-800/60 rounded border border-slate-700/30 text-center hover:bg-slate-700/60 transition-colors"
-                                    title={municipio}
-                                  >
-                                    {municipio}
-                                  </div>
-                                ))}
+                            <div className="flex-1 flex flex-col">
+                              <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-0.5 sm:gap-1 justify-items-stretch content-start auto-rows-min">
+                                {(() => {
+                                  // 🆕 Cálculo de paginação
+                                  const totalMunicipios = derived.municipiosList.length;
+                                  const startIdx = currentPage * MUNICIPIOS_PER_PAGE;
+                                  const endIdx = Math.min(startIdx + MUNICIPIOS_PER_PAGE, totalMunicipios);
+                                  const municipiosPaginados = derived.municipiosList.slice(startIdx, endIdx);
+                                  const totalPages = Math.ceil(totalMunicipios / MUNICIPIOS_PER_PAGE);
+
+                                  return municipiosPaginados.map((municipio, idx) => {
+                                    // Obter o codigo_destino correspondente ao nome do município
+                                    const codigoDestino = derived.municipiosCodigoMap?.get(municipio) || municipio;
+                                    
+                                    return (
+                                      <button
+                                        key={`${currentPage}-${idx}`}
+                                        onClick={() => {
+                                          // 🆕 Usar codigo_destino em vez do nome do município
+                                          setSelectedMunicipioPeriferico(codigoDestino);
+                                          setPeriferiaInputValue(municipio);
+                                          
+                                          // Aplicar filtros selecionados (executar busca)
+                                          setAppliedPolo(selectedPolo);
+                                          setAppliedMunicipioPeriferico(codigoDestino);
+                                          setAppliedMinValor(minValor);
+                                          setAppliedMaxValor(maxValor);
+                                          setAppliedUFs(selectedUFs);
+                                          setAppliedProducts(selectedProducts.length === PRODUCTS.length ? [] : selectedProducts);
+                                          setAppliedUF(selectedUFs.length === 1 ? selectedUFs[0] : 'ALL');
+                                          
+                                          // Fechar o flip card automaticamente
+                                          setIsCardFlipped(false);
+                                          
+                                          // Fechar todos os dropdowns
+                                          setIsEstadoOpen(false);
+                                          setIsProdutosOpen(false);
+                                          setIsPeriferiaOpen(false);
+                                          setIsPoloDropdownOpen(false);
+                                          setIsPeriferiaDropdownOpen(false);
+                                          
+                                          // 🆕 Resetar página ao fechar card
+                                          setCurrentPage(0);
+                                        }}
+                                        className="w-full text-xs text-slate-300 py-0.5 px-1.5 truncate leading-tight bg-slate-800/60 rounded border border-slate-700/30 text-center hover:bg-sky-700/60 hover:text-sky-200 hover:border-sky-500/50 transition-all cursor-pointer font-medium"
+                                        title={`Selecionar ${municipio} e pesquisar`}
+                                      >
+                                        {municipio}
+                                      </button>
+                                    );
+                                  });
+                                })()}
                               </div>
+
+                              {/* 🆕 Controle de Paginação Sutil */}
+                              {(() => {
+                                const totalPages = Math.ceil(derived.municipiosList.length / MUNICIPIOS_PER_PAGE);
+                                return totalPages > 1 ? (
+                                  <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-slate-700/30">
+                                    <button
+                                      onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
+                                      disabled={currentPage === 0}
+                                      className="flex items-center justify-center w-6 h-6 rounded text-xs text-slate-400 hover:text-slate-200 hover:bg-slate-700/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                      title="Página anterior"
+                                      aria-label="Página anterior"
+                                    >
+                                      ‹
+                                    </button>
+                                    
+                                    <span className="text-[10px] text-slate-500 font-medium">
+                                      {currentPage + 1} / {totalPages}
+                                    </span>
+                                    
+                                    <button
+                                      onClick={() => setCurrentPage(prev => Math.min(totalPages - 1, prev + 1))}
+                                      disabled={currentPage === totalPages - 1}
+                                      className="flex items-center justify-center w-6 h-6 rounded text-xs text-slate-400 hover:text-slate-200 hover:bg-slate-700/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                      title="Próxima página"
+                                      aria-label="Próxima página"
+                                    >
+                                      ›
+                                    </button>
+                                  </div>
+                                ) : null;
+                              })()}
                             </div>
                           </div>
                         </motion.div>

@@ -218,7 +218,7 @@ export default function MapLibrePolygons({
     poloHighlighted: {
       fillOpacity: 0.8,
       line: '#2563EB', // Azul para destaque
-      lineWidth: 3,
+      lineWidth: 1.5,
     },
     periferia: {
       fillOpacity: 0.5,

@@ -167,6 +167,7 @@ function MapaPageContent() {
   const [selectValue, setSelectValue] = useState<string>("");
   const [estadoInputValue, setEstadoInputValue] = useState<string>("");
   const [municipioInputValue, setMunicipioInputValue] = useState<string>("");
+  const [modoVendas, setModoVendas] = useState<boolean>(false);
   const dadosRef = useRef<HTMLDivElement>(null);
   const planeIconRef = useRef<HTMLDivElement>(null);
   const estadosDropdownRef = useRef<HTMLDivElement>(null);
@@ -180,32 +181,28 @@ function MapaPageContent() {
 
   // Estados filtrados baseado no input e estado do dropdown
   const estadosFiltrados = useMemo(() => {
-    // Quando o dropdown está aberto, mostrar todos os estados (respeitando expansão)
-    if (estadosSubmenuOpen) {
-      return estadosExpanded ? estados : estadosPrioritarios;
-    }
-
-    // Quando o dropdown está fechado, filtrar baseado no input (se houver)
+    // PRIORIDADE 1: Se há texto digitado, SEMPRE filtrar por input (ignorar expansão)
     if (estadoInputValue.trim()) {
       return estados.filter(estado =>
         estado.toLowerCase().includes(estadoInputValue.toLowerCase())
       );
     }
-    // Quando não há texto digitado, respeitar a opção de exibir mais/menos
+
+    // PRIORIDADE 2: Sem texto digitado, respeitar a expansão
     return estadosExpanded ? estados : estadosPrioritarios;
-  }, [estados, estadosPrioritarios, estadosExpanded, estadoInputValue, estadosSubmenuOpen]);
+  }, [estados, estadosPrioritarios, estadosExpanded, estadoInputValue]);
 
-  // Municípios filtrados baseado no input e estado do dropdown
+  // Municípios filtrados baseado no input
   const municipiosFiltrados = useMemo(() => {
-    // Quando o dropdown está aberto, mostrar todos os municípios
-    if (municipiosSubmenuOpen) return municipios;
-
-    // Quando o dropdown está fechado, filtrar baseado no input (se houver)
-    if (!municipioInputValue.trim()) return municipios;
-    return municipios.filter(municipio =>
-      municipio.toLowerCase().includes(municipioInputValue.toLowerCase())
-    );
-  }, [municipios, municipioInputValue, municipiosSubmenuOpen]);
+    // Se há texto digitado, filtrar por input
+    if (municipioInputValue.trim()) {
+      return municipios.filter(municipio =>
+        municipio.toLowerCase().includes(municipioInputValue.toLowerCase())
+      );
+    }
+    // Sem texto, mostrar todos os municípios
+    return municipios;
+  }, [municipios, municipioInputValue]);
 
   // Atualizar largura da tela para responsividade
   useEffect(() => {
@@ -521,13 +518,20 @@ function MapaPageContent() {
                     value={estadoInputValue}
                     onChange={(e) => {
                       setEstadoInputValue(e.target.value);
-                      // Quando começa a digitar, mostra todos os estados (não apenas os prioritários)
-                      if (e.target.value.trim() && !estadosExpanded) {
-                        setEstadosExpanded(true);
-                      }
+                      // Garantir que o dropdown fica aberto enquanto há digitação
                       setEstadosSubmenuOpen(true);
+                      // Não modificar estadosExpanded automaticamente - deixar o usuário controlar
                     }}
-                    onFocus={() => setEstadosSubmenuOpen(true)}
+                    onFocus={() => {
+                      // Limpeza automática: ao clicar, apagar o conteúdo anterior
+                      setEstadoInputValue("");
+                      setEstadoSelecionado("");
+                      setEstadosSubmenuOpen(true);
+                      // Também limpar o município quando mudar de estado
+                      setMunicipioInputValue("");
+                      setMunicipioSelecionadoDropdown("");
+                      console.log(`🧹 [MapaPage] ${userInfo} - Campo de Estado limpo automaticamente ao focar`);
+                    }}
                     placeholder="Digite o estado..."
                     className="appearance-none w-full rounded-md bg-[#1e293b] text-white placeholder-slate-400 border border-slate-600 px-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-left"
                   />
@@ -627,11 +631,16 @@ function MapaPageContent() {
                     value={municipioInputValue}
                     onChange={(e) => {
                       setMunicipioInputValue(e.target.value);
+                      // Manter o dropdown aberto enquanto há digitação
                       setMunicipiosSubmenuOpen(true);
                     }}
                     onFocus={() => {
                       if (estadoSelecionado) {
+                        // Limpeza automática: ao clicar, apagar o conteúdo anterior
+                        setMunicipioInputValue("");
+                        setMunicipioSelecionadoDropdown("");
                         setMunicipiosSubmenuOpen(true);
+                        console.log(`🧹 [MapaPage] ${userInfo} - Campo de Município limpo automaticamente ao focar`);
                       }
                     }}
                     disabled={!estadoSelecionado}
@@ -728,6 +737,55 @@ function MapaPageContent() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                   Limpar
+                </button>
+
+                {/* Botão Toggle: Modo Vendas */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const novoEstado = !modoVendas;
+                    setModoVendas(novoEstado);
+                    
+                    // Telemetria: evento de toggle
+                    console.log(`💼 [MapaPage] ${userInfo} - Modo vendas ${novoEstado ? 'ativado' : 'desativado'}`, {
+                      estado: novoEstado ? 'on' : 'off',
+                      municipio: municipioSelecionado?.properties?.code_muni || null,
+                      uf: municipioSelecionado?.properties?.UF || null,
+                      nome_municipio: municipioSelecionado?.properties?.nome_municipio || null
+                    });
+                  }}
+                  disabled={!municipioSelecionado}
+                  aria-pressed={modoVendas}
+                  aria-label={modoVendas ? "Desativar modo vendas" : "Ativar modo vendas"}
+                  title={!municipioSelecionado ? "Selecione um município primeiro" : (modoVendas ? "Mostrar portfólio completo" : "Exibir o que podemos vender")}
+                  className={`
+                    w-full md:w-auto font-semibold py-1.5 px-4 rounded-md transition-all duration-150 ease-in-out 
+                    flex items-center justify-center gap-2
+                    focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#0f172a]
+                    ${!municipioSelecionado 
+                      ? 'border border-slate-700 text-slate-500 bg-slate-800/50 cursor-not-allowed' 
+                      : modoVendas 
+                        ? 'border border-green-500 text-green-400 bg-green-900/30 hover:bg-green-900/50 focus:ring-green-500' 
+                        : 'border border-slate-600 text-slate-300 bg-transparent hover:bg-slate-700/50 focus:ring-slate-500'
+                    }
+                  `}
+                >
+                  {modoVendas ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-iteration-cw-icon lucide-iteration-cw h-5 w-5">
+                      <path d="M4 10a8 8 0 1 1 8 8H4"/>
+                      <path d="m8 22-4-4 4-4"/>
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-chart-no-axes-combined-icon lucide-chart-no-axes-combined h-5 w-5">
+                      <path d="M12 16v5"/>
+                      <path d="M16 14v7"/>
+                      <path d="M20 10v11"/>
+                      <path d="m22 3-8.646 8.646a.5.5 0 0 1-.708 0L9.354 8.354a.5.5 0 0 0-.707 0L2 15"/>
+                      <path d="M4 18v3"/>
+                      <path d="M8 14v7"/>
+                    </svg>
+                  )}
+                  {modoVendas ? 'Exibir todos' : 'Soluções disponíveis'}
                 </button>
               </div>
             </form>
@@ -986,7 +1044,10 @@ function MapaPageContent() {
                     
                     {/* Container com largura total e altura completa */}
                     <div className="flex flex-col w-full h-full p-2 md:p-3 overflow-y-auto">
-                      <InformacoesMunicipio municipioSelecionado={municipioSelecionado} />
+                      <InformacoesMunicipio 
+                        municipioSelecionado={municipioSelecionado} 
+                        modoVendas={modoVendas}
+                      />
                     </div>
                   </div>
                 </div>

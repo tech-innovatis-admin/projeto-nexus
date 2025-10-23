@@ -42,6 +42,30 @@ O **NEXUS** é uma plataforma web desenvolvida pela *Data Science Team – Innov
 - **Busca Inteligente**: Autocomplete com normalização de acentos
 - **Ferramenta de Raio**: Análise de cobertura de valores por área geográfica
 
+### 🎯 **Modo Vendas - Análise de Oportunidades**
+O **Modo Vendas** permite aos usuários identificar rapidamente quais produtos podem ser vendidos para um município específico, baseado em regras de elegibilidade automática.
+
+#### **Como Funciona:**
+1. **Seleção de Município**: Escolha um município no mapa ou busca
+2. **Ativação**: Clique no botão "O que vender?" na barra de ações
+3. **Filtragem Automática**: A lista de produtos é filtrada automaticamente
+4. **Análise**: Produtos elegíveis permanecem visíveis, não elegíveis são ocultados
+
+#### **Regras de Elegibilidade:**
+- **Plano Diretor (PD)**: Pode vender se não possui OU está vencido (>10 anos)
+- **PMSB**: Pode vender se não possui OU está vencido (>4 anos)
+- **Outros Produtos**: Sempre podem ser vendidos (REURB, PLHIS, CTM, Start Lab, etc.)
+
+#### **Estados Visuais:**
+- **Botão OFF**: "O que vender?" (cinza) - mostra todos os produtos
+- **Botão ON**: "Mostrar todos" (verde) - mostra apenas produtos vendáveis
+
+#### **Benefícios:**
+- **Decisões Rápidas**: Identifica oportunidades de venda em segundos
+- **Foco Estratégico**: Concentra atenção nos produtos realmente vendáveis
+- **Interface Intuitiva**: Mesmo layout, apenas filtra produtos não elegíveis
+- **Telemetria Integrada**: Acompanhamento de uso para otimização
+
 ### 📊 **Módulo Estratégia**
 - **Análise de Polos de Valores** (geojson estratégico)
 - **Dados de Periferia Urbana** para planejamento
@@ -330,6 +354,7 @@ O Sistema de Rotas é uma página independente (`/rotas`) com **otimização mul
 - ✅ **Tratamento robusto de erros**: Fallbacks inteligentes e validações completas
 - ✅ **Rate limiting avançado**: 60 req/min com proteção automática contra abuso
 - ✅ **Health check completo**: Monitoramento de APIs Google com status detalhado
+- ✅ **Modo Vendas - Análise de Oportunidades**: Botão toggle que filtra produtos elegíveis para venda (PD/PMSB por regras, outros sempre visíveis)
 
 #### Próximas Evoluções (Roadmap Futuro)
 - ✅ **Exportação PDF**: Relatórios profissionais das rotas calculadas
@@ -433,6 +458,16 @@ Lista dinâmica – prioridades podem mudar conforme feedback operacional.
 - **Links Diretos** para Google Drive por produto
 - **Status Automático**: Em dia / Vencido / Não existe
 - **Valores Monetários** formatados automaticamente
+
+### 🎯 **Modo Vendas - Análise de Oportunidades**
+- **Botão Toggle "O que vender?"** na barra de ações do mapa
+- **Filtragem Inteligente** de produtos elegíveis para venda:
+  - **Plano Diretor**: Aparece apenas se município não possui OU está vencido (>10 anos)
+  - **PMSB**: Aparece apenas se município não possui OU está vencido (>4 anos)
+  - **Outros Produtos**: Sempre aparecem (REURB, PLHIS, CTM, Start Lab, etc.)
+- **Interface Intuitiva**: Mesmo layout da tabela, apenas filtra produtos não vendáveis
+- **Estados Visuais**: Botão verde quando ativo, cinza quando inativo
+- **Telemetria Integrada**: Logs estruturados para análise de uso
 
 ### 📄 **Sistema de Exportação**
 - **Geração de PDFs** de orçamento personalizados
@@ -1413,4 +1448,4 @@ Distribuído sob a **Licença MIT**. Consulte o arquivo `LICENSE` para mais deta
 
 ---
 
-**Última atualização**: Outubro 2025 - Sistema de Rotas Multimodal + Controle Preventivo de Custos Google Maps API + Integração Completa de Pistas de Voo + Otimização de Periferias Independentes + Filtro de Raio Estratégico de João Pessoa implementado
+**Última atualização**: Outubro 2025 - Sistema de Rotas Multimodal + Controle Preventivo de Custos Google Maps API + Integração Completa de Pistas de Voo + Otimização de Periferias Independentes + Filtro de Raio Estratégico de João Pessoa + Modo Vendas - Análise de Oportunidades implementado

@@ -14,7 +14,7 @@ import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import { RadiusResultPayload, MunicipioRaio } from '@/components/MapLibrePolygons';
 // Removido: import { fetchGeoJSONWithCache } from '@/utils/cacheGeojson';
-import { UF_ABERTURA, isUFAbertura, REGIOES_BRASIL, TODAS_UFS, isRegiaoAbertura, PRODUCTS, PROD_FIELDS, ProdFieldKey } from '@/utils/mapConfig';
+import { UF_ABERTURA, isUFAbertura, REGIOES_BRASIL, TODAS_UFS, UF_NAMES, isRegiaoAbertura, PRODUCTS, PROD_FIELDS, ProdFieldKey } from '@/utils/mapConfig';
 
 // Evita SSR para o mapa (MapLibre), prevenindo avisos de hidratação
 const MapLibrePolygons = dynamic(() => import('@/components/MapLibrePolygons'), { ssr: false });
@@ -48,6 +48,17 @@ interface PeriferiaProps {
 interface MunicipioRanking {
   nome: string;
   valor: number;
+}
+
+// Municípios Sem Tag (não são polo nem periferia)
+interface SemTagMunicipio {
+  UF?: string;
+  codigo: string;
+  municipio: string;
+  valor_total_sem_tag?: number;
+  polo_mais_proximo?: string;
+  codigo_polo?: string;
+  productValues?: Record<string, number>;
 }
 
 // MapLibre não funciona no SSR; o componente MapLibrePolygons é client-only (este arquivo já é "use client")
@@ -147,7 +158,7 @@ function EstadoDropdown({
   const dropdownContent = (
     <div 
       ref={dropdownRef}
-      className="fixed bg-[#0f172a] border border-slate-700/70 rounded-md shadow-lg z-[9999]"
+      className="fixed bg-[#1e293b] border border-slate-600 rounded-md shadow-lg z-[9999]"
       style={{
         top: position.top,
         left: position.left,
@@ -162,7 +173,7 @@ function EstadoDropdown({
         <div className="p-2 border-b border-slate-700/50 flex-shrink-0 shadow-sm">
           {/* Seção TODOS */}
       <div className="px-1 py-1">
-            <label className="flex items-center gap-2 py-1 px-1 hover:bg-slate-800/50 rounded cursor-pointer">
+            <label className="flex items-center gap-2 py-1 px-1 hover:bg-slate-600 rounded cursor-pointer transition-colors">
               <input
                 type="checkbox"
                 className="w-4 h-4"
@@ -178,7 +189,7 @@ function EstadoDropdown({
               />
               <span className="text-sm text-white font-semibold">Todos (Abertura)</span>
             </label>
-            <label className="flex items-center gap-2 py-1 px-1 hover:bg-slate-800/50 rounded cursor-pointer">
+            <label className="flex items-center gap-2 py-1 px-1 hover:bg-slate-600 rounded cursor-pointer transition-colors">
               <input
                 type="checkbox"
                 className="w-4 h-4"
@@ -196,7 +207,7 @@ function EstadoDropdown({
             </label>
             <button
               onClick={() => setSelectedUFs([])}
-              className="flex items-center gap-2 py-1 px-1 hover:bg-slate-800/50 rounded cursor-pointer w-full text-left"
+              className="flex items-center gap-2 py-1 px-1 hover:bg-slate-600 rounded cursor-pointer w-full text-left transition-colors"
             >
               <div className="w-4 h-4 flex items-center justify-center">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -224,7 +235,7 @@ function EstadoDropdown({
               const someSelected = ufsDisponiveis.some(uf => selectedUFs.includes(uf));
               const temAbertura = isRegiaoAbertura(regiao);
           return (
-            <label key={regiao} className="flex items-center gap-2 py-1 px-1 hover:bg-slate-800/50 rounded cursor-pointer">
+            <label key={regiao} className="flex items-center gap-2 py-1 px-1 hover:bg-slate-600 rounded cursor-pointer transition-colors">
               <input
                 type="checkbox"
                 className="w-4 h-4"
@@ -264,7 +275,7 @@ function EstadoDropdown({
 
               const temAbertura = isUFAbertura(uf);
               return (
-          <label key={uf} className="flex items-center gap-2 py-1 px-1 hover:bg-slate-800/50 rounded cursor-pointer">
+          <label key={uf} className="flex items-center gap-2 py-1 px-1 hover:bg-slate-600 rounded cursor-pointer transition-colors">
             <input
               type="checkbox"
               className="w-4 h-4"
@@ -279,7 +290,7 @@ function EstadoDropdown({
               }}
             />
                   <span className="text-sm text-white">
-                    {uf}{temAbertura ? <span className="text-sky-400"> (Abertura)</span> : ''}
+                    {UF_NAMES[uf] || uf}{temAbertura ? <span className="text-sky-400"> (Abertura)</span> : ''}
                   </span>
           </label>
               );
@@ -575,10 +586,15 @@ export default function EstrategiaPage() {
   const [isPeriferiaOpen, setIsPeriferiaOpen] = useState<boolean>(false);
   const periferiaDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Base dos Municípios Sem Tag (para incluir no filtro "MUNICÍPIOS PRÓXIMO")
+  const [semTagMunicipios, setSemTagMunicipios] = useState<SemTagMunicipio[]>([]);
+
   // Filtros aplicados (após clicar em buscar)
   const [appliedUF, setAppliedUF] = useState<string>('ALL'); // Mantido para compatibilidade com mapa
   const [appliedPolo, setAppliedPolo] = useState<string>('ALL');
   const [appliedMunicipioPeriferico, setAppliedMunicipioPeriferico] = useState<string>('ALL');
+  // Município Sem Tag aplicado (quando selecionado em MUNICÍPIOS PRÓXIMO)
+  const [appliedSemTagMunicipio, setAppliedSemTagMunicipio] = useState<string>('ALL');
   const [appliedMinValor, setAppliedMinValor] = useState<number | ''>('');
   const [appliedMaxValor, setAppliedMaxValor] = useState<number | ''>('');
   const [appliedUFs, setAppliedUFs] = useState<string[]>([]); // Novo: UFs aplicadas
@@ -606,10 +622,11 @@ export default function EstrategiaPage() {
   const [currentPage, setCurrentPage] = useState(0);
   const MUNICIPIOS_PER_PAGE = 10;
 
-  // Estado para o payload do raio
+  // Estado para controlar tooltip do Radar Estratégico
+  const [showRadarTooltip, setShowRadarTooltip] = useState(false);
+
+  // Estado para dados do raio (usado nas exportações)
   const [radiusPayload, setRadiusPayload] = useState<RadiusResultPayload | null>(null);
-
-
 
   // Coordenadas de João Pessoa (latitude, longitude)
   const JOAO_PESSOA_COORDS = [-7.14804917856058, -34.95096946933421]; // [lat, lng]
@@ -784,6 +801,60 @@ export default function EstrategiaPage() {
       console.error('Erro ao processar dados estratégicos:', err);
     }
   }, [estrategiaData, loadingData]);
+
+  // Carregar base dos municípios Sem Tag para o filtro de "MUNICÍPIOS PRÓXIMO"
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const resp = await fetch('/api/proxy-geojson/municipios_sem_tag.json', { cache: 'force-cache' });
+        if (!resp.ok) return;
+        const json = await resp.json();
+
+        if (cancelled) return;
+
+        const items: SemTagMunicipio[] = [];
+        const pushItem = (props: any) => {
+          const it: SemTagMunicipio = {
+            UF: props?.UF,
+            codigo: String(props?.codigo || props?.codigo_ibge || ''),
+            municipio: String(props?.municipio || ''),
+            valor_total_sem_tag: Number(props?.valor_total_sem_tag || 0),
+            polo_mais_proximo: props?.polo_mais_proximo ? String(props.polo_mais_proximo) : undefined,
+            codigo_polo: props?.codigo_polo ? String(props.codigo_polo) : undefined,
+            productValues: {
+              VALOR_PD: Number(props?.valor_pd_num_sem_tag || 0),
+              VALOR_PMBSB: Number(props?.valor_pmsb_num_sem_tag || 0),
+              VALOR_CTM: Number(props?.valor_ctm_num_sem_tag || 0),
+              VALOR_DEC_AMBIENTAL: Number(props?.VALOR_DEC_AMBIENTAL_NUM_sem_tag || 0),
+              VALOR_PLHIS: Number(props?.PLHIS_sem_tag || 0),
+              VALOR_START: Number(props?.valor_start_iniciais_finais_sem_tag || 0),
+              VALOR_LIVRO: Number(props?.LIVRO_FUND_1_2_sem_tag || 0),
+              VALOR_PVA: Number(props?.PVA_sem_tag || 0),
+              VALOR_EDUCAGAME: Number(props?.educagame_sem_tag || 0),
+              VALOR_REURB: Number(props?.valor_reurb_sem_tag || 0),
+              VALOR_DESERT: Number(props?.VALOR_DESERT_NUM_sem_tag || 0),
+            }
+          };
+          if (it.codigo && it.municipio) items.push(it);
+        };
+
+        if (Array.isArray(json)) {
+          json.forEach(pushItem);
+        } else if (json?.type === 'FeatureCollection' && Array.isArray(json.features)) {
+          json.features.forEach((f: any) => pushItem(f?.properties || {}));
+        } else if (Array.isArray(json?.data || json?.items)) {
+          (json.data || json.items).forEach(pushItem);
+        }
+
+        setSemTagMunicipios(items);
+      } catch (e) {
+        console.warn('Não foi possível carregar municipios_sem_tag.json para o filtro:', e);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, []);
 
   // Função para filtrar municípios dentro do raio de João Pessoa
   const filterByJoaoPessoaRadius = useCallback((municipios: (PoloValoresProps | PeriferiaProps)[]) => {
@@ -1003,6 +1074,55 @@ export default function EstrategiaPage() {
       peri.municipio_destino.toLowerCase().includes(periferiaInputValue.toLowerCase())
     );
   }, [municipiosPerifericosUnicos, periferiaInputValue]);
+
+  // Lista combinada para o filtro "MUNICÍPIOS PRÓXIMO": periferias + sem tag
+  type MunicipioProximoItem =
+    | { tipo: 'periferia'; id: string; nome: string; UF: string; valor?: number; codigo_origem?: string }
+    | { tipo: 'semTag'; id: string; nome: string; UF: string; valor?: number; poloMaisProximo?: string };
+
+  const municipiosProximosFiltrados = useMemo(() => {
+    const normalize = (s: string) => s ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim() : '';
+
+    const perif: MunicipioProximoItem[] = (periferiasFiltradas || []).map(p => ({
+      tipo: 'periferia' as const,
+      id: String(p.codigo_destino || p.municipio_destino),
+      nome: p.municipio_destino,
+      UF: String(p.UF || ''),
+      valor: Number(p.valor_total_destino || 0),
+      codigo_origem: p.codigo_origem,
+    }));
+
+    // Filtrar sem tag pela seleção de UFs quando houver
+    const baseSemTag = selectedUFs.length
+      ? semTagMunicipios.filter(s => selectedUFs.includes(String(s.UF || '')))
+      : semTagMunicipios;
+
+    const term = (periferiaInputValue || '').toLowerCase();
+    let semTagFiltered = (!term ? baseSemTag : baseSemTag.filter(s => s.municipio.toLowerCase().includes(term)));
+
+    // Se um polo estiver selecionado, manter apenas Sem Tag cujo polo_mais_proximo corresponda ao nome do polo
+    if (selectedPolo !== 'ALL') {
+      const selectedLabel = (poloOptions.find(o => o.value === selectedPolo)?.label) || '';
+      if (selectedLabel) {
+        const poloNorm = normalize(selectedLabel);
+        semTagFiltered = semTagFiltered.filter(s => normalize(String(s.polo_mais_proximo || '')) === poloNorm);
+      }
+    }
+
+    const semTag: MunicipioProximoItem[] = semTagFiltered.map(s => ({
+      tipo: 'semTag' as const,
+      id: s.codigo,
+      nome: s.municipio,
+      UF: String(s.UF || ''),
+      valor: Number(s.valor_total_sem_tag || 0),
+      poloMaisProximo: s.polo_mais_proximo,
+    }));
+
+    // Ordenar alfabeticamente dentro de cada grupo, mantendo periferias primeiro
+    perif.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    semTag.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    return [...perif, ...semTag];
+  }, [periferiasFiltradas, semTagMunicipios, selectedUFs, periferiaInputValue, selectedPolo, poloOptions]);
 
   // Opções filtradas por UFs selecionadas e filtro de João Pessoa (para o select de POLO)
   const filteredPoloOptions = useMemo(() => {
@@ -1436,7 +1556,53 @@ export default function EstrategiaPage() {
     }).filter(produto => produto.valor > 0); // Mostrar apenas produtos com valor > 0
   }, [municipioPerifericoSelecionado]);
 
-  const metrics = appliedMunicipioPeriferico !== 'ALL' && municipioPerifericoSelecionado ? [
+  // Município Sem Tag selecionado (se houver)
+  const municipioSemTagSelecionado = useMemo(() => {
+    if (appliedSemTagMunicipio === 'ALL') return null;
+    const m = semTagMunicipios.find(s => s.codigo === appliedSemTagMunicipio) || null;
+    return m;
+  }, [appliedSemTagMunicipio, semTagMunicipios]);
+
+  const valorMunicipioSemTag = useMemo(() => {
+    if (!municipioSemTagSelecionado) return 0;
+    return sumSelectedProducts(municipioSemTagSelecionado.productValues, Number(municipioSemTagSelecionado.valor_total_sem_tag) || 0);
+  }, [municipioSemTagSelecionado, appliedProducts]);
+
+  const produtosMunicipioSemTag = useMemo(() => {
+    if (!municipioSemTagSelecionado) return [];
+    return Object.entries(PROD_FIELDS).map(([key, config]) => {
+      const valor = municipioSemTagSelecionado.productValues?.[key as ProdFieldKey] || 0;
+      return {
+        key: key as ProdFieldKey,
+        label: config.label,
+        shortLabel: config.shortLabel,
+        valor: Number(valor),
+        category: config.category
+      };
+    }).filter(produto => produto.valor > 0);
+  }, [municipioSemTagSelecionado]);
+
+  // Lista de produtos para o município selecionado (periferia ou sem tag)
+  const produtosMunicipioDetalhes = produtosMunicipioPeriferico.length > 0 ? produtosMunicipioPeriferico : produtosMunicipioSemTag;
+
+  // Montagem dos cards: Sem Tag selecionado -> mostra dados do Sem Tag;
+  // senão, Periferia selecionada -> mostra dados da periferia; caso contrário, visão agregada por polo
+  const metrics = (appliedSemTagMunicipio !== 'ALL' && municipioSemTagSelecionado) ? [
+    {
+      id: 'valor_municipio_periferico',
+      title: 'Valor Total',
+      value: valorMunicipioSemTag,
+      subtitle: municipioSemTagSelecionado.municipio,
+      description: `${municipioSemTagSelecionado.UF || ''} • ${municipioSemTagSelecionado.codigo}`
+    },
+    {
+      id: 'produtos_municipio_periferico',
+      title: 'Produtos Detalhados',
+      value: 'produtos',
+      subtitle: `${produtosMunicipioDetalhes.length} produtos ativos`,
+      description: 'Valores individuais por produto no município'
+    }
+  ] : (appliedMunicipioPeriferico !== 'ALL' && municipioPerifericoSelecionado) ? [
     // Card 1: Valor total do município periférico
     {
       id: 'valor_municipio_periferico',
@@ -1450,7 +1616,7 @@ export default function EstrategiaPage() {
       id: 'produtos_municipio_periferico',
       title: 'Produtos Detalhados',
       value: 'produtos',
-      subtitle: `${produtosMunicipioPeriferico.length} produtos ativos`,
+      subtitle: `${produtosMunicipioDetalhes.length} produtos ativos`,
       description: 'Valores individuais por produto no município'
     }
   ] : [
@@ -1852,16 +2018,39 @@ export default function EstrategiaPage() {
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5 }}
-                className="flex justify-between items-center"
+                className="flex flex-col md:flex-row md:justify-between md:items-center gap-2 md:gap-0"
               >
-                <h1 className="text-3xl font-bold text-white mb-2">
+                <h1 className="text-3xl font-bold text-white">
                   Análise Estratégica de <span className="text-sky-400">Produtos</span>
                 </h1>
                 
                 {/* Botão Toggle para Filtro de João Pessoa */}
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-slate-300 font-medium">Radar (1.300km)</span>
+                  <div className="flex items-center gap-2 relative">
+                    <span 
+                      className="text-sm text-slate-300 font-medium cursor-pointer"
+                      onMouseEnter={() => setShowRadarTooltip(true)}
+                      onMouseLeave={() => setShowRadarTooltip(false)}
+                      onClick={() => setShowRadarTooltip(!showRadarTooltip)}
+                    >
+                      Radar Estratégico
+                    </span>
+                    
+                    {/* Tooltip profissional */}
+                    {showRadarTooltip && (
+                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-2 bg-slate-800 text-white text-xs rounded-md shadow-lg border border-slate-600 z-50 whitespace-nowrap">
+                        <div className="flex items-center gap-2">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          Raio de 1.300 km a partir de João Pessoa
+                        </div>
+                        {/* Seta do tooltip */}
+                        <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-slate-800 border-l border-t border-slate-600 rotate-45"></div>
+                      </div>
+                    )}
+                    
                     <button
                       onClick={() => setIsJoaoPessoaFilterActive(!isJoaoPessoaFilterActive)}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-slate-800 ${
@@ -1923,7 +2112,7 @@ export default function EstrategiaPage() {
                         ref={estadoButtonRef}
                         type="button"
                         onClick={() => setIsEstadoOpen(v => !v)}
-                        className="bg-[#0f172a] text-slate-200 border border-slate-700/50 rounded-md px-3 py-1.5 text-left flex items-center justify-between min-h-[40px]"
+                        className="relative bg-[#1e293b] text-white border border-slate-600 rounded-md px-3 pr-8 py-1.5 text-left flex items-center min-h-[40px] focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
                       >
                         <span className="text-sm">
                           {selectedUFs.length === 0 ? 'Todos os Estados' :
@@ -1931,7 +2120,7 @@ export default function EstrategiaPage() {
                            selectedUFs.length === TODAS_UFS.length ? 'Todos' :
                            selectedUFs.length <= 3 ? selectedUFs.join(', ') : `${selectedUFs.length} selecionados`}
                         </span>
-                        <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 transition-transform ${isEstadoOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd"/></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 text-slate-300 transition-transform absolute right-2 top-1/2 -translate-y-1/2 ${isEstadoOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd"/></svg>
                       </button>
                       <EstadoDropdown
                         isOpen={isEstadoOpen}
@@ -2040,7 +2229,7 @@ export default function EstrategiaPage() {
 
                     {/* MUNICÍPIO PERIFÉRICO */}
                     <div className="flex flex-col">
-                      <label className="text-slate-300 text-sm mb-0.5 text-center font-bold">MUNICÍPIOS PRÓXIMO</label>
+                      <label className="text-slate-300 text-sm mb-0.5 text-center font-bold">MUNICÍPIOS PRÓXIMOS</label>
                       <div className="flex gap-2">
                         <div className="relative flex-1" ref={periferiaDropdownRef}>
                           <input
@@ -2084,59 +2273,112 @@ export default function EstrategiaPage() {
                                     // 🆕 Limpar aviso ao selecionar "Todos"
                                     setShowPoloSelectionWarning(false);
                                     setFilteredPolosByPeriferia([]);
+                                    setAppliedSemTagMunicipio('ALL');
                                   }}
                                   className="w-full text-left px-3 py-2 text-sm text-white hover:bg-slate-600 transition-colors"
                                 >
                                   Todos os municípios
                                 </button>
 
-                                {/* 🆕 Municípios únicos filtrados por busca */}
-                                {periferiasFiltradas.map((peri) => {
-                                  const codigoDestino = peri.codigo_destino || peri.municipio_destino;
-                                  const polosRelacionados = periferiaToPolosMap.get(codigoDestino) || [];
+                                {/* Municípios próximos (periferias + sem tag) */}
+                                {municipiosProximosFiltrados.map((item) => {
+                                  if (item.tipo === 'periferia') {
+                                    const codigoDestino = item.id;
+                                    const polosRelacionados = periferiaToPolosMap.get(codigoDestino) || [];
+                                    return (
+                                      <button
+                                        key={`peri-${codigoDestino}`}
+                                        onClick={() => {
+                                          const municipioId = codigoDestino;
 
-                                  return (
-                                    <button
-                                      key={codigoDestino}
-                                      onClick={() => {
-                                        const municipioId = codigoDestino;
+                                          if (polosRelacionados.length > 1) {
+                                            setShowPoloSelectionWarning(true);
+                                            setFilteredPolosByPeriferia(polosRelacionados.map(p => p.codigo_origem));
+                                            setSelectedMunicipioPeriferico(municipioId);
+                                            setPeriferiaInputValue(item.nome);
+                                          } else {
+                                            if (selectedPolo === 'ALL' && polosRelacionados.length === 1) {
+                                              setSelectedPolo(polosRelacionados[0].codigo_origem);
+                                              setPoloInputValue(polosRelacionados[0].municipio_origem);
+                                            }
+                                            setSelectedMunicipioPeriferico(municipioId);
+                                            setPeriferiaInputValue(item.nome);
+                                            setShowPoloSelectionWarning(false);
+                                            setFilteredPolosByPeriferia([]);
 
-                                        // 🆕 Verificar se há múltiplos polos para esta periferia
-                                        if (polosRelacionados.length > 1) {
-                                          // Múltiplos polos: ativar aviso e filtrar lista de polos
-                                          setShowPoloSelectionWarning(true);
-                                          setFilteredPolosByPeriferia(polosRelacionados.map(p => p.codigo_origem));
-
-                                          // Selecionar o município (não muda o polo automaticamente)
-                                          setSelectedMunicipioPeriferico(municipioId);
-                                          setPeriferiaInputValue(peri.municipio_destino);
-                                        } else {
-                                          // Polo único: comportamento normal
-                                          if (selectedPolo === 'ALL' && polosRelacionados.length === 1) {
-                                            // Ajustar polo automaticamente apenas se "Todos os Polos" estiver selecionado
-                                            setSelectedPolo(polosRelacionados[0].codigo_origem);
-                                            setPoloInputValue(polosRelacionados[0].municipio_origem);
+                                            // Aplicar filtros imediatamente (auto buscar)
+                                            setAppliedPolo(selectedPolo);
+                                            setAppliedMunicipioPeriferico(municipioId);
+                                            setAppliedSemTagMunicipio('ALL');
+                                            setAppliedMinValor(minValor);
+                                            setAppliedMaxValor(maxValor);
+                                            setAppliedUFs(selectedUFs);
+                                            setAppliedProducts(selectedProducts.length === PRODUCTS.length ? [] : selectedProducts);
+                                            setAppliedUF(selectedUFs.length === 1 ? selectedUFs[0] : 'ALL');
                                           }
-                                          setSelectedMunicipioPeriferico(municipioId);
-                                          setPeriferiaInputValue(peri.municipio_destino);
+
+                                          setIsPeriferiaDropdownOpen(false);
+                                          setAppliedSemTagMunicipio('ALL');
+                                        }}
+                                        className="w-full text-left px-3 py-2 text-sm text-white hover:bg-slate-600 transition-colors"
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <span>{item.nome}</span>
+                                          <span className="text-[10px] text-slate-400">{item.UF}</span>
+                                        </div>
+                                      </button>
+                                    );
+                                  } else {
+                                    // item.tipo === 'semTag'
+                                    return (
+                                      <button
+                                        key={`sem-${item.id}`}
+                                        onClick={() => {
+                                          // Encontrar o código do polo mais próximo pelo nome informado na base sem tag
+                                          const nomePolo = (item.poloMaisProximo || '').trim();
+                                          const match = polosValores.find(p => p.municipio_origem.toLowerCase() === nomePolo.toLowerCase());
+                                          if (!match) {
+                                            console.warn('Polo mais próximo não encontrado para município Sem Tag:', { municipio: item.nome, nomePolo });
+                                            setIsPeriferiaDropdownOpen(false);
+                                            return;
+                                          }
+
+                                          // Preencher o campo de POLO e aplicar a busca automaticamente
+                                          setSelectedPolo(match.codigo_origem);
+                                          setPoloInputValue(`${match.municipio_origem} (Mais Próximo)`);
+                                          setSelectedMunicipioPeriferico('ALL');
+                                          setPeriferiaInputValue(item.nome);
+
+                                          // Aplicar filtros imediatamente (auto buscar)
+                                          setAppliedPolo(match.codigo_origem);
+                                          setAppliedMunicipioPeriferico('ALL');
+                                          setAppliedSemTagMunicipio(item.id);
+                                          setAppliedMinValor(minValor);
+                                          setAppliedMaxValor(maxValor);
+                                          setAppliedUFs(selectedUFs);
+                                          setAppliedProducts(selectedProducts.length === PRODUCTS.length ? [] : selectedProducts);
+                                          setAppliedUF(selectedUFs.length === 1 ? selectedUFs[0] : 'ALL');
+
                                           setShowPoloSelectionWarning(false);
                                           setFilteredPolosByPeriferia([]);
-                                        }
-
-                                        setIsPeriferiaDropdownOpen(false);
-                                      }}
-                                      className="w-full text-left px-3 py-2 text-sm text-white hover:bg-slate-600 transition-colors"
-                                    >
-                                      <div className="flex items-center gap-1">
-                                        <span>{peri.municipio_destino}</span>
-                                        {/* 🆕 Removido: não mostra mais o nome do polo entre parênteses */}
-                                      </div>
-                                    </button>
-                                  );
+                                          setIsPeriferiaDropdownOpen(false);
+                                        }}
+                                        className="w-full text-left px-3 py-2 text-sm text-white hover:bg-slate-700 transition-colors"
+                                        title="Selecionar município sem tag e pesquisar automaticamente"
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <span>{item.nome}</span>
+                                          {item.poloMaisProximo && (
+                                            <span className="ml-auto text-[10px] text-sky-300">Polo próximo: {item.poloMaisProximo}</span>
+                                          )}
+                                        </div>
+                                      </button>
+                                    );
+                                  }
                                 })}
 
                                 {/* Mensagem quando não há resultados na busca */}
-                                {periferiaInputValue.trim() && periferiasFiltradas.length === 0 && (
+                                {periferiaInputValue.trim() && municipiosProximosFiltrados.length === 0 && (
                                   <div className="px-3 py-2 text-sm text-slate-400 text-center">
                                     Nenhum município encontrado
                                   </div>
@@ -2146,11 +2388,12 @@ export default function EstrategiaPage() {
                           )}
                         </div>
 
-                        {selectedMunicipioPeriferico !== 'ALL' && (
+                        {(selectedMunicipioPeriferico !== 'ALL' || appliedSemTagMunicipio !== 'ALL') && (
                           <button
                             onClick={() => {
                               setSelectedMunicipioPeriferico('ALL');
                               setAppliedMunicipioPeriferico('ALL');
+                              setAppliedSemTagMunicipio('ALL');
                               setPeriferiaInputValue('');
                               setIsPeriferiaDropdownOpen(false);
                               // 🆕 Limpar aviso ao limpar seleção
@@ -2176,17 +2419,17 @@ export default function EstrategiaPage() {
                         ref={produtosButtonRef}
                         type="button"
                         onClick={() => setIsProdutosOpen(v => !v)}
-                        className="bg-[#0f172a] text-slate-200 border border-slate-700/50 rounded-md px-3 py-1.5 text-left flex items-center justify-between min-h-[40px]"
+                        className="relative bg-[#1e293b] text-white border border-slate-600 rounded-md px-3 pr-8 py-1.5 text-left flex items-center min-h-[40px] focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
                       >
                         <span className="text-sm">
                           {selectedProducts.length === PRODUCTS.length ? 'Todos' : selectedProducts.length === 0 ? 'Nenhum' : selectedProducts.map(k => (PRODUCTS.find(p => p.key === k)?.label || k)).join(', ')}
                         </span>
-                        <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 transition-transform ${isProdutosOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd"/></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 text-slate-300 transition-transform absolute right-2 top-1/2 -translate-y-1/2 ${isProdutosOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd"/></svg>
                       </button>
                       {typeof window !== 'undefined' && isProdutosOpen && createPortal((
                         <div 
                           ref={produtosDropdownRef}
-                          className="fixed bg-[#0f172a] border border-slate-700/70 rounded-md shadow-lg p-2 z-[9999]"
+                          className="fixed bg-[#1e293b] border border-slate-600 rounded-md shadow-lg p-2 z-[9999]"
                           style={{
                             top: ((produtosButtonRef.current?.getBoundingClientRect()?.bottom || 0) + window.scrollY + 4),
                             left: ((produtosButtonRef.current?.getBoundingClientRect()?.left || 0) + window.scrollX),
@@ -2195,7 +2438,7 @@ export default function EstrategiaPage() {
                         >
                           <div className="px-1 py-1">
                             <p className="text-[10px] tracking-wider text-slate-400 font-semibold mb-1">PRODUTOS</p>
-                            <label className="flex items-center gap-2 py-1 px-1 hover:bg-slate-800/50 rounded cursor-pointer">
+                            <label className="flex items-center gap-2 py-1 px-1 hover:bg-slate-600 rounded cursor-pointer transition-colors">
                               <input
                                 type="checkbox"
                                 className="w-4 h-4"
@@ -2213,7 +2456,7 @@ export default function EstrategiaPage() {
                               <span className="text-sm text-white">Todos</span>
                             </label>
                             {PRODUCTS.map(prod => (
-                              <label key={prod.key} className="flex items-center gap-2 py-1 px-1 hover:bg-slate-800/50 rounded cursor-pointer">
+                              <label key={prod.key} className="flex items-center gap-2 py-1 px-1 hover:bg-slate-600 rounded cursor-pointer transition-colors">
                                 <input
                                   type="checkbox"
                                   className="w-4 h-4"
@@ -2477,7 +2720,7 @@ export default function EstrategiaPage() {
                         className={`bg-[#1e293b] rounded-lg border border-slate-700/50 hover:bg-[#233044] transition-all duration-300 group min-h-[160px] ${
                           metric.id === 'top_municipios' ? 'p-4' : metric.id === 'valor_polo' ? 'p-6' : 'p-4'
                         } ${
-                          appliedMunicipioPeriferico !== 'ALL' && municipioPerifericoSelecionado
+                          ((appliedMunicipioPeriferico !== 'ALL' && municipioPerifericoSelecionado) || (appliedSemTagMunicipio !== 'ALL' && municipioSemTagSelecionado))
                             ? metric.id === 'valor_municipio_periferico'
                               ? 'md:col-span-1' // Primeiro card ocupa 1/3 do espaço
                               : metric.id === 'produtos_municipio_periferico'
@@ -2532,7 +2775,7 @@ export default function EstrategiaPage() {
                               {/* Grid de 5 linhas x 2 colunas para produtos */}
                               <div className="grid grid-cols-2 grid-rows-5 gap-1 h-full">
                                 {Array.from({ length: 10 }, (_, idx) => {
-                                  const produto = produtosMunicipioPeriferico[idx];
+                                  const produto = produtosMunicipioDetalhes[idx];
                                   return (
                                     <div
                                       key={idx}
@@ -2568,7 +2811,7 @@ export default function EstrategiaPage() {
                                   );
                                 })}
                               </div>
-                              {produtosMunicipioPeriferico.length === 0 && (
+                              {produtosMunicipioDetalhes.length === 0 && (
                                 <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-sm">
                                   Nenhum produto ativo neste município
                                 </div>
@@ -2592,7 +2835,13 @@ export default function EstrategiaPage() {
                                   <p className="font-extrabold text-emerald-400 text-2xl sm:text-3xl md:text-4xl lg:text-3xl xl:text-4xl text-center leading-tight break-words">
                                     <AnimatedCurrency
                                       targetValue={metric.value as number}
-                                      selectedPolo={appliedMunicipioPeriferico !== 'ALL' ? appliedMunicipioPeriferico : appliedPolo}
+                                      selectedPolo={
+                                        appliedMunicipioPeriferico !== 'ALL'
+                                          ? appliedMunicipioPeriferico
+                                          : appliedSemTagMunicipio !== 'ALL'
+                                          ? appliedSemTagMunicipio
+                                          : appliedPolo
+                                      }
                                     />
                                   </p>
                                 </div>
@@ -2658,6 +2907,7 @@ export default function EstrategiaPage() {
                             setAppliedMunicipioPeriferico(municipioId);
                           }}
                           municipioPerifericoSelecionado={appliedMunicipioPeriferico}
+                          municipioSemTagSelecionado={appliedSemTagMunicipio !== 'ALL' ? appliedSemTagMunicipio : undefined}
                           // Passa o estado do filtro Radar (João Pessoa 1.300km) para filtrar Sem Tag visualmente
                           radarFilterActive={isJoaoPessoaFilterActive}
                           // Converter [lat, lng] -> [lng, lat] para uso no Turf/MapLibre
@@ -2725,6 +2975,7 @@ export default function EstrategiaPage() {
                           setAppliedMunicipioPeriferico(municipioId);
                         }}
                         municipioPerifericoSelecionado={appliedMunicipioPeriferico}
+                        municipioSemTagSelecionado={appliedSemTagMunicipio !== 'ALL' ? appliedSemTagMunicipio : undefined}
                         // Passa o estado do filtro Radar (João Pessoa 1.300km) para filtrar Sem Tag visualmente
                         radarFilterActive={isJoaoPessoaFilterActive}
                         // Converter [lat, lng] -> [lng, lat]

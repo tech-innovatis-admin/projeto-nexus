@@ -69,12 +69,101 @@ O **Modo Vendas** permite aos usuários identificar rapidamente quais produtos p
 ### 📊 **Módulo Estratégia**
 - **Análise de Polos de Valores** (geojson estratégico)
 - **Dados de Periferia Urbana** para planejamento
+- **Integração Completa de Municípios Sem Tag** (visibilidade, filtros, cards, mapa)
 - **Visualização Temática** de conectividade municipal
 - **Integração com Dados Municipais** para insights estratégicos
 - **Filtro Unificado ESTADO/REGIÃO** com seleção por regiões e estados
 - **Indicadores Visuais de Abertura** comercial por estado/região
 - **Filtro de Raio Estratégico de João Pessoa** (1.300km)
 - **Ferramenta de Raio Interativo** para análise de cobertura de valores
+
+### 📋 **Definições dos Tipos de Municípios**
+As definições abaixo explicam os conceitos fundamentais utilizados no Projeto NEXUS para classificar os municípios brasileiros em diferentes categorias estratégicas.
+
+#### **Polo**
+Um Polo é composto por um município que possui pista de voo e, em seu entorno, os 10 municípios mais próximos cuja soma do valor potencial de vendas dos produtos da empresa seja igual ou superior a R$ 3.000.000,00.  
+Assim, um Polo é formado por:  
+- Um município polo (origem), que centraliza a estrutura do Polo; e  
+- Dez municípios periferia (destino), que orbitam em torno do polo principal.
+
+#### **Município Polo**
+O Município Polo é aquele que:  
+- Possui pista de voo;  
+- E apresenta 10 municípios vizinhos cuja soma dos valores potenciais de venda de produtos atinge ou supera R$ 3.000.000,00.  
+
+Em outras palavras, é o município central que dá origem a um Polo.
+
+#### **Município Periferia**
+O Município Periferia é aquele que:  
+- Está associado a um Município Polo;  
+- E não possui, necessariamente, pista de voo própria, mas integra o conjunto de municípios que compõem o Polo.  
+
+Esses municípios são considerados destinos em relação ao polo de origem.
+
+#### **Município Sem Tag**
+Os Municípios Sem Tag são aqueles que:  
+- Não se enquadram como Município Polo;  
+- Nem estão vinculados a nenhum Município Polo como periferia.  
+
+Portanto, não atendem aos critérios para compor um Polo.
+
+**Nota**: Os municípios "Sem Tag" podem ser chamados também de municípios livres, independentes, fora dos polos, fora dos eixos ou não classificados.
+
+#### **Observação**
+No contexto do projeto, o termo Município Polo também pode ser chamado de Município de Origem, e o Município Periferia, de Município de Destino.
+
+### 🏙️ **Integração de Municípios Sem Tag**
+O sistema agora inclui uma integração completa dos municípios classificados como "Sem Tag" (municípios que não são polos nem periferias), permitindo análise estratégica abrangente de todo o território brasileiro.
+
+#### **Funcionalidades Implementadas:**
+
+##### **🎯 Visibilidade da Camada Sem Tag**
+- **Camada Desativada por Padrão**: A camada "Sem Tag" inicia desativada na página `/estratégia` para foco inicial nos polos e periferias
+- **Toggle Independente**: Controle visual separado no painel de camadas do mapa
+- **Visualização Diferenciada**: Polígonos com cores distintas para identificação clara
+
+##### **🔍 Integração no Filtro "MUNICÍPIOS PRÓXIMO"**
+- **Inclusão Automática**: Municípios Sem Tag aparecem no dropdown "MUNICÍPIOS PRÓXIMO" junto com as periferias
+- **Auto-Preenchimento de Polo**: Ao selecionar um município Sem Tag, o campo "POLO" é automaticamente preenchido com o polo mais próximo
+- **Busca Automática**: A seleção dispara automaticamente a busca, sem necessidade de clicar em "Buscar"
+- **Ordenação Inteligente**: Periferias aparecem primeiro, seguidas dos Sem Tag em ordem alfabética
+
+##### **📊 Exibição de Dados nos Cards**
+- **Dados Completos**: Quando um município Sem Tag é selecionado, os cards exibem valor total e valores por produto
+- **Compatibilidade Total**: Mesmo layout e funcionalidades dos cards de polos e periferias
+- **Cálculos Precisos**: Valores agregados corretamente para análise comparativa
+
+##### **🗺️ Destaque no Mapa**
+- **Highlighting Automático**: Seleção de município Sem Tag destaca o polígono correspondente no mapa
+- **Camada Específica**: Source dedicado para evitar conflitos visuais
+- **Cores Consistentes**: Destaque em tons âmbar para diferenciação visual
+
+##### **🎯 Filtragem por Polo**
+- **Lógica Baseada em IBGE**: Uso de `codigo_polo` (código IBGE do polo mais próximo) para mapeamento preciso
+- **Priorização Inteligente**: Quando um polo é selecionado, primeiro aparecem as periferias atreladas, depois os Sem Tag com aquele polo como mais próximo
+- **Evita Conflitos**: Códigos IBGE únicos eliminam ambiguidades de nomes similares
+
+##### **⚡ Busca Automática para Periferias**
+- **Ativação Imediata**: Seleção de município periferia dispara busca automática
+- **Estado Aplicado**: Filtros são aplicados instantaneamente sem interação manual
+- **UX Fluida**: Transições suaves entre seleções
+
+##### **💡 Tooltip do Radar Estratégico**
+- **Informação Contextual**: Hover/click no texto "Radar Estratégico" exibe tooltip profissional
+- **Mensagem Clara**: "Raio de 1.300 km a partir de João Pessoa"
+- **Interface Limpa**: Sem símbolos indesejados ("?") no cursor
+
+#### **Arquitetura Técnica:**
+- **Base de Dados**: `municipios_sem_tag.json` carregado dinamicamente via proxy S3
+- **Mapeamento IBGE**: Join por `codigo_polo` para associação precisa com polos
+- **Estado Reativo**: Estados dedicados para controle de seleção e aplicação de filtros
+- **Performance Otimizada**: Memoização de cálculos e filtros para responsividade
+
+#### **Benefícios Estratégicos:**
+- **Cobertura Completa**: Análise de 100% dos municípios brasileiros
+- **Decisões Informadas**: Dados completos para planejamento territorial
+- **Interface Intuitiva**: Integração seamless com fluxo existente
+- **Precisão de Dados**: Mapeamento IBGE evita erros de associação
 
 ### 🔍 **Ferramenta de Raio Interativo**
 A ferramenta de Raio permite ao usuário desenhar um círculo no mapa para calcular o total dos valores estratégicos dos municípios (polos e periferias) que estão dentro da área selecionada.
@@ -1253,6 +1342,15 @@ O sistema implementa um controle preventivo robusto contra custos excessivos da 
 ---
 
 ### 🔧 **Correções Técnicas Recentes (2025)**
+- **Integração Completa de Municípios Sem Tag**:
+  - **Camada Desativada por Padrão**: Toggle independente no mapa para controle de visibilidade
+  - **Filtro "MUNICÍPIOS PRÓXIMO"**: Inclusão automática com auto-preenchimento de polo mais próximo e busca automática
+  - **Exibição nos Cards**: Dados completos (valor total e por produto) para municípios Sem Tag selecionados
+  - **Destaque no Mapa**: Highlighting automático com cores diferenciadas (âmbar)
+  - **Filtragem por Polo**: Lógica baseada em códigos IBGE (`codigo_polo`) para mapeamento preciso
+  - **Busca Automática para Periferias**: Ativação imediata da busca ao selecionar município periferia
+  - **Tooltip do Radar Estratégico**: Hover/click profissional sem símbolos indesejados
+
 - **Códigos IBGE Corretos**: Popups das periferias agora exibem códigos IBGE corretos
   - Adicionado `codigo_destino` nas properties do FeatureCollection de periferias
   - Fallback inteligente: `codigo_destino` → `codigo` → `codigo_ibge` → vazio
@@ -1448,4 +1546,4 @@ Distribuído sob a **Licença MIT**. Consulte o arquivo `LICENSE` para mais deta
 
 ---
 
-**Última atualização**: Outubro 2025 - Sistema de Rotas Multimodal + Controle Preventivo de Custos Google Maps API + Integração Completa de Pistas de Voo + Otimização de Periferias Independentes + Filtro de Raio Estratégico de João Pessoa + Modo Vendas - Análise de Oportunidades implementado
+**Última atualização**: Outubro 2025 - Sistema de Rotas Multimodal + Controle Preventivo de Custos Google Maps API + Integração Completa de Municípios Sem Tag + Integração Completa de Pistas de Voo + Otimização de Periferias Independentes + Filtro de Raio Estratégico de João Pessoa + Modo Vendas - Análise de Oportunidades implementado

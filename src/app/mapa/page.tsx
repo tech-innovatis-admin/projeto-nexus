@@ -765,7 +765,7 @@ function MapaPageContent() {
                     ${!municipioSelecionado 
                       ? 'border border-slate-700 text-slate-500 bg-slate-800/50 cursor-not-allowed' 
                       : modoVendas 
-                        ? 'border border-green-500 text-green-400 bg-green-900/30 hover:bg-green-900/50 focus:ring-green-500' 
+                        ? 'border border-cyan-500 text-cyan-400 bg-cyan-900/30 hover:bg-cyan-900/50 focus:ring-cyan-500' 
                         : 'border border-slate-600 text-slate-300 bg-transparent hover:bg-slate-700/50 focus:ring-slate-500'
                     }
                   `}

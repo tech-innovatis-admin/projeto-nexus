@@ -155,6 +155,8 @@ export default function MapLibrePolygons({
   onExportXLSX,
   onMunicipioPerifericoClick,
   municipioPerifericoSelecionado,
+  // Município Sem Tag selecionado para destaque
+  municipioSemTagSelecionado,
   // Filtro de radar (João Pessoa 1.300km) vindo da página
   radarFilterActive,
   radarCenterLngLat,
@@ -172,6 +174,7 @@ export default function MapLibrePolygons({
   onExportXLSX?: () => void;
   onMunicipioPerifericoClick?: (municipioId: string) => void;
   municipioPerifericoSelecionado?: string;
+  municipioSemTagSelecionado?: string;
   // Props opcionais para filtrar visualmente a camada Sem Tag pelo raio fixo (1.300km)
   radarFilterActive?: boolean;
   // Espera [lng, lat]
@@ -597,6 +600,28 @@ export default function MapLibrePolygons({
         source: 'municipio-periferico-highlight-src',
         paint: {
           'line-color': '#10B981',
+          'line-width': 3,
+          'line-opacity': 0.9
+        },
+      });
+
+      // Camada para destaque do município Sem Tag selecionado
+      map.addSource('municipio-semtag-highlight-src', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      map.addLayer({
+        id: 'municipio-semtag-highlight-fill',
+        type: 'fill',
+        source: 'municipio-semtag-highlight-src',
+        paint: {
+          'fill-color': '#F59E0B', // Amber para Sem Tag
+          'fill-opacity': 0.28
+        },
+      });
+      map.addLayer({
+        id: 'municipio-semtag-highlight-line',
+        type: 'line',
+        source: 'municipio-semtag-highlight-src',
+        paint: {
+          'line-color': '#F59E0B',
           'line-width': 3,
           'line-opacity': 0.9
         },
@@ -1165,6 +1190,17 @@ export default function MapLibrePolygons({
         }
       : { type: 'FeatureCollection', features: [] };
     try { (map.getSource('municipio-periferico-highlight-src') as any)?.setData(municipioPerifericoFC); } catch {}
+
+    // Atualizar source do destaque do município Sem Tag selecionado
+    const municipioSemTagFC = municipioSemTagSelecionado && semTagAllFC.features.length > 0
+      ? {
+          type: 'FeatureCollection',
+          features: semTagAllFC.features.filter(f =>
+            String(f.properties?.codigo || f.properties?.codigo_ibge || f.properties?.id) === String(municipioSemTagSelecionado)
+          )
+        }
+      : { type: 'FeatureCollection', features: [] };
+    try { (map.getSource('municipio-semtag-highlight-src') as any)?.setData(municipioSemTagFC); } catch {}
     
     // Atualiza as propriedades de pintura para destacar o polo selecionado (apenas opacidade/espessura)
     if (map.isStyleLoaded()) {
@@ -1233,7 +1269,7 @@ export default function MapLibrePolygons({
       // Modo geral - mostrar Brasil inteiro
       map.fitBounds([[-74, -34], [-34, 5]], { padding: 24, duration: 700 }); // Brasil aprox
     }
-  }, [polos, periferias, appliedPolo, appliedUF, municipioPerifericoSelecionado, semTagAllFC, radarFilterActive, radarCenterLngLat, radarRadiusKm]);
+  }, [polos, periferias, appliedPolo, appliedUF, municipioPerifericoSelecionado, municipioSemTagSelecionado, semTagAllFC, radarFilterActive, radarCenterLngLat, radarRadiusKm]);
 
   // SINCRONIZAR refs COM STATE DE RAIO E CURSOR
   useEffect(() => {
@@ -1312,7 +1348,7 @@ export default function MapLibrePolygons({
                 onChange={(e) => setShowSemTag(e.target.checked)} 
                 className="w-4 h-4" 
               />
-              <span>Sem Tag</span>
+              <span>Fora dos Polos</span>
             </label>
           </div>
         </div>

@@ -24,6 +24,37 @@ export const TODAS_UFS = [
   'AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT','PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO'
 ] as const;
 
+// Mapeamento de siglas para nomes completos dos estados
+export const UF_NAMES: Record<string, string> = {
+  'AC': 'Acre',
+  'AL': 'Alagoas',
+  'AM': 'Amazonas',
+  'AP': 'Amapá',
+  'BA': 'Bahia',
+  'CE': 'Ceará',
+  'DF': 'Distrito Federal',
+  'ES': 'Espírito Santo',
+  'GO': 'Goiás',
+  'MA': 'Maranhão',
+  'MG': 'Minas Gerais',
+  'MS': 'Mato Grosso do Sul',
+  'MT': 'Mato Grosso',
+  'PA': 'Pará',
+  'PB': 'Paraíba',
+  'PE': 'Pernambuco',
+  'PI': 'Piauí',
+  'PR': 'Paraná',
+  'RJ': 'Rio de Janeiro',
+  'RN': 'Rio Grande do Norte',
+  'RO': 'Rondônia',
+  'RR': 'Roraima',
+  'RS': 'Rio Grande do Sul',
+  'SC': 'Santa Catarina',
+  'SE': 'Sergipe',
+  'SP': 'São Paulo',
+  'TO': 'Tocantins'
+};
+
 // Função para verificar se uma região tem abertura comercial
 export function isRegiaoAbertura(regiao: string): boolean {
   if (regiao === 'Nordeste') return true;

@@ -2658,6 +2658,11 @@ export default function EstrategiaPage() {
                             setAppliedMunicipioPeriferico(municipioId);
                           }}
                           municipioPerifericoSelecionado={appliedMunicipioPeriferico}
+                          // Passa o estado do filtro Radar (João Pessoa 1.300km) para filtrar Sem Tag visualmente
+                          radarFilterActive={isJoaoPessoaFilterActive}
+                          // Converter [lat, lng] -> [lng, lat] para uso no Turf/MapLibre
+                          radarCenterLngLat={[JOAO_PESSOA_COORDS[1], JOAO_PESSOA_COORDS[0]] as [number, number]}
+                          radarRadiusKm={JOAO_PESSOA_RADIUS_KM}
                         />
 
                       </div>
@@ -2720,6 +2725,11 @@ export default function EstrategiaPage() {
                           setAppliedMunicipioPeriferico(municipioId);
                         }}
                         municipioPerifericoSelecionado={appliedMunicipioPeriferico}
+                        // Passa o estado do filtro Radar (João Pessoa 1.300km) para filtrar Sem Tag visualmente
+                        radarFilterActive={isJoaoPessoaFilterActive}
+                        // Converter [lat, lng] -> [lng, lat]
+                        radarCenterLngLat={[JOAO_PESSOA_COORDS[1], JOAO_PESSOA_COORDS[0]] as [number, number]}
+                        radarRadiusKm={JOAO_PESSOA_RADIUS_KM}
                       />
 
                       <AnimatePresence>

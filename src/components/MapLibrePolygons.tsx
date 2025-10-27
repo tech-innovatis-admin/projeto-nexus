@@ -7,7 +7,7 @@ import * as turf from '@turf/turf';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import { registerMapInstance } from '@/utils/mapRegistry';
-import { setupMapLibreHover, removeMapLibreHover, readCssVar } from '@/utils/mapLibreHoverHandlers';
+import { setupMapLibreHover, setupMapLibreHoverSemTag, removeMapLibreHover, readCssVar } from '@/utils/mapLibreHoverHandlers';
 
 // Tipos para o sistema de exportação do raio
 export interface MunicipioRaio {
@@ -155,6 +155,10 @@ export default function MapLibrePolygons({
   onExportXLSX,
   onMunicipioPerifericoClick,
   municipioPerifericoSelecionado,
+  // Filtro de radar (João Pessoa 1.300km) vindo da página
+  radarFilterActive,
+  radarCenterLngLat,
+  radarRadiusKm,
 }: {
   polos: FC;
   periferias: FC;
@@ -168,6 +172,11 @@ export default function MapLibrePolygons({
   onExportXLSX?: () => void;
   onMunicipioPerifericoClick?: (municipioId: string) => void;
   municipioPerifericoSelecionado?: string;
+  // Props opcionais para filtrar visualmente a camada Sem Tag pelo raio fixo (1.300km)
+  radarFilterActive?: boolean;
+  // Espera [lng, lat]
+  radarCenterLngLat?: [number, number];
+  radarRadiusKm?: number;
 }) {
   const mapRef = useRef<MapLibreMap | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -175,6 +184,8 @@ export default function MapLibrePolygons({
   // Camadas visíveis: polos deve sempre iniciar ativado (e ficará bloqueado)
   const [showPolos, setShowPolos] = useState(true);
   const [showPeriferia, setShowPeriferia] = useState(false);
+  // Nova camada: municípios sem tag (nem periferia, nem polo)
+  const [showSemTag, setShowSemTag] = useState(false);
   // ADICIONAR ESTADO PARA RAIO
   const [radiusMode, setRadiusMode] = useState(false);
   const [circleGeoJSON, setCircleGeoJSON] = useState<any>(null);
@@ -213,7 +224,7 @@ export default function MapLibrePolygons({
     polo: {
       fillOpacity: 0.6,
       line: '#2563EB', // Azul substituindo cores anteriores
-      lineWidth: 2,
+      lineWidth: 1,
     },
     poloHighlighted: {
       fillOpacity: 0.8,
@@ -223,7 +234,7 @@ export default function MapLibrePolygons({
     periferia: {
       fillOpacity: 0.5,
       line: '#2563EB', // Azul com baixa opacidade
-      lineWidth: 1, // Sem borda para periferia
+      lineWidth: 0.5, // Sem borda para periferia
     },
     periferiaHighlighted: {
       fillOpacity: 0.5,
@@ -254,6 +265,83 @@ export default function MapLibrePolygons({
       ])
     );
   }, [polos]);
+
+  // =============================
+  // MUNICÍPIOS SEM TAG (camada base)
+  // =============================
+  type SemTagItem = {
+    UF?: string;
+    codigo?: string;
+    municipio?: string;
+    valor_total_sem_tag?: number;
+    [k: string]: any;
+  };
+  const [semTagAllFC, setSemTagAllFC] = useState<FC>({ type: 'FeatureCollection', features: [] });
+  const semTagLatestRef = useRef<FC>({ type: 'FeatureCollection', features: [] });
+
+  // Normaliza JSON arbitrário para FeatureCollection com geometry legit
+  const normalizeSemTagJson = (json: any): FC => {
+    try {
+      if (!json) return { type: 'FeatureCollection', features: [] };
+      if (Array.isArray(json)) {
+        const features: FeatureLike[] = json.map((item: SemTagItem) => {
+          const { geom_sem_tag, geometry, ...rest } = item as any;
+          const geom = geometry || geom_sem_tag;
+          if (!geom) return null as any;
+          // Espera MultiPolygon/Polygon com coordinates [ [ [lng,lat], ... ] ]
+          const type = geom.type || 'MultiPolygon';
+          const coordinates = geom.coordinates || geom;
+          return {
+            type: 'Feature',
+            properties: { ...rest },
+            geometry: { type, coordinates }
+          } as FeatureLike;
+        }).filter(Boolean);
+        return { type: 'FeatureCollection', features };
+      }
+      if (json.type === 'FeatureCollection' && Array.isArray(json.features)) {
+        const features: FeatureLike[] = json.features.map((f: any) => {
+          const props = f.properties || {};
+          const geom = f.geometry || props.geom_sem_tag || props.geom || null;
+          if (!geom) return null as any;
+          return { type: 'Feature', properties: props, geometry: geom } as FeatureLike;
+        }).filter(Boolean);
+        return { type: 'FeatureCollection', features };
+      }
+      // Objeto com campo data ou items
+      const arr = json.data || json.items || [];
+      if (Array.isArray(arr)) return normalizeSemTagJson(arr);
+      return { type: 'FeatureCollection', features: [] };
+    } catch (e) {
+      console.warn('Falha ao normalizar municipios_sem_tag.json:', e);
+      return { type: 'FeatureCollection', features: [] };
+    }
+  };
+
+  // Buscar dataset via endpoint proxy (S3) e normalizar
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const resp = await fetch('/api/proxy-geojson/municipios_sem_tag.json', { cache: 'force-cache' });
+        if (!resp.ok) {
+          console.warn('Falha ao carregar /api/proxy-geojson/municipios_sem_tag.json; camada Sem Tag ficará vazia. HTTP', resp.status);
+          return;
+        }
+        const json = await resp.json();
+        if (cancelled) return;
+        const fc = normalizeSemTagJson(json);
+        setSemTagAllFC(fc);
+        try {
+          console.info(`Sem Tag carregado: ${fc.features?.length ?? 0} municípios.`);
+        } catch {}
+      } catch (e) {
+        console.warn('Erro ao carregar municipios_sem_tag.json:', e);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, []);
 
   // Função para fechar popup ativo
   const closeActivePopup = () => {
@@ -363,6 +451,11 @@ export default function MapLibrePolygons({
 
     map.on('load', () => {
       // sources
+      map.addSource('semtag-src', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+        promoteId: 'codigo',
+      });
       map.addSource('polos-src', {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: [] },
@@ -378,8 +471,39 @@ export default function MapLibrePolygons({
       // NOVO SOURCE
       map.addSource('radius-circle-src', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
 
-    // layers - ordem: periferia-fill → polos-fill → polos-line → polo-highlight-line
-      // 1. Periferia fill (camada mais baixa)
+    // layers - nova ordem: semtag-fill (mais baixa) → periferia-fill → polos-fill → polos-line → polo-highlight-line
+      // 0. Sem Tag fill (camada mais baixa)
+      map.addLayer({
+        id: 'semtag-fill',
+        type: 'fill',
+        source: 'semtag-src',
+        paint: {
+          'fill-color': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            readCssVar('--map-hover-fill', '#bfdbfe'),
+            '#E5E7EB' // cinza claro para fundo neutro
+          ],
+          'fill-opacity': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            0.35,
+            0.18,
+          ],
+        },
+      });
+      map.addLayer({
+        id: 'semtag-line',
+        type: 'line',
+        source: 'semtag-src',
+        paint: {
+          'line-color': '#9CA3AF',
+          'line-width': 0.5,
+          'line-opacity': 0.6
+        },
+      });
+
+      // 1. Periferia fill
       map.addLayer({
         id: 'peri-fill',
         type: 'fill',
@@ -495,6 +619,8 @@ export default function MapLibrePolygons({
 
       // Aplicar visibilidade inicial (polos sempre visível)
       try {
+        map.setLayoutProperty('semtag-fill', 'visibility', showSemTag ? 'visible' : 'none');
+        map.setLayoutProperty('semtag-line', 'visibility', showSemTag ? 'visible' : 'none');
         map.setLayoutProperty('polos-fill', 'visibility', showPolos ? 'visible' : 'none');
         map.setLayoutProperty('polos-line', 'visibility', showPolos ? 'visible' : 'none');
         map.setLayoutProperty('peri-fill', 'visibility', showPeriferia ? 'visible' : 'none');
@@ -805,6 +931,7 @@ export default function MapLibrePolygons({
       // ============================================================
       // CONFIGURAR HOVER HANDLERS (Tooltips estilo Leaflet)
       // ============================================================
+  setupMapLibreHoverSemTag(map, 'semtag-fill');
       setupMapLibreHover(map, 'polos-fill', true);     // true = é camada de polos
       setupMapLibreHover(map, 'peri-fill', false);     // false = é camada de periferias
       console.log('🎯 [MapLibrePolygons] Hover handlers configurados para polos e periferias');
@@ -857,10 +984,36 @@ export default function MapLibrePolygons({
         }
       });
 
+      // Clique em sem tag
+      map.on('click', 'semtag-fill', (e) => {
+        if (e.features && e.features.length > 0) {
+          closeActivePopup();
+          const feature = e.features[0];
+          const p: any = feature.properties || {};
+          const nome = safe(p.municipio, 'Município');
+          const uf = safe(p.UF);
+          const codigo = safe(p.codigo);
+          const valorTotal = Number(p.valor_total_sem_tag || 0);
+          const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, offset: 8 })
+            .setLngLat(e.lngLat)
+            .setHTML(`
+              <div class="nexus-popup-content">
+                <div class="nexus-popup-title">${nome}</div>
+                <div class="nexus-popup-line">UF: ${uf}</div>
+                <div class="nexus-popup-line">Código: ${codigo}</div>
+                <div class="nexus-popup-line">Valor Total (Sem Tag): ${formatCurrencyBRL(valorTotal)}</div>
+              </div>
+            `)
+            .addTo(map);
+          popup.addClassName('nexus-popup');
+          popupRef.current = popup;
+        }
+      });
+
       // Clique no mapa (fora dos polígonos) fecha popup
       map.on('click', (e) => {
         const features = map.queryRenderedFeatures(e.point, {
-          layers: ['polos-fill', 'peri-fill']
+          layers: ['polos-fill', 'peri-fill', 'semtag-fill']
         });
         
         if (features.length === 0) {
@@ -891,6 +1044,7 @@ export default function MapLibrePolygons({
       // Remover hover handlers antes de destruir o mapa
       removeMapLibreHover(map, 'polos-fill');
       removeMapLibreHover(map, 'peri-fill');
+      removeMapLibreHover(map, 'semtag-fill');
       
       map.remove();
       mapRef.current = null;
@@ -919,6 +1073,8 @@ export default function MapLibrePolygons({
     };
     
     // Aplicar visibilidade conforme estados (polos agora controlável)
+    setVis('semtag-fill', showSemTag);
+    setVis('semtag-line', showSemTag);
     setVis('polos-fill', showPolos);
     setVis('polos-line', showPolos);
 
@@ -929,7 +1085,7 @@ export default function MapLibrePolygons({
     
     // Contorno azul sempre visível quando há dados (independente dos toggles individuais)
     setVis('polo-highlight-line', true);
-  }, [showPeriferia, showPolos, appliedUF, appliedPolo]);
+  }, [showPeriferia, showPolos, showSemTag, appliedUF, appliedPolo]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -952,11 +1108,32 @@ export default function MapLibrePolygons({
     const periFilteredFC: FC = inUFMode
       ? { type: 'FeatureCollection', features: periFC.features.filter(f => String(f.properties?.UF || '').toUpperCase() === ufUpper) }
       : periFC;
+    // Sem tag: também acompanhando filtro de UF (modo polo mantém geral para contexto)
+    const semTagFilteredFC: FC = inUFMode
+      ? { type: 'FeatureCollection', features: semTagAllFC.features.filter(f => String(f.properties?.UF || '').toUpperCase() === ufUpper) }
+      : semTagAllFC;
+
+    // Aplicar filtro visual de Radar (João Pessoa 1.300km) na camada Sem Tag, igual às outras camadas
+    let semTagFilteredByRadarFC: FC = semTagFilteredFC;
+    try {
+      if (radarFilterActive && radarCenterLngLat && typeof radarRadiusKm === 'number' && radarRadiusKm > 0) {
+        const circle = turf.circle(radarCenterLngLat, radarRadiusKm, { steps: 128, units: 'kilometers' });
+        const onlyWithin = semTagFilteredFC.features.filter((f: any) => {
+          try { return turf.booleanIntersects(circle as any, f as any); } catch { return false; }
+        });
+        semTagFilteredByRadarFC = { type: 'FeatureCollection', features: onlyWithin } as FC;
+      }
+    } catch (e) {
+      console.warn('Falha ao aplicar filtro de Radar na camada Sem Tag:', e);
+    }
+
   try { (map.getSource('polos-src') as any)?.setData(polosFilteredFC); } catch {}
   try { (map.getSource('periferia-src') as any)?.setData(periFilteredFC); } catch {}
+  try { (map.getSource('semtag-src') as any)?.setData(semTagFilteredByRadarFC); } catch {}
   // Atualizar refs com os dados mais recentes (evita stale closures no handler do raio)
   polosLatestRef.current = polosFilteredFC;
   periLatestRef.current = periFilteredFC;
+  semTagLatestRef.current = semTagFilteredFC;
     
     // Criar contorno azul unificado para polo selecionado ou UF
     let highlightGeometry = null;
@@ -1056,7 +1233,7 @@ export default function MapLibrePolygons({
       // Modo geral - mostrar Brasil inteiro
       map.fitBounds([[-74, -34], [-34, 5]], { padding: 24, duration: 700 }); // Brasil aprox
     }
-  }, [polos, periferias, appliedPolo, appliedUF, municipioPerifericoSelecionado]);
+  }, [polos, periferias, appliedPolo, appliedUF, municipioPerifericoSelecionado, semTagAllFC, radarFilterActive, radarCenterLngLat, radarRadiusKm]);
 
   // SINCRONIZAR refs COM STATE DE RAIO E CURSOR
   useEffect(() => {
@@ -1127,6 +1304,15 @@ export default function MapLibrePolygons({
                 className="w-4 h-4"
               />
               <span>Periferia</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input 
+                type="checkbox" 
+                checked={showSemTag} 
+                onChange={(e) => setShowSemTag(e.target.checked)} 
+                className="w-4 h-4" 
+              />
+              <span>Sem Tag</span>
             </label>
           </div>
         </div>

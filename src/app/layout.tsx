@@ -3,8 +3,8 @@
  * Define a estrutura base comum a todas as páginas
  */
 
-// Tipo para metadados do Next.js
-import type { Metadata } from "next";
+// Tipos do Next.js
+import type { Metadata, Viewport } from "next";
 // Estilos globais da aplicação
 import "./globals.css";
 // Componente 3D da NEXUS
@@ -18,10 +18,15 @@ import { EstrategiaDataProvider } from "../contexts/EstrategiaDataContext";
 export const metadata: Metadata = {
   title: 'NEXUS - Plataforma de Produtos',
   description: 'NEXUS é uma plataforma de produtos e dados municipais que oferece suporte estratégico à Diretoria de Estratégia e Mercado da Innovatis MC.',
-  viewport: 'width=device-width, initial-scale=1',
   icons: {
     icon: '/logo_innovatis_preta.svg',
   },
+};
+
+// Viewport deve ser exportado separadamente em Next 13.4+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
 };
 
 // Componente de layout raiz que envolve todas as páginas

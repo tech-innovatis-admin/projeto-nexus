@@ -119,7 +119,8 @@ export async function fetchAllGeoJSONFiles() {
     'base_municipios.geojson',
     'parceiros1.json',
     'pistas_s3_lat_log.json',
-    'sedes_municipais_lat_long.json'
+    'sedes_municipais_lat_long.json',
+    'municipios_sem_tag.json'
   ];
 
   console.log(`📥 Loading ${fileNames.length} GeoJSON files...`);

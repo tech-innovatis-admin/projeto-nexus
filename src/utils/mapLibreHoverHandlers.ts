@@ -37,6 +37,15 @@ export interface PeriferiaFields {
 }
 
 /**
+ * Interface para campos extraídos de um município SEM TAG
+ */
+export interface SemTagFields {
+  uf: string;      // Unidade Federativa (sigla)
+  ibge: string;    // Código IBGE do município
+  nome: string;    // Nome do município
+}
+
+/**
  * Tipo genérico para propriedades de features GeoJSON
  */
 type MuniProps = Record<string, any>;
@@ -151,6 +160,49 @@ export function extractPeriferiaFields(properties: MuniProps): PeriferiaFields {
 }
 
 /**
+ * Extrai campos essenciais de um município SEM TAG a partir de propriedades GeoJSON
+ * com fallbacks múltiplos para suportar diferentes esquemas de dados.
+ */
+export function extractSemTagFields(properties: MuniProps): SemTagFields {
+  const uf =
+    properties.UF ??
+    properties.uf ??
+    properties.sigla_uf ??
+    properties.name_state ??
+    properties.state ??
+    properties.STATE ??
+    '-';
+
+  const ibge =
+    properties.codigo ??
+    properties.codigo_ibge ??
+    properties.code_muni ??
+    properties.cod_ibge ??
+    properties.CD_MUN ??
+    properties.COD_MUNIC ??
+    properties.codigo_ibge7 ??
+    properties.codigo_ibge_7 ??
+    properties.IBGE ??
+    '-';
+
+  const nome =
+    properties.municipio ??
+    properties.nome_municipio ??
+    properties.nome ??
+    properties.nome_munic ??
+    properties.NM_MUN ??
+    properties.NM_MUNICIP ??
+    properties.MUNICIPIO ??
+    '-';
+
+  return {
+    uf: String(uf).trim() || '-',
+    ibge: String(ibge).trim() || '-',
+    nome: String(nome).trim() || '-',
+  };
+}
+
+/**
  * Escapa caracteres HTML perigosos para evitar injeção XSS no tooltip
  * @param value - Valor a ser escapado
  * @returns String segura para inserção em HTML
@@ -229,6 +281,22 @@ export function periferiaTooltipHtml(properties: MuniProps): string {
       <div class="t-row">UF: <b>${escapeHtml(uf)}</b></div>
       <div class="t-row">IBGE: <b>${escapeHtml(ibge)}</b></div>
       <div class="t-row t-tipo"><span class="t-badge t-badge-periferia">Periferia</span></div>
+    </div>
+  `.trim();
+}
+
+/**
+ * Gera HTML do tooltip para município SEM TAG
+ */
+export function semTagTooltipHtml(properties: MuniProps): string {
+  const { uf, ibge, nome } = extractSemTagFields(properties);
+
+  return `
+    <div class="t-muni">
+      <div class="t-title">${escapeHtml(nome)}</div>
+      <div class="t-row">UF: <b>${escapeHtml(uf)}</b></div>
+      <div class="t-row">IBGE: <b>${escapeHtml(ibge)}</b></div>
+      <div class="t-row t-tipo"><span class="t-badge t-badge-semtag">Sem Tag</span></div>
     </div>
   `.trim();
 }
@@ -383,6 +451,84 @@ export function setupMapLibreHover(
     }
 
     // Cria popup persistente no click (para mobile)
+    popup = new maplibregl.Popup({
+      closeButton: true,
+      closeOnClick: true,
+      className: 'muni-tooltip maplibregl-popup',
+      offset: 12,
+    })
+      .setLngLat(e.lngLat)
+      .setHTML(tooltipHtml)
+      .addTo(map);
+  });
+}
+
+/**
+ * Handlers de hover específicos para camada de Municípios Sem Tag
+ */
+export function setupMapLibreHoverSemTag(
+  map: maplibregl.Map,
+  layerId: string,
+): void {
+  let popup: maplibregl.Popup | null = null;
+  let hoveredFeatureId: string | number | null = null;
+
+  const hoverColors = getHoverColors();
+
+  map.on('mousemove', layerId, (e) => {
+    if (!e.features || e.features.length === 0) return;
+    const feature = e.features[0];
+    const properties = feature.properties || {};
+
+    const tooltipHtml = semTagTooltipHtml(properties);
+
+    if (popup) popup.remove();
+    popup = new maplibregl.Popup({
+      closeButton: false,
+      closeOnClick: false,
+      className: 'muni-tooltip maplibregl-popup',
+      offset: 12,
+    })
+      .setLngLat(e.lngLat)
+      .setHTML(tooltipHtml)
+      .addTo(map);
+
+    const sourceId = map.getLayer(layerId)?.source as string;
+    if (sourceId) {
+      if (hoveredFeatureId !== null) {
+        try {
+          map.setFeatureState({ source: sourceId, id: hoveredFeatureId }, { hover: false });
+        } catch {}
+      }
+      const newFeatureId = properties.codigo || properties.codigo_ibge || properties.code_muni || `sem-${Math.random()}`;
+      if (newFeatureId) {
+        try {
+          map.setFeatureState({ source: sourceId, id: newFeatureId }, { hover: true });
+          hoveredFeatureId = newFeatureId;
+        } catch { hoveredFeatureId = null; }
+      } else {
+        hoveredFeatureId = null;
+      }
+    }
+    map.getCanvas().style.cursor = 'pointer';
+  });
+
+  map.on('mouseleave', layerId, () => {
+    if (popup) { popup.remove(); popup = null; }
+    const sourceId = map.getLayer(layerId)?.source as string;
+    if (sourceId && hoveredFeatureId !== null) {
+      try { map.setFeatureState({ source: sourceId, id: hoveredFeatureId }, { hover: false }); } catch {}
+      hoveredFeatureId = null;
+    }
+    map.getCanvas().style.cursor = '';
+  });
+
+  map.on('click', layerId, (e) => {
+    if (!e.features || e.features.length === 0) return;
+    const feature = e.features[0];
+    const properties = feature.properties || {};
+    const tooltipHtml = semTagTooltipHtml(properties);
+    if (popup) popup.remove();
     popup = new maplibregl.Popup({
       closeButton: true,
       closeOnClick: true,

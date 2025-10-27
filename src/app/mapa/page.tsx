@@ -167,7 +167,7 @@ function MapaPageContent() {
   const [selectValue, setSelectValue] = useState<string>("");
   const [estadoInputValue, setEstadoInputValue] = useState<string>("");
   const [municipioInputValue, setMunicipioInputValue] = useState<string>("");
-  const [modoVendas, setModoVendas] = useState<boolean>(false);
+  const [modoVendas, setModoVendas] = useState<boolean>(true);
   const dadosRef = useRef<HTMLDivElement>(null);
   const planeIconRef = useRef<HTMLDivElement>(null);
   const estadosDropdownRef = useRef<HTMLDivElement>(null);

@@ -14,6 +14,10 @@ export default function InformacoesMunicipio({ municipioSelecionado, modoVendas 
   const [showStatusPopover, setShowStatusPopover] = useState(false);
   // Referência para o timer do popover
   const popoverTimerRef = useRef<number | null>(null);
+  // Controle de exibição do total do Start Lab (alternar entre detalhado e total)
+  const [mostrarTotalStartLab, setMostrarTotalStartLab] = useState(true);
+  // Controle de exibição do total do Saber+ (alternar entre detalhado e total)
+  const [mostrarTotalSaberPlus, setMostrarTotalSaberPlus] = useState(true);
   
   // Função para mostrar o popover e configurar o timer para escondê-lo após 5 segundos
   const handleShowStatusPopover = () => {
@@ -44,13 +48,13 @@ export default function InformacoesMunicipio({ municipioSelecionado, modoVendas 
     'VALOR_PMSB',
     'VALOR_CTM',
     'VALOR_REURB',
-    'VALOR_START_INICIAIS_FINAIS',
     'VALOR_DEC_AMBIENTAL',
     'VALOR_PLHIS',
     'VALOR_DESERT',
     'educagame_fmt',
     'PVA_fmt',
-    'LIVRO_FUND_COMBINADO'
+    'LIVRO_FUND_COMBINADO',
+    'VALOR_START_INICIAIS_FINAIS'
     // valor_vaat_mensal_fmt foi movido para o Container "Município e Gestão"
   ];
 
@@ -82,7 +86,7 @@ export default function InformacoesMunicipio({ municipioSelecionado, modoVendas 
         : "PMSB",
     VALOR_CTM: "IPTU Legal",
     VALOR_REURB: "REURB",
-    VALOR_START_INICIAIS_FINAIS: "Start Lab - Ensino Fund. 1 e 2",
+    VALOR_START_INICIAIS_FINAIS: "Start Lab",
     VALOR_DEC_AMBIENTAL: "Plano Decenal do Meio Ambiente",
     VALOR_PLHIS: "PLHIS",
     VALOR_DESERT: "Plano de Desertificação",
@@ -216,11 +220,19 @@ export default function InformacoesMunicipio({ municipioSelecionado, modoVendas 
     if (k === 'VALOR_REURB') {
       return [k, 'R$ 300.000,00 (200 imóveis)'];
     }
+    // Para o Start Lab, separar valores de Fund. 1 e Fund. 2
+    if (k === 'VALOR_START_INICIAIS_FINAIS') {
+      const valorFund1 = municipioSelecionado.properties?.VALOR_START_INICIAIS;
+      const valorFund2 = municipioSelecionado.properties?.VALOR_START_FINAIS;
+      const total = municipioSelecionado.properties?.VALOR_START_INICIAIS_FINAIS;
+      return [k, { fund1: valorFund1, fund2: valorFund2, total }];
+    }
     // Para o LIVRO_FUND_COMBINADO, combinar os valores de Fund. 1 e Fund. 2
     if (k === 'LIVRO_FUND_COMBINADO') {
       const valorFund1 = municipioSelecionado.properties?.LIVRO_FUND_1_fmt;
       const valorFund2 = municipioSelecionado.properties?.LIVRO_FUND_2_fmt;
-      return [k, { fund1: valorFund1, fund2: valorFund2 }];
+      const total = municipioSelecionado.properties?.LIVRO_FUND_1_2_fmt;
+      return [k, { fund1: valorFund1, fund2: valorFund2, total }];
     }
     // Para os demais produtos, usamos o valor presente nas propriedades
     const valor = municipioSelecionado.properties?.[k];
@@ -500,6 +512,9 @@ export default function InformacoesMunicipio({ municipioSelecionado, modoVendas 
                       {k === 'PVA_fmt' && (
                         <div className="text-xs text-slate-400 font-medium mt-1">R$ 450,00/aluno</div>
                       )}
+                      {k === 'VALOR_REURB' && (
+                        <div className="text-xs text-slate-400 font-medium mt-1">Mín. 200 unid.</div>
+                      )}
                     </span>
                   </div>
                 </td>
@@ -509,7 +524,6 @@ export default function InformacoesMunicipio({ municipioSelecionado, modoVendas 
                     const valorMin = 'R$ 300.000,00';
                     const valorMaxRaw = municipioSelecionado.properties?.VALOR_REURB_MAX;
                     const valorMax = valorMaxRaw ? formatarValor(valorMaxRaw) : 'Personalizado';
-                    const detalhe = '(200)';
                     return (
                       <div className="flex flex-col w-full items-center">
                         <div className="flex items-baseline gap-2">
@@ -517,7 +531,6 @@ export default function InformacoesMunicipio({ municipioSelecionado, modoVendas 
                           <span className={`text-sm font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>
                             {valorMin}
                           </span>
-                          <span className="text-xs text-slate-400 font-medium">{detalhe}</span>
                         </div>
                         <div className="flex items-baseline gap-2 mt-1">
                           <span className="text-xs text-slate-400 min-w-[2.5rem]">Máx.</span>
@@ -555,18 +568,40 @@ export default function InformacoesMunicipio({ municipioSelecionado, modoVendas 
                       </div>
                     );
                   })() : k === 'LIVRO_FUND_COMBINADO' ? (() => {
-                    const valores = valor as { fund1?: string; fund2?: string };
+                    const valores = valor as { fund1?: string; fund2?: string; total?: string };
                     const valorFund1 = valores?.fund1;
                     const valorFund2 = valores?.fund2;
+                    const total = valores?.total ?? municipioSelecionado.properties?.LIVRO_FUND_1_2_fmt;
+                    if (mostrarTotalSaberPlus) {
+                      const totalFmt = total ? formatarValor(total.toString()) : '—';
+                      return (
+                        <div className="flex flex-col items-center select-none">
+                          <span
+                            className={`text-base font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'} cursor-pointer`}
+                            title="Clique para voltar a detalhar"
+                            onClick={() => setMostrarTotalSaberPlus(false)}
+                          >
+                            {totalFmt}
+                          </span>
+                          <span
+                            className="text-xs text-slate-400 font-medium mt-1 cursor-pointer"
+                            title="Clique para voltar a detalhar"
+                            onClick={() => setMostrarTotalSaberPlus(false)}
+                          >
+                            Total (Fund. 1 + Fund. 2)
+                          </span>
+                        </div>
+                      );
+                    }
                     return (
                       <div className="flex flex-col w-full items-center">
-                        <div className="flex items-baseline gap-2">
+                        <div className="flex items-baseline gap-2 cursor-pointer" onClick={() => setMostrarTotalSaberPlus(true)} title="Clique para ver o total">
                           <span className="text-xs text-slate-400 min-w-[3rem]">Fund. 1</span>
                           <span className={`text-sm font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>
                             {valorFund1 ? formatarValor(valorFund1) : '—'}
                           </span>
                         </div>
-                        <div className="flex items-baseline gap-2 mt-1">
+                        <div className="flex items-baseline gap-2 mt-1 cursor-pointer" onClick={() => setMostrarTotalSaberPlus(true)} title="Clique para ver o total">
                           <span className="text-xs text-slate-400 min-w-[3rem]">Fund. 2</span>
                           <span className={`text-sm font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>
                             {valorFund2 ? formatarValor(valorFund2) : '—'}
@@ -575,11 +610,45 @@ export default function InformacoesMunicipio({ municipioSelecionado, modoVendas 
                       </div>
                     );
                   })() : k === 'VALOR_START_INICIAIS_FINAIS' ? (() => {
-                    const valorPrincipal = formatarValor(valor?.toString());
+                    const valores = valor as { fund1?: string; fund2?: string; total?: string };
+                    const valorFund1 = valores?.fund1;
+                    const valorFund2 = valores?.fund2;
+                    const total = valores?.total ?? municipioSelecionado.properties?.VALOR_START_INICIAIS_FINAIS;
+                    if (mostrarTotalStartLab) {
+                      const totalFmt = total ? formatarValor(total.toString()) : '—';
+                      return (
+                        <div className="flex flex-col items-center select-none">
+                          <span
+                            className={`text-base font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'} cursor-pointer`}
+                            title="Clique para voltar a detalhar"
+                            onClick={() => setMostrarTotalStartLab(false)}
+                          >
+                            {totalFmt}
+                          </span>
+                          <span
+                            className="text-xs text-slate-400 font-medium mt-1 cursor-pointer"
+                            title="Clique para voltar a detalhar"
+                            onClick={() => setMostrarTotalStartLab(false)}
+                          >
+                            Total (Fund. 1 + Fund. 2)
+                          </span>
+                        </div>
+                      );
+                    }
                     return (
-                      <div className="flex flex-col items-center">
-                        <span className={`text-base font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>{valorPrincipal}</span>
-                        <span className="text-xs text-slate-400 font-medium mt-1">R$ 395,00/aluno</span>
+                      <div className="flex flex-col w-full items-center">
+                        <div className="flex items-baseline gap-2 cursor-pointer" onClick={() => setMostrarTotalStartLab(true)} title="Clique para ver o total">
+                          <span className="text-xs text-slate-400 min-w-[3rem]">Fund. 1</span>
+                          <span className={`text-sm font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>
+                            {valorFund1 ? formatarValor(valorFund1) : '—'}
+                          </span>
+                        </div>
+                        <div className="flex items-baseline gap-2 mt-1 cursor-pointer" onClick={() => setMostrarTotalStartLab(true)} title="Clique para ver o total">
+                          <span className="text-xs text-slate-400 min-w-[3rem]">Fund. 2</span>
+                          <span className={`text-sm font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>
+                            {valorFund2 ? formatarValor(valorFund2) : '—'}
+                          </span>
+                        </div>
                       </div>
                     );
                   })() : (

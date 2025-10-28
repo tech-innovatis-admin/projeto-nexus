@@ -785,7 +785,7 @@ function MapaPageContent() {
                       <path d="M8 14v7"/>
                     </svg>
                   )}
-                  {modoVendas ? 'Exibir todos' : 'Soluções disponíveis'}
+                  {modoVendas ? 'Todos os Produtos' : 'Soluções disponíveis'}
                 </button>
               </div>
             </form>

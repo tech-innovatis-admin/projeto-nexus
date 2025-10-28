@@ -515,6 +515,7 @@ export default function InformacoesMunicipio({ municipioSelecionado, modoVendas 
                       {k === 'VALOR_REURB' && (
                         <div className="text-xs text-slate-400 font-medium mt-1">Mín. 200 unid.</div>
                       )}
+                      {/* Ícone de dica removido do nome do produto para ficar ao lado dos valores */}
                     </span>
                   </div>
                 </td>
@@ -576,13 +577,16 @@ export default function InformacoesMunicipio({ municipioSelecionado, modoVendas 
                       const totalFmt = total ? formatarValor(total.toString()) : '—';
                       return (
                         <div className="flex flex-col items-center select-none">
-                          <span
-                            className={`text-base font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'} cursor-pointer`}
+                          <div
+                            className="flex items-center gap-1 cursor-pointer"
                             title="Clique para voltar a detalhar"
                             onClick={() => setMostrarTotalSaberPlus(false)}
                           >
-                            {totalFmt}
-                          </span>
+                            <span className={`text-base font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>{totalFmt}</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-400 cursor-help" viewBox="0 0 24 24" fill="currentColor" aria-label="Valores clicáveis: alternar entre Total e Detalhado">
+                              <path fillRule="evenodd" d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2Zm0 14a1 1 0 1 1 0-2h.01a1 1 0 1 1 0 2H12Zm-1-8a1 1 0 1 1 2 0v5a1 1 0 1 1-2 0V8Z" clipRule="evenodd" />
+                            </svg>
+                          </div>
                           <span
                             className="text-xs text-slate-400 font-medium mt-1 cursor-pointer"
                             title="Clique para voltar a detalhar"
@@ -595,17 +599,16 @@ export default function InformacoesMunicipio({ municipioSelecionado, modoVendas 
                     }
                     return (
                       <div className="flex flex-col w-full items-center">
-                        <div className="flex items-baseline gap-2 cursor-pointer" onClick={() => setMostrarTotalSaberPlus(true)} title="Clique para ver o total">
+                        <div className="flex items-center gap-2 cursor-pointer" onClick={() => setMostrarTotalSaberPlus(true)} title="Clique para ver o total">
                           <span className="text-xs text-slate-400 min-w-[3rem]">Fund. 1</span>
-                          <span className={`text-sm font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>
-                            {valorFund1 ? formatarValor(valorFund1) : '—'}
-                          </span>
+                          <span className={`text-sm font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>{valorFund1 ? formatarValor(valorFund1) : '—'}</span>
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-400 cursor-help" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <path fillRule="evenodd" d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2Zm0 14a1 1 0 1 1 0-2h.01a1 1 0 1 1 0 2H12Zm-1-8a1 1 0 1 1 2 0v5a1 1 0 1 1-2 0V8Z" clipRule="evenodd" />
+                          </svg>
                         </div>
-                        <div className="flex items-baseline gap-2 mt-1 cursor-pointer" onClick={() => setMostrarTotalSaberPlus(true)} title="Clique para ver o total">
+                        <div className="flex items-center gap-2 mt-1 cursor-pointer" onClick={() => setMostrarTotalSaberPlus(true)} title="Clique para ver o total">
                           <span className="text-xs text-slate-400 min-w-[3rem]">Fund. 2</span>
-                          <span className={`text-sm font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>
-                            {valorFund2 ? formatarValor(valorFund2) : '—'}
-                          </span>
+                          <span className={`text-sm font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>{valorFund2 ? formatarValor(valorFund2) : '—'}</span>
                         </div>
                       </div>
                     );
@@ -618,13 +621,16 @@ export default function InformacoesMunicipio({ municipioSelecionado, modoVendas 
                       const totalFmt = total ? formatarValor(total.toString()) : '—';
                       return (
                         <div className="flex flex-col items-center select-none">
-                          <span
-                            className={`text-base font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'} cursor-pointer`}
+                          <div
+                            className="flex items-center gap-1 cursor-pointer"
                             title="Clique para voltar a detalhar"
                             onClick={() => setMostrarTotalStartLab(false)}
                           >
-                            {totalFmt}
-                          </span>
+                            <span className={`text-base font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>{totalFmt}</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-400 cursor-help" viewBox="0 0 24 24" fill="currentColor" aria-label="Valores clicáveis: alternar entre Total e Detalhado">
+                              <path fillRule="evenodd" d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2Zm0 14a1 1 0 1 1 0-2h.01a1 1 0 1 1 0 2H12Zm-1-8a1 1 0 1 1 2 0v5a1 1 0 1 1-2 0V8Z" clipRule="evenodd" />
+                            </svg>
+                          </div>
                           <span
                             className="text-xs text-slate-400 font-medium mt-1 cursor-pointer"
                             title="Clique para voltar a detalhar"
@@ -637,17 +643,16 @@ export default function InformacoesMunicipio({ municipioSelecionado, modoVendas 
                     }
                     return (
                       <div className="flex flex-col w-full items-center">
-                        <div className="flex items-baseline gap-2 cursor-pointer" onClick={() => setMostrarTotalStartLab(true)} title="Clique para ver o total">
+                        <div className="flex items-center gap-2 cursor-pointer" onClick={() => setMostrarTotalStartLab(true)} title="Clique para ver o total">
                           <span className="text-xs text-slate-400 min-w-[3rem]">Fund. 1</span>
-                          <span className={`text-sm font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>
-                            {valorFund1 ? formatarValor(valorFund1) : '—'}
-                          </span>
+                          <span className={`text-sm font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>{valorFund1 ? formatarValor(valorFund1) : '—'}</span>
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-400 cursor-help" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <path fillRule="evenodd" d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2Zm0 14a1 1 0 1 1 0-2h.01a1 1 0 1 1 0 2H12Zm-1-8a1 1 0 1 1 2 0v5a1 1 0 1 1-2 0V8Z" clipRule="evenodd" />
+                          </svg>
                         </div>
-                        <div className="flex items-baseline gap-2 mt-1 cursor-pointer" onClick={() => setMostrarTotalStartLab(true)} title="Clique para ver o total">
+                        <div className="flex items-center gap-2 mt-1 cursor-pointer" onClick={() => setMostrarTotalStartLab(true)} title="Clique para ver o total">
                           <span className="text-xs text-slate-400 min-w-[3rem]">Fund. 2</span>
-                          <span className={`text-sm font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>
-                            {valorFund2 ? formatarValor(valorFund2) : '—'}
-                          </span>
+                          <span className={`text-sm font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>{valorFund2 ? formatarValor(valorFund2) : '—'}</span>
                         </div>
                       </div>
                     );

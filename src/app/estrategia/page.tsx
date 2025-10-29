@@ -11,6 +11,7 @@ import dynamic from 'next/dynamic';
 import { AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import VirtualizedList from '@/components/VirtualizedList';
+import { hashBy, hashStringArray } from '@/utils/hash';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import { RadiusResultPayload, MunicipioRaio } from '@/components/MapLibrePolygons';
@@ -623,6 +624,7 @@ export default function EstrategiaPage() {
   const [appliedMaxValor, setAppliedMaxValor] = useState<number | ''>('');
   const [appliedUFs, setAppliedUFs] = useState<string[]>([]); // Novo: UFs aplicadas
   const [appliedProducts, setAppliedProducts] = useState<string[]>([]);
+  
 
   // Estados para inputs de busca
   const [poloInputValue, setPoloInputValue] = useState<string>('');
@@ -917,6 +919,23 @@ export default function EstrategiaPage() {
     return total;
   };
 
+  // Assinaturas (hashes) estáveis para grandes coleções — usadas em deps
+  const periferiaHash = useMemo(
+    () => hashBy(periferia, (p) => `${String(p.codigo_origem)}|${String(p.codigo_destino ?? p.municipio_destino)}|${String(p.UF ?? '')}|${Number((p as any).valor_total_destino ?? 0)}`),
+    [periferia]
+  );
+  const polosValoresHash = useMemo(
+    () => hashBy(polosValores, (p) => `${String(p.codigo_origem)}|${String(p.municipio_origem)}|${String((p as any).UF ?? (p as any).UF_origem ?? '')}`),
+    [polosValores]
+  );
+  const selectedUFsHash = useMemo(() => hashStringArray(selectedUFs), [selectedUFs]);
+  const appliedUFsHash = useMemo(() => hashStringArray(appliedUFs), [appliedUFs]);
+  const appliedProductsHash = useMemo(() => hashStringArray(appliedProducts), [appliedProducts]);
+  const semTagMunicipiosHash = useMemo(
+    () => hashBy(semTagMunicipios, (s) => `${String(s.codigo)}|${String(s.municipio)}|${String(s.UF ?? '')}`),
+    [semTagMunicipios]
+  );
+
   // Agregação por polo (codigo_origem) a partir da periferia filtrada
   const periferiaAggByCodigo = useMemo(() => {
     const ufUpper = String(appliedUF || '').toUpperCase();
@@ -936,7 +955,7 @@ export default function EstrategiaPage() {
       map.set(f.codigo_origem, (map.get(f.codigo_origem) || 0) + agg);
     }
     return map;
-  }, [periferia, appliedUFs, appliedPolo, appliedUF, appliedProducts, filterByJoaoPessoaRadius]);
+  }, [periferiaHash, appliedUFsHash, appliedPolo, appliedUF, appliedProductsHash, filterByJoaoPessoaRadius]);
 
   // Função para formatar valores monetários
   const formatCurrency = (value: number) => {
@@ -968,7 +987,7 @@ export default function EstrategiaPage() {
       .map(p => ({ value: p.codigo_origem, label: p.municipio_origem }));
     // Ordena alfabeticamente pelo label
     return opts.sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
-  }, [polosValores, selectedUFs, filterByJoaoPessoaRadius]);
+  }, [polosValoresHash, selectedUFsHash, filterByJoaoPessoaRadius]);
 
   // 🆕 UFs disponíveis quando o filtro de João Pessoa está ativo
   const availableUFsWithRadiusFilter = useMemo(() => {
@@ -996,7 +1015,7 @@ export default function EstrategiaPage() {
     }
 
     return ufsWithinRadius;
-  }, [polosValores, isJoaoPessoaFilterActive]);
+  }, [polosValoresHash, isJoaoPessoaFilterActive]);
 
   // 🆕 Mapa de periferias para seus polos (pre-computado para performance) - SIMPLIFICADO
   const periferiaToPolosMap = useMemo(() => {
@@ -1031,7 +1050,7 @@ export default function EstrategiaPage() {
     }
 
     return map;
-  }, [periferia, polosValores, selectedUFs, filterByJoaoPessoaRadius]);
+  }, [periferiaHash, polosValoresHash, selectedUFsHash, filterByJoaoPessoaRadius]);
 
   // 🆕 Lista única de municípios periféricos (sem duplicatas)
   const municipiosPerifericosUnicos = useMemo(() => {
@@ -1070,7 +1089,7 @@ export default function EstrategiaPage() {
     }
 
     return Array.from(uniqueMunicipios.values());
-  }, [periferia, selectedUFs, selectedPolo, filterByJoaoPessoaRadius]);
+  }, [periferiaHash, selectedUFsHash, selectedPolo, filterByJoaoPessoaRadius]);
 
   // 🆕 Mapa de distâncias: para cada periferia, calcular distância aos seus polos relacionados
   const periferiaToPolosDistances = useMemo(() => {
@@ -1112,7 +1131,7 @@ export default function EstrategiaPage() {
     }
 
     return distMap;
-  }, [periferia, selectedUFs, filterByJoaoPessoaRadius, periferiaToPolosMap, polosValores]);
+  }, [periferiaHash, selectedUFsHash, filterByJoaoPessoaRadius, periferiaToPolosMap, polosValoresHash]);
 
   // Polos filtrados baseado no input de busca
   const polosFiltrados = useMemo(() => {
@@ -1212,7 +1231,7 @@ export default function EstrategiaPage() {
     perif.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
     semTag.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
     return [...perif, ...semTag];
-  }, [periferiasFiltradas, semTagMunicipios, selectedUFs, periferiaInputValue, selectedPolo, poloOptions]);
+  }, [periferiasFiltradas, semTagMunicipiosHash, selectedUFsHash, periferiaInputValue, selectedPolo, poloOptions]);
 
   // Opções filtradas por UFs selecionadas e filtro de João Pessoa (para o select de POLO)
   const filteredPoloOptions = useMemo(() => {
@@ -1233,7 +1252,7 @@ export default function EstrategiaPage() {
       })
       .map(p => ({ value: p.codigo_origem, label: p.municipio_origem }));
     return opts.sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
-  }, [selectedUFs, polosValores, filterByJoaoPessoaRadius]);
+  }, [selectedUFsHash, polosValoresHash, filterByJoaoPessoaRadius]);
 
   // Resetar polo selecionado caso UFs mudem e o polo atual não exista mais
   useEffect(() => {
@@ -1253,7 +1272,7 @@ export default function EstrategiaPage() {
     base = filterByJoaoPessoaRadius(base) as PeriferiaProps[];
     
     return base.filter(p => p.codigo_origem === selectedPolo);
-  }, [periferia, selectedPolo, selectedUFs, filterByJoaoPessoaRadius]);
+  }, [periferiaHash, selectedPolo, selectedUFsHash, filterByJoaoPessoaRadius]);
 
   // Resetar município periférico selecionado caso o polo mude
   useEffect(() => {
@@ -1654,12 +1673,12 @@ export default function EstrategiaPage() {
     if (appliedSemTagMunicipio === 'ALL') return null;
     const m = semTagMunicipios.find(s => s.codigo === appliedSemTagMunicipio) || null;
     return m;
-  }, [appliedSemTagMunicipio, semTagMunicipios]);
+  }, [appliedSemTagMunicipio, semTagMunicipiosHash]);
 
   const valorMunicipioSemTag = useMemo(() => {
     if (!municipioSemTagSelecionado) return 0;
     return sumSelectedProducts(municipioSemTagSelecionado.productValues, Number(municipioSemTagSelecionado.valor_total_sem_tag) || 0);
-  }, [municipioSemTagSelecionado, appliedProducts]);
+  }, [municipioSemTagSelecionado, appliedProductsHash]);
 
   const produtosMunicipioSemTag = useMemo(() => {
     if (!municipioSemTagSelecionado) return [];

@@ -10,6 +10,7 @@ import ScrollToTopButton from '@/components/ScrollToTopButton';
 import dynamic from 'next/dynamic';
 import { AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
+import VirtualizedList from '@/components/VirtualizedList';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import { RadiusResultPayload, MunicipioRaio } from '@/components/MapLibrePolygons';
@@ -396,31 +397,41 @@ function Combobox({
               />
             </div>
 
-            {/* Área scrollável */}
-            <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
-              <div className="px-3 py-2">
+            {/* Área scrollável virtualizada */}
+            <div className="flex-1">
+              <div className="px-3 pt-2">
                 <p className="text-[10px] tracking-wider text-slate-400 font-semibold mb-2">{label.toUpperCase()}</p>
-                {filteredOptions.map(option => (
-                  <label key={option.value} className="flex items-center gap-2 py-1 px-1 hover:bg-slate-800/50 rounded cursor-pointer">
-                    <input
-                      type="radio"
-                      name={`combobox-${label}`}
-                      className="w-4 h-4"
-                      checked={value === option.value}
-                      onChange={() => {
-                        onChange(option.value);
-                        setIsOpen(false);
-                      }}
-                    />
-                    <span className="text-sm text-white">{option.label}</span>
-                  </label>
-                ))}
-                {filteredOptions.length === 0 && searchTerm && (
-                  <div className="text-xs text-slate-500 text-center py-4">
-                    Nenhum resultado encontrado para "{searchTerm}"
-                  </div>
-                )}
               </div>
+              {filteredOptions.length > 0 ? (
+                <VirtualizedList
+                  items={filteredOptions}
+                  height={220}
+                  itemSize={40}
+                  getItemKey={(opt) => opt.value}
+                  className="scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800"
+                  renderItem={(option) => (
+                    <div className="px-3">
+                      <label className="flex items-center gap-2 py-1 px-1 hover:bg-slate-800/50 rounded cursor-pointer">
+                        <input
+                          type="radio"
+                          name={`combobox-${label}`}
+                          className="w-4 h-4"
+                          checked={value === option.value}
+                          onChange={() => {
+                            onChange(option.value);
+                            setIsOpen(false);
+                          }}
+                        />
+                        <span className="text-sm text-white">{option.label}</span>
+                      </label>
+                    </div>
+                  )}
+                />
+              ) : (
+                searchTerm ? (
+                  <div className="text-xs text-slate-500 text-center py-4">Nenhum resultado encontrado para "{searchTerm}"</div>
+                ) : null
+              )}
             </div>
           </div>
         </div>
@@ -518,36 +529,46 @@ function MunicipioPerifericoDropdown({
           />
         </div>
 
-        {/* Área scrollável */}
-        <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
-          <div className="px-3 py-2">
+        {/* Área scrollável virtualizada */}
+        <div className="flex-1">
+          <div className="px-3 pt-2">
             <p className="text-[10px] tracking-wider text-slate-400 font-semibold mb-2">MUNICÍPIOS PERIFÉRICOS</p>
-            {periferiasOrdenadas.map(peri => (
-              <label key={peri.codigo_destino || peri.municipio_destino} className="flex items-center gap-2 py-1 px-1 hover:bg-slate-800/50 rounded cursor-pointer">
-                <input
-                  type="radio"
-                  name="municipio-periferico"
-                  className="w-4 h-4"
-                  checked={selectedMunicipio === (peri.codigo_destino || peri.municipio_destino)}
-                  onChange={() => setSelectedMunicipio(peri.codigo_destino || peri.municipio_destino)}
-                />
-                <div className="flex flex-col leading-tight">
-                  <span className="text-sm text-white font-medium">{peri.municipio_destino}</span>
-                  <span className="text-xs text-slate-400">{peri.UF}</span>
-                </div>
-                <div className="ml-auto text-right">
-                  <span className="text-xs text-emerald-400 font-medium">
-                    R$ {new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(peri.valor_total_destino || 0)}
-                  </span>
-                </div>
-              </label>
-            ))}
-            {periferiasOrdenadas.length === 0 && (
-              <div className="text-xs text-slate-500 text-center py-4">
-                {searchTerm ? `Nenhum município encontrado para "${searchTerm}"` : 'Nenhum município periférico encontrado para este polo'}
-              </div>
-            )}
           </div>
+          {periferiasOrdenadas.length > 0 ? (
+            <VirtualizedList
+              items={periferiasOrdenadas}
+              height={220}
+              itemSize={56}
+              getItemKey={(peri) => (peri.codigo_destino || peri.municipio_destino)}
+              className="scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800"
+              renderItem={(peri) => (
+                <div className="px-3">
+                  <label className="flex items-center gap-2 py-1 px-1 hover:bg-slate-800/50 rounded cursor-pointer">
+                    <input
+                      type="radio"
+                      name="municipio-periferico"
+                      className="w-4 h-4"
+                      checked={selectedMunicipio === (peri.codigo_destino || peri.municipio_destino)}
+                      onChange={() => setSelectedMunicipio(peri.codigo_destino || peri.municipio_destino)}
+                    />
+                    <div className="flex flex-col leading-tight">
+                      <span className="text-sm text-white font-medium">{peri.municipio_destino}</span>
+                      <span className="text-xs text-slate-400">{peri.UF}</span>
+                    </div>
+                    <div className="ml-auto text-right">
+                      <span className="text-xs text-emerald-400 font-medium">
+                        R$ {new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(peri.valor_total_destino || 0)}
+                      </span>
+                    </div>
+                  </label>
+                </div>
+              )}
+            />
+          ) : (
+            <div className="text-xs text-slate-500 text-center py-4">
+              {searchTerm ? `Nenhum município encontrado para "${searchTerm}"` : 'Nenhum município periférico encontrado para este polo'}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -558,14 +579,17 @@ function MunicipioPerifericoDropdown({
 }
 
 export default function EstrategiaPage() {
-  console.log('📊 [EstrategiaPage] Componente montado');
-
   // 🔥 USANDO O NOVO CONTEXTO - Resolve problema de remount-triggered fetching
   const { estrategiaData, loading: loadingData, error: errorData } = useEstrategiaData();
 
   const [selectedMetric, setSelectedMetric] = useState('overview');
   const [showMunicipiosList, setShowMunicipiosList] = useState(false);
   const [isCardFlipped, setIsCardFlipped] = useState(false);
+
+  // Log apenas na montagem do componente
+  useEffect(() => {
+    console.log('📊 [EstrategiaPage] Componente montado');
+  }, []);
 
   // Filtros selecionados (não aplicados ainda)
   const [selectedPolo, setSelectedPolo] = useState<string>('ALL');

@@ -10,8 +10,6 @@ import ScrollToTopButton from '@/components/ScrollToTopButton';
 import dynamic from 'next/dynamic';
 import { AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
-import VirtualizedList from '@/components/VirtualizedList';
-import { hashBy, hashStringArray } from '@/utils/hash';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import { RadiusResultPayload, MunicipioRaio } from '@/components/MapLibrePolygons';
@@ -398,41 +396,31 @@ function Combobox({
               />
             </div>
 
-            {/* Área scrollável virtualizada */}
-            <div className="flex-1">
-              <div className="px-3 pt-2">
+            {/* Área scrollável */}
+            <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
+              <div className="px-3 py-2">
                 <p className="text-[10px] tracking-wider text-slate-400 font-semibold mb-2">{label.toUpperCase()}</p>
+                {filteredOptions.map(option => (
+                  <label key={option.value} className="flex items-center gap-2 py-1 px-1 hover:bg-slate-800/50 rounded cursor-pointer">
+                    <input
+                      type="radio"
+                      name={`combobox-${label}`}
+                      className="w-4 h-4"
+                      checked={value === option.value}
+                      onChange={() => {
+                        onChange(option.value);
+                        setIsOpen(false);
+                      }}
+                    />
+                    <span className="text-sm text-white">{option.label}</span>
+                  </label>
+                ))}
+                {filteredOptions.length === 0 && searchTerm && (
+                  <div className="text-xs text-slate-500 text-center py-4">
+                    Nenhum resultado encontrado para "{searchTerm}"
+                  </div>
+                )}
               </div>
-              {filteredOptions.length > 0 ? (
-                <VirtualizedList
-                  items={filteredOptions}
-                  height={220}
-                  itemSize={40}
-                  getItemKey={(opt) => opt.value}
-                  className="scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800"
-                  renderItem={(option) => (
-                    <div className="px-3">
-                      <label className="flex items-center gap-2 py-1 px-1 hover:bg-slate-800/50 rounded cursor-pointer">
-                        <input
-                          type="radio"
-                          name={`combobox-${label}`}
-                          className="w-4 h-4"
-                          checked={value === option.value}
-                          onChange={() => {
-                            onChange(option.value);
-                            setIsOpen(false);
-                          }}
-                        />
-                        <span className="text-sm text-white">{option.label}</span>
-                      </label>
-                    </div>
-                  )}
-                />
-              ) : (
-                searchTerm ? (
-                  <div className="text-xs text-slate-500 text-center py-4">Nenhum resultado encontrado para "{searchTerm}"</div>
-                ) : null
-              )}
             </div>
           </div>
         </div>
@@ -530,46 +518,36 @@ function MunicipioPerifericoDropdown({
           />
         </div>
 
-        {/* Área scrollável virtualizada */}
-        <div className="flex-1">
-          <div className="px-3 pt-2">
+        {/* Área scrollável */}
+        <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800">
+          <div className="px-3 py-2">
             <p className="text-[10px] tracking-wider text-slate-400 font-semibold mb-2">MUNICÍPIOS PERIFÉRICOS</p>
-          </div>
-          {periferiasOrdenadas.length > 0 ? (
-            <VirtualizedList
-              items={periferiasOrdenadas}
-              height={220}
-              itemSize={56}
-              getItemKey={(peri) => (peri.codigo_destino || peri.municipio_destino)}
-              className="scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800"
-              renderItem={(peri) => (
-                <div className="px-3">
-                  <label className="flex items-center gap-2 py-1 px-1 hover:bg-slate-800/50 rounded cursor-pointer">
-                    <input
-                      type="radio"
-                      name="municipio-periferico"
-                      className="w-4 h-4"
-                      checked={selectedMunicipio === (peri.codigo_destino || peri.municipio_destino)}
-                      onChange={() => setSelectedMunicipio(peri.codigo_destino || peri.municipio_destino)}
-                    />
-                    <div className="flex flex-col leading-tight">
-                      <span className="text-sm text-white font-medium">{peri.municipio_destino}</span>
-                      <span className="text-xs text-slate-400">{peri.UF}</span>
-                    </div>
-                    <div className="ml-auto text-right">
-                      <span className="text-xs text-emerald-400 font-medium">
-                        R$ {new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(peri.valor_total_destino || 0)}
-                      </span>
-                    </div>
-                  </label>
+            {periferiasOrdenadas.map(peri => (
+              <label key={peri.codigo_destino || peri.municipio_destino} className="flex items-center gap-2 py-1 px-1 hover:bg-slate-800/50 rounded cursor-pointer">
+                <input
+                  type="radio"
+                  name="municipio-periferico"
+                  className="w-4 h-4"
+                  checked={selectedMunicipio === (peri.codigo_destino || peri.municipio_destino)}
+                  onChange={() => setSelectedMunicipio(peri.codigo_destino || peri.municipio_destino)}
+                />
+                <div className="flex flex-col leading-tight">
+                  <span className="text-sm text-white font-medium">{peri.municipio_destino}</span>
+                  <span className="text-xs text-slate-400">{peri.UF}</span>
                 </div>
-              )}
-            />
-          ) : (
-            <div className="text-xs text-slate-500 text-center py-4">
-              {searchTerm ? `Nenhum município encontrado para "${searchTerm}"` : 'Nenhum município periférico encontrado para este polo'}
-            </div>
-          )}
+                <div className="ml-auto text-right">
+                  <span className="text-xs text-emerald-400 font-medium">
+                    R$ {new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(peri.valor_total_destino || 0)}
+                  </span>
+                </div>
+              </label>
+            ))}
+            {periferiasOrdenadas.length === 0 && (
+              <div className="text-xs text-slate-500 text-center py-4">
+                {searchTerm ? `Nenhum município encontrado para "${searchTerm}"` : 'Nenhum município periférico encontrado para este polo'}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -580,17 +558,14 @@ function MunicipioPerifericoDropdown({
 }
 
 export default function EstrategiaPage() {
+  console.log('📊 [EstrategiaPage] Componente montado');
+
   // 🔥 USANDO O NOVO CONTEXTO - Resolve problema de remount-triggered fetching
   const { estrategiaData, loading: loadingData, error: errorData } = useEstrategiaData();
 
   const [selectedMetric, setSelectedMetric] = useState('overview');
   const [showMunicipiosList, setShowMunicipiosList] = useState(false);
   const [isCardFlipped, setIsCardFlipped] = useState(false);
-
-  // Log apenas na montagem do componente
-  useEffect(() => {
-    console.log('📊 [EstrategiaPage] Componente montado');
-  }, []);
 
   // Filtros selecionados (não aplicados ainda)
   const [selectedPolo, setSelectedPolo] = useState<string>('ALL');
@@ -624,7 +599,6 @@ export default function EstrategiaPage() {
   const [appliedMaxValor, setAppliedMaxValor] = useState<number | ''>('');
   const [appliedUFs, setAppliedUFs] = useState<string[]>([]); // Novo: UFs aplicadas
   const [appliedProducts, setAppliedProducts] = useState<string[]>([]);
-  
 
   // Estados para inputs de busca
   const [poloInputValue, setPoloInputValue] = useState<string>('');
@@ -919,23 +893,6 @@ export default function EstrategiaPage() {
     return total;
   };
 
-  // Assinaturas (hashes) estáveis para grandes coleções — usadas em deps
-  const periferiaHash = useMemo(
-    () => hashBy(periferia, (p) => `${String(p.codigo_origem)}|${String(p.codigo_destino ?? p.municipio_destino)}|${String(p.UF ?? '')}|${Number((p as any).valor_total_destino ?? 0)}`),
-    [periferia]
-  );
-  const polosValoresHash = useMemo(
-    () => hashBy(polosValores, (p) => `${String(p.codigo_origem)}|${String(p.municipio_origem)}|${String((p as any).UF ?? (p as any).UF_origem ?? '')}`),
-    [polosValores]
-  );
-  const selectedUFsHash = useMemo(() => hashStringArray(selectedUFs), [selectedUFs]);
-  const appliedUFsHash = useMemo(() => hashStringArray(appliedUFs), [appliedUFs]);
-  const appliedProductsHash = useMemo(() => hashStringArray(appliedProducts), [appliedProducts]);
-  const semTagMunicipiosHash = useMemo(
-    () => hashBy(semTagMunicipios, (s) => `${String(s.codigo)}|${String(s.municipio)}|${String(s.UF ?? '')}`),
-    [semTagMunicipios]
-  );
-
   // Agregação por polo (codigo_origem) a partir da periferia filtrada
   const periferiaAggByCodigo = useMemo(() => {
     const ufUpper = String(appliedUF || '').toUpperCase();
@@ -955,7 +912,7 @@ export default function EstrategiaPage() {
       map.set(f.codigo_origem, (map.get(f.codigo_origem) || 0) + agg);
     }
     return map;
-  }, [periferiaHash, appliedUFsHash, appliedPolo, appliedUF, appliedProductsHash, filterByJoaoPessoaRadius]);
+  }, [periferia, appliedUFs, appliedPolo, appliedUF, appliedProducts, filterByJoaoPessoaRadius]);
 
   // Função para formatar valores monetários
   const formatCurrency = (value: number) => {
@@ -987,7 +944,7 @@ export default function EstrategiaPage() {
       .map(p => ({ value: p.codigo_origem, label: p.municipio_origem }));
     // Ordena alfabeticamente pelo label
     return opts.sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
-  }, [polosValoresHash, selectedUFsHash, filterByJoaoPessoaRadius]);
+  }, [polosValores, selectedUFs, filterByJoaoPessoaRadius]);
 
   // 🆕 UFs disponíveis quando o filtro de João Pessoa está ativo
   const availableUFsWithRadiusFilter = useMemo(() => {
@@ -1015,7 +972,7 @@ export default function EstrategiaPage() {
     }
 
     return ufsWithinRadius;
-  }, [polosValoresHash, isJoaoPessoaFilterActive]);
+  }, [polosValores, isJoaoPessoaFilterActive]);
 
   // 🆕 Mapa de periferias para seus polos (pre-computado para performance) - SIMPLIFICADO
   const periferiaToPolosMap = useMemo(() => {
@@ -1050,7 +1007,7 @@ export default function EstrategiaPage() {
     }
 
     return map;
-  }, [periferiaHash, polosValoresHash, selectedUFsHash, filterByJoaoPessoaRadius]);
+  }, [periferia, polosValores, selectedUFs, filterByJoaoPessoaRadius]);
 
   // 🆕 Lista única de municípios periféricos (sem duplicatas)
   const municipiosPerifericosUnicos = useMemo(() => {
@@ -1089,7 +1046,7 @@ export default function EstrategiaPage() {
     }
 
     return Array.from(uniqueMunicipios.values());
-  }, [periferiaHash, selectedUFsHash, selectedPolo, filterByJoaoPessoaRadius]);
+  }, [periferia, selectedUFs, selectedPolo, filterByJoaoPessoaRadius]);
 
   // 🆕 Mapa de distâncias: para cada periferia, calcular distância aos seus polos relacionados
   const periferiaToPolosDistances = useMemo(() => {
@@ -1131,7 +1088,7 @@ export default function EstrategiaPage() {
     }
 
     return distMap;
-  }, [periferiaHash, selectedUFsHash, filterByJoaoPessoaRadius, periferiaToPolosMap, polosValoresHash]);
+  }, [periferia, selectedUFs, filterByJoaoPessoaRadius, periferiaToPolosMap, polosValores]);
 
   // Polos filtrados baseado no input de busca
   const polosFiltrados = useMemo(() => {
@@ -1231,7 +1188,7 @@ export default function EstrategiaPage() {
     perif.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
     semTag.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
     return [...perif, ...semTag];
-  }, [periferiasFiltradas, semTagMunicipiosHash, selectedUFsHash, periferiaInputValue, selectedPolo, poloOptions]);
+  }, [periferiasFiltradas, semTagMunicipios, selectedUFs, periferiaInputValue, selectedPolo, poloOptions]);
 
   // Opções filtradas por UFs selecionadas e filtro de João Pessoa (para o select de POLO)
   const filteredPoloOptions = useMemo(() => {
@@ -1252,7 +1209,7 @@ export default function EstrategiaPage() {
       })
       .map(p => ({ value: p.codigo_origem, label: p.municipio_origem }));
     return opts.sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
-  }, [selectedUFsHash, polosValoresHash, filterByJoaoPessoaRadius]);
+  }, [selectedUFs, polosValores, filterByJoaoPessoaRadius]);
 
   // Resetar polo selecionado caso UFs mudem e o polo atual não exista mais
   useEffect(() => {
@@ -1272,7 +1229,7 @@ export default function EstrategiaPage() {
     base = filterByJoaoPessoaRadius(base) as PeriferiaProps[];
     
     return base.filter(p => p.codigo_origem === selectedPolo);
-  }, [periferiaHash, selectedPolo, selectedUFsHash, filterByJoaoPessoaRadius]);
+  }, [periferia, selectedPolo, selectedUFs, filterByJoaoPessoaRadius]);
 
   // Resetar município periférico selecionado caso o polo mude
   useEffect(() => {
@@ -1673,12 +1630,12 @@ export default function EstrategiaPage() {
     if (appliedSemTagMunicipio === 'ALL') return null;
     const m = semTagMunicipios.find(s => s.codigo === appliedSemTagMunicipio) || null;
     return m;
-  }, [appliedSemTagMunicipio, semTagMunicipiosHash]);
+  }, [appliedSemTagMunicipio, semTagMunicipios]);
 
   const valorMunicipioSemTag = useMemo(() => {
     if (!municipioSemTagSelecionado) return 0;
     return sumSelectedProducts(municipioSemTagSelecionado.productValues, Number(municipioSemTagSelecionado.valor_total_sem_tag) || 0);
-  }, [municipioSemTagSelecionado, appliedProductsHash]);
+  }, [municipioSemTagSelecionado, appliedProducts]);
 
   const produtosMunicipioSemTag = useMemo(() => {
     if (!municipioSemTagSelecionado) return [];

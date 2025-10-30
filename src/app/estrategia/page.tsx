@@ -35,6 +35,87 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c;
 }
 
+// Outras constantes/funções puras movidas para módulo
+const MUNICIPIOS_PER_PAGE = 10; // paginação de municípios
+const PANEL_WIDTH = 420; // largura do painel (px)
+
+// Fallback: cálculo simples de centróide quando necessário
+function getCentroid(geom: any): [number, number] | null {
+  if (!geom || !geom.coordinates) return null;
+  try {
+    if (geom.type === 'Point') {
+      return [geom.coordinates[1], geom.coordinates[0]]; // [lat, lng]
+    } else if (geom.type === 'Polygon') {
+      const coords = geom.coordinates[0];
+      let latSum = 0, lngSum = 0;
+      for (const coord of coords) {
+        lngSum += coord[0];
+        latSum += coord[1];
+      }
+      return [latSum / coords.length, lngSum / coords.length];
+    } else if (geom.type === 'MultiPolygon') {
+      const firstPolygon = geom.coordinates[0][0];
+      let latSum = 0, lngSum = 0;
+      for (const coord of firstPolygon) {
+        lngSum += coord[0];
+        latSum += coord[1];
+      }
+      return [latSum / firstPolygon.length, lngSum / firstPolygon.length];
+    }
+  } catch (error) {
+    console.warn('Erro ao calcular centroide:', error);
+  }
+  return null;
+}
+
+// Normalizador de números pt-BR (aceita number ou string "1.234,56")
+function parsePtBrNumber(v: unknown): number {
+  if (typeof v === 'number') return v;
+  if (typeof v !== 'string') return 0;
+  const clean = v
+    .replace(/\s+/g, '')
+    .replace(/^R\$\s?/, '')
+    .replace(/\./g, '')
+    .replace(/,/g, '.');
+  const n = Number(clean);
+  return Number.isFinite(n) ? n : 0;
+}
+
+// Formatação monetária brasileira
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(value);
+}
+
+// Soma produtos selecionados com fallback para total quando nenhum produto aplicado (função pura)
+function sumSelectedProducts(
+  vals: Record<string, number> | undefined,
+  fallbackTotal: number,
+  appliedProducts: string[],
+  totalProductCount: number
+): number {
+  if (!vals) return fallbackTotal || 0;
+  if (!appliedProducts.length) return fallbackTotal || 0;
+  // Quando todos os produtos estiverem selecionados, retorna o valor consolidado (fallbackTotal)
+  if (appliedProducts.length === totalProductCount) return fallbackTotal || 0;
+  let total = 0;
+  for (const key of appliedProducts) {
+    const val = Number(vals[key] || 0);
+    total += val;
+  }
+  if (total === 0 && appliedProducts.length === totalProductCount) {
+    console.warn('⚠️ [EstrategiaPage] Soma de produtos resultou em 0 com todos os produtos aplicados. Aplicando fallback.', {
+      fallbackTotal,
+    });
+    return fallbackTotal || 0;
+  }
+  return total;
+}
+
 // Tipagens para as duas bases reais
 interface PoloValoresProps {
   codigo_origem: string;
@@ -645,7 +726,6 @@ export default function EstrategiaPage() {
 
   // Estado para paginação do card de municípios
   const [currentPage, setCurrentPage] = useState(0);
-  const MUNICIPIOS_PER_PAGE = 10;
 
   // Estado para controlar tooltip do Radar Estratégico
   const [showRadarTooltip, setShowRadarTooltip] = useState(false);
@@ -655,48 +735,9 @@ export default function EstrategiaPage() {
 
   // Coordenadas e função de distância movidas para escopo do módulo (ver topo do arquivo)
 
-  // Função para extrair coordenadas do centroide de uma geometria
-  const getCentroid = (geom: any): [number, number] | null => {
-    if (!geom || !geom.coordinates) return null;
-    
-    try {
-      if (geom.type === 'Point') {
-        return [geom.coordinates[1], geom.coordinates[0]]; // [lat, lng]
-      } else if (geom.type === 'Polygon') {
-        const coords = geom.coordinates[0];
-        let latSum = 0, lngSum = 0;
-        for (const coord of coords) {
-          lngSum += coord[0];
-          latSum += coord[1];
-        }
-        return [latSum / coords.length, lngSum / coords.length];
-      } else if (geom.type === 'MultiPolygon') {
-        const firstPolygon = geom.coordinates[0][0];
-        let latSum = 0, lngSum = 0;
-        for (const coord of firstPolygon) {
-          lngSum += coord[0];
-          latSum += coord[1];
-        }
-        return [latSum / firstPolygon.length, lngSum / firstPolygon.length];
-      }
-    } catch (error) {
-      console.warn('Erro ao calcular centroide:', error);
-    }
-    return null;
-  };
+  // getCentroid movida para escopo do módulo
 
-  // Normalizador de números pt-BR (aceita number ou string "1.234,56")
-  const parsePtBrNumber = (v: unknown): number => {
-    if (typeof v === 'number') return v;
-    if (typeof v !== 'string') return 0;
-    const clean = v
-      .replace(/\s+/g, '')
-      .replace(/^R\$\s?/, '')
-      .replace(/\./g, '')
-      .replace(/,/g, '.');
-    const n = Number(clean);
-    return Number.isFinite(n) ? n : 0;
-  };
+  // parsePtBrNumber movida para escopo do módulo
 
   // 🔥 NOVO: Processar dados do contexto (resolve remount-triggered fetching)
   useEffect(() => {
@@ -905,25 +946,7 @@ export default function EstrategiaPage() {
     });
   }, [isJoaoPessoaFilterActive]);
 
-  // Soma produtos selecionados com fallback para total quando nenhum produto aplicado
-  const sumSelectedProducts = (vals: Record<string, number> | undefined, fallbackTotal: number): number => {
-    if (!vals) return fallbackTotal || 0;
-    if (!appliedProducts.length) return fallbackTotal || 0;
-    // Quando todos os produtos estiverem selecionados, retorna o valor consolidado (fallbackTotal)
-    if (appliedProducts.length === PRODUCTS.length) return fallbackTotal || 0;
-    let total = 0;
-    for (const key of appliedProducts) {
-      const val = Number(vals[key] || 0);
-      total += val;
-    }
-    if (total === 0 && appliedProducts.length === PRODUCTS.length) {
-      console.warn('⚠️ [EstrategiaPage] Soma de produtos resultou em 0 com todos os produtos aplicados. Aplicando fallback.', {
-        fallbackTotal,
-      });
-      return fallbackTotal || 0;
-    }
-    return total;
-  };
+  // sumSelectedProducts movida para escopo do módulo (recebe appliedProducts e PRODUCTS.length explicitamente)
 
   // Agregação por polo (codigo_origem) a partir da periferia filtrada
   const periferiaAggByCodigo = useMemo(() => {
@@ -940,21 +963,13 @@ export default function EstrategiaPage() {
     
     const map = new Map<string, number>();
     for (const f of base) {
-      const agg = sumSelectedProducts(f.productValues, Number(f.valor_total_destino) || 0);
+      const agg = sumSelectedProducts(f.productValues, Number(f.valor_total_destino) || 0, appliedProducts, PRODUCTS.length);
       map.set(f.codigo_origem, (map.get(f.codigo_origem) || 0) + agg);
     }
     return map;
   }, [periferia, appliedUFs, appliedPolo, appliedUF, appliedProducts, filterByJoaoPessoaRadius]);
 
-  // Função para formatar valores monetários
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(value);
-  };
+  // formatCurrency movida para escopo do módulo
 
   // Opções de polo vindas da base real (filtradas por João Pessoa se ativo)
   const poloOptions = useMemo(() => {
@@ -1467,7 +1482,7 @@ export default function EstrategiaPage() {
           codigo_destino: String((p as any).codigo_destino ?? (p as any).codigo ?? (p as any).codigo_ibge ?? ''),
           municipio_destino: p.municipio_destino,
           UF: String(p.UF || '').toUpperCase(),
-          valor_total_destino: sumSelectedProducts(p.productValues, Number(p.valor_total_destino) || 0),
+          valor_total_destino: sumSelectedProducts(p.productValues, Number(p.valor_total_destino) || 0, appliedProducts, PRODUCTS.length),
           // Inclui productValues já calculados para uso no raio/export
           productValues: p.productValues,
           // Inclui TODAS as propriedades originais para acesso aos valores de produtos
@@ -1521,7 +1536,7 @@ export default function EstrategiaPage() {
 
     const valorPolo = valoresFiltrados.reduce((acc, polo) => {
       const valorPeriferias = periferiaAggByCodigo.get(polo.codigo_origem) || 0;
-      const valorOrigem = sumSelectedProducts(polo.productValues, Number(polo.valor_total_origem) || 0);
+      const valorOrigem = sumSelectedProducts(polo.productValues, Number(polo.valor_total_origem) || 0, appliedProducts, PRODUCTS.length);
       somaPeriferiaSelecionada += valorPeriferias;
       somaOrigemSelecionada += valorOrigem;
       return acc + valorPeriferias + valorOrigem;
@@ -1531,7 +1546,7 @@ export default function EstrategiaPage() {
     const aggMap = new Map<string, number>();
     for (const p of periferiaFiltrada) {
       const nome = p.municipio_destino || '';
-      const val = sumSelectedProducts(p.productValues, Number(p.valor_total_destino) || 0);
+      const val = sumSelectedProducts(p.productValues, Number(p.valor_total_destino) || 0, appliedProducts, PRODUCTS.length);
       if (!nome) continue;
       aggMap.set(nome, (aggMap.get(nome) || 0) + val);
     }
@@ -1615,7 +1630,7 @@ export default function EstrategiaPage() {
   // Valor total do município periférico selecionado
   const valorMunicipioPeriferico = useMemo(() => {
     if (!municipioPerifericoSelecionado) return 0;
-    return sumSelectedProducts(municipioPerifericoSelecionado.productValues, Number(municipioPerifericoSelecionado.valor_total_destino) || 0);
+    return sumSelectedProducts(municipioPerifericoSelecionado.productValues, Number(municipioPerifericoSelecionado.valor_total_destino) || 0, appliedProducts, PRODUCTS.length);
   }, [municipioPerifericoSelecionado, appliedProducts]);
 
   // Lista detalhada de produtos do município periférico
@@ -1643,7 +1658,7 @@ export default function EstrategiaPage() {
 
   const valorMunicipioSemTag = useMemo(() => {
     if (!municipioSemTagSelecionado) return 0;
-    return sumSelectedProducts(municipioSemTagSelecionado.productValues, Number(municipioSemTagSelecionado.valor_total_sem_tag) || 0);
+    return sumSelectedProducts(municipioSemTagSelecionado.productValues, Number(municipioSemTagSelecionado.valor_total_sem_tag) || 0, appliedProducts, PRODUCTS.length);
   }, [municipioSemTagSelecionado, appliedProducts]);
 
   const produtosMunicipioSemTag = useMemo(() => {
@@ -1727,7 +1742,7 @@ export default function EstrategiaPage() {
   const [isRunwayOpen, setIsRunwayOpen] = useState(false);
 
   // Largura alvo do painel
-  const PANEL_WIDTH = 420; // px
+  // PANEL_WIDTH movida para escopo do módulo
 
   const handleRunwayClick = (runway: any, bbox: [number, number, number, number], mapInstance: any) => {
     setSelectedRunway(runway);
@@ -2008,12 +2023,12 @@ export default function EstrategiaPage() {
 
       const periferiaAgg = new Map<string, number>();
       for (const item of periferiaFiltrada) {
-        const val = sumSelectedProducts(item.productValues, Number(item.valor_total_destino) || 0);
+        const val = sumSelectedProducts(item.productValues, Number(item.valor_total_destino) || 0, appliedProducts, PRODUCTS.length);
         periferiaAgg.set(item.codigo_origem, (periferiaAgg.get(item.codigo_origem) || 0) + val);
       }
 
       const polosSheetData = valoresFiltrados.map(polo => {
-        const valorOrigemSelecionada = sumSelectedProducts(polo.productValues, Number(polo.valor_total_origem) || 0);
+        const valorOrigemSelecionada = sumSelectedProducts(polo.productValues, Number(polo.valor_total_origem) || 0, appliedProducts, PRODUCTS.length);
         const valorDestinoSelecionada = periferiaAgg.get(polo.codigo_origem) || 0;
         const row: Record<string, any> = {
           codigo_origem: polo.codigo_origem,
@@ -2034,7 +2049,7 @@ export default function EstrategiaPage() {
         codigo_origem: periItem.codigo_origem,
         municipio_destino: periItem.municipio_destino,
         UF: periItem.UF || '',
-        valor_destino_selecionada: sumSelectedProducts(periItem.productValues, Number(periItem.valor_total_destino) || 0),
+        valor_destino_selecionada: sumSelectedProducts(periItem.productValues, Number(periItem.valor_total_destino) || 0, appliedProducts, PRODUCTS.length),
         ...(periItem.codigo_destino ? { codigo_destino: periItem.codigo_destino } : {}),
       }));
 
@@ -2073,7 +2088,7 @@ export default function EstrategiaPage() {
     } catch (error) {
       console.error('Erro ao exportar resultados:', error);
     }
-  }, [appliedUF, appliedPolo, appliedUFs, appliedMinValor, appliedMaxValor, appliedProducts, polosValores, periferia, sumSelectedProducts]);
+  }, [appliedUF, appliedPolo, appliedUFs, appliedMinValor, appliedMaxValor, appliedProducts, polosValores, periferia]);
 
 
 

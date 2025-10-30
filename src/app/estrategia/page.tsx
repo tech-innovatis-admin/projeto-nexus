@@ -564,7 +564,10 @@ function MunicipioPerifericoDropdown({
 }
 
 export default function EstrategiaPage() {
-  console.log('📊 [EstrategiaPage] Componente montado');
+  // Loga apenas uma vez no mount real (evita confundir re-render com remount)
+  useEffect(() => {
+    console.log('📊 [EstrategiaPage] Componente montado');
+  }, []);
 
   // 🔥 USANDO O NOVO CONTEXTO - Resolve problema de remount-triggered fetching
   const { estrategiaData, loading: loadingData, error: errorData } = useEstrategiaData();
@@ -583,8 +586,8 @@ export default function EstrategiaPage() {
   const [isProdutosOpen, setIsProdutosOpen] = useState<boolean>(false);
   const produtosButtonRef = useRef<HTMLButtonElement>(null);
   const produtosDropdownRef = useRef<HTMLDivElement>(null);
-  // Filtro de Estados/Regiões unificado: lista de UFs selecionadas. Vazio = todos
-  const [selectedUFs, setSelectedUFs] = useState<string[]>([]);
+  // Filtro de Estados/Regiões unificado: iniciar com "Todos (Abertura)"
+  const [selectedUFs, setSelectedUFs] = useState<string[]>([...UF_ABERTURA]);
   const [isEstadoOpen, setIsEstadoOpen] = useState<boolean>(false);
   const estadoButtonRef = useRef<HTMLButtonElement>(null);
   const estadoDropdownRef = useRef<HTMLDivElement>(null);
@@ -603,7 +606,7 @@ export default function EstrategiaPage() {
   const [appliedSemTagMunicipio, setAppliedSemTagMunicipio] = useState<string>('ALL');
   const [appliedMinValor, setAppliedMinValor] = useState<number | ''>('');
   const [appliedMaxValor, setAppliedMaxValor] = useState<number | ''>('');
-  const [appliedUFs, setAppliedUFs] = useState<string[]>([]); // Novo: UFs aplicadas
+  const [appliedUFs, setAppliedUFs] = useState<string[]>([...UF_ABERTURA]); // Inicia aplicado com "Todos (Abertura)"
   const [appliedProducts, setAppliedProducts] = useState<string[]>([]);
 
   // Estados para inputs de busca

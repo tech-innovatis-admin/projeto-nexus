@@ -1,5 +1,5 @@
 "use client";
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 
 interface EstrategiaData {
   poloValores: any;
@@ -122,19 +122,22 @@ export function EstrategiaDataProvider({ children }: { children: React.ReactNode
     loadEstrategiaData();
   }, [estrategiaData]);
 
-  const refreshEstrategiaData = async () => {
+  const refreshEstrategiaData = useCallback(async () => {
     // Força uma revalidação com feedback de progresso
     await fetchAndStore(true);
-  };
+  }, []);
+
+  // Evita recriar o objeto value sem necessidade, reduzindo re-renders em consumidores
+  const contextValue = useMemo(() => ({
+    estrategiaData,
+    loading,
+    loadingProgress,
+    error,
+    refreshEstrategiaData
+  }), [estrategiaData, loading, loadingProgress, error, refreshEstrategiaData]);
 
   return (
-    <EstrategiaDataContext.Provider value={{
-      estrategiaData,
-      loading,
-      loadingProgress,
-      error,
-      refreshEstrategiaData
-    }}>
+    <EstrategiaDataContext.Provider value={contextValue}>
       {children}
     </EstrategiaDataContext.Provider>
   );

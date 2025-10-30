@@ -19,6 +19,22 @@ import { UF_ABERTURA, isUFAbertura, REGIOES_BRASIL, TODAS_UFS, UF_NAMES, isRegia
 // Evita SSR para o mapa (MapLibre), prevenindo avisos de hidratação
 const MapLibrePolygons = dynamic(() => import('@/components/MapLibrePolygons'), { ssr: false });
 
+// Constantes e funções puras no escopo do módulo (evita realocação a cada render)
+const JOAO_PESSOA_COORDS: [number, number] = [-7.14804917856058, -34.95096946933421]; // [lat, lng]
+const JOAO_PESSOA_RADIUS_KM = 1300;
+
+function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // km
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+}
+
 // Tipagens para as duas bases reais
 interface PoloValoresProps {
   codigo_origem: string;
@@ -637,22 +653,7 @@ export default function EstrategiaPage() {
   // Estado para dados do raio (usado nas exportações)
   const [radiusPayload, setRadiusPayload] = useState<RadiusResultPayload | null>(null);
 
-  // Coordenadas de João Pessoa (latitude, longitude)
-  const JOAO_PESSOA_COORDS = [-7.14804917856058, -34.95096946933421]; // [lat, lng]
-  const JOAO_PESSOA_RADIUS_KM = 1300;
-
-  // Função para calcular distância entre duas coordenadas usando fórmula de Haversine
-  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 6371; // Raio da Terra em km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-  };
+  // Coordenadas e função de distância movidas para escopo do módulo (ver topo do arquivo)
 
   // Função para extrair coordenadas do centroide de uma geometria
   const getCentroid = (geom: any): [number, number] | null => {

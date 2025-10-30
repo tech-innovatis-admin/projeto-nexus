@@ -31,6 +31,9 @@ interface PoloValoresProps {
   geom?: any;
   productValues?: Record<string, number>;
   propriedadesOriginais?: Record<string, any>; // Preserva todas as propriedades originais
+  // Coordenadas já fornecidas pela base (evita calcular centróide)
+  latitude_munic_polo?: number;
+  longitude_munic_polo?: number;
 }
 
 interface PeriferiaProps {
@@ -43,6 +46,9 @@ interface PeriferiaProps {
   productValues?: Record<string, number>;
   codigo_destino?: string;
   propriedadesOriginais?: Record<string, any>; // Preserva todas as propriedades originais
+  // Coordenadas já fornecidas pela base (evita calcular centróide)
+  latitude_munic_periferia?: number;
+  longitude_munic_periferia?: number;
 }
 
 interface MunicipioRanking {
@@ -737,6 +743,9 @@ export default function EstrategiaPage() {
               UF: String(f?.properties?.UF_origem ?? ''), // normaliza para UF
               // Preserve a geometria (prioriza feature.geometry; fallback para properties.geom)
               geom: f?.geometry ?? f?.properties?.geom ?? null,
+              // Coordenadas diretas do polo (se fornecidas na base)
+              latitude_munic_polo: f?.properties?.latitude_munic_polo != null ? Number(f.properties.latitude_munic_polo) : undefined,
+              longitude_munic_polo: f?.properties?.longitude_munic_polo != null ? Number(f.properties.longitude_munic_polo) : undefined,
               // Preferir agregação vinda da periferia; fallback para ler direto de poloValores quando não houver
               productValues: produtoValuesFromAgg ?? PRODUCTS.reduce((acc: Record<string, number>, p) => {
                 const origemvalorKey = (p as any).origemvalorKey as string | null;
@@ -765,6 +774,9 @@ export default function EstrategiaPage() {
             ...(f?.properties?.codigo_destino ? { codigo_destino: String(f.properties.codigo_destino) } : {}),
             // Preserve a geometria
             geom: f?.geometry ?? f?.properties?.geom ?? null,
+            // Coordenadas diretas da periferia (se fornecidas na base)
+            latitude_munic_periferia: f?.properties?.latitude_munic_periferia != null ? Number(f.properties.latitude_munic_periferia) : undefined,
+            longitude_munic_periferia: f?.properties?.longitude_munic_periferia != null ? Number(f.properties.longitude_munic_periferia) : undefined,
             productValues: PRODUCTS.reduce((acc: Record<string, number>, p) => {
               // Para periferias, usar somente valores de DESTINO
               const destinoKey = (p as any).destinovalorKey as string;
@@ -859,16 +871,32 @@ export default function EstrategiaPage() {
   // Função para filtrar municípios dentro do raio de João Pessoa
   const filterByJoaoPessoaRadius = useCallback((municipios: (PoloValoresProps | PeriferiaProps)[]) => {
     if (!isJoaoPessoaFilterActive) return municipios;
-    
+
     return municipios.filter(municipio => {
-      const centroid = getCentroid(municipio.geom);
-      if (!centroid) return false;
-      
+      // Preferir coordenadas diretas, evitando cálculo de centróide
+      let lat: number | undefined;
+      let lon: number | undefined;
+
+      const asAny = municipio as any;
+      if (typeof asAny.latitude_munic_polo === 'number' && typeof asAny.longitude_munic_polo === 'number') {
+        lat = asAny.latitude_munic_polo;
+        lon = asAny.longitude_munic_polo;
+      } else if (typeof asAny.latitude_munic_periferia === 'number' && typeof asAny.longitude_munic_periferia === 'number') {
+        lat = asAny.latitude_munic_periferia;
+        lon = asAny.longitude_munic_periferia;
+      } else {
+        // Fallback raro: tenta centróide se não houver coordenadas na base
+        const centroid = getCentroid((municipio as any).geom);
+        if (!centroid) return false;
+        lat = centroid[0];
+        lon = centroid[1];
+      }
+
       const distance = calculateDistance(
         JOAO_PESSOA_COORDS[0], JOAO_PESSOA_COORDS[1],
-        centroid[0], centroid[1]
+        lat!, lon!
       );
-      
+
       return distance <= JOAO_PESSOA_RADIUS_KM;
     });
   }, [isJoaoPessoaFilterActive]);
@@ -955,14 +983,23 @@ export default function EstrategiaPage() {
 
     // Se o raio está ativo, retornar apenas os UFs que têm polos dentro do raio
     const ufsWithinRadius = new Set<string>();
-    
+
     for (const polo of polosValores) {
-      const centroid = getCentroid(polo.geom);
-      if (!centroid) continue;
+      let lat: number | undefined = polo.latitude_munic_polo;
+      let lon: number | undefined = polo.longitude_munic_polo;
+      if (typeof lat !== 'number' || typeof lon !== 'number') {
+        // Fallback eventual
+        const centroid = getCentroid(polo.geom);
+        if (centroid) {
+          lat = centroid[0];
+          lon = centroid[1];
+        }
+      }
+      if (typeof lat !== 'number' || typeof lon !== 'number') continue;
 
       const distance = calculateDistance(
         JOAO_PESSOA_COORDS[0], JOAO_PESSOA_COORDS[1],
-        centroid[0], centroid[1]
+        lat, lon
       );
 
       if (distance <= JOAO_PESSOA_RADIUS_KM) {
@@ -1048,47 +1085,6 @@ export default function EstrategiaPage() {
     return Array.from(uniqueMunicipios.values());
   }, [periferia, selectedUFs, selectedPolo, filterByJoaoPessoaRadius]);
 
-  // 🆕 Mapa de distâncias: para cada periferia, calcular distância aos seus polos relacionados
-  const periferiaToPolosDistances = useMemo(() => {
-    const distMap = new Map<string, Map<string, number>>();
-
-    let base = selectedUFs.length
-      ? periferia.filter(p => selectedUFs.includes(String(p.UF)))
-      : periferia;
-
-    base = filterByJoaoPessoaRadius(base) as PeriferiaProps[];
-
-    for (const peri of base) {
-      const periCode = String(peri.codigo_destino || peri.municipio_destino);
-      const relacionados = periferiaToPolosMap.get(periCode) || [];
-
-      if (relacionados.length === 0) continue;
-
-      // Obter centroide da periferia
-      const periCentroid = getCentroid(peri.geom);
-      if (!periCentroid) continue;
-
-      const poloDistances = new Map<string, number>();
-      for (const polo of relacionados) {
-        // Encontrar o polo na base polosValores para obter sua geometria
-        const poloData = polosValores.find(p => p.codigo_origem === polo.codigo_origem);
-        if (!poloData) continue;
-
-        const poloCentroid = getCentroid(poloData.geom);
-        if (!poloCentroid) continue;
-
-        // Calcular distância entre centroides
-        const distance = calculateDistance(periCentroid[0], periCentroid[1], poloCentroid[0], poloCentroid[1]);
-        poloDistances.set(polo.codigo_origem, distance);
-      }
-
-      if (poloDistances.size > 0) {
-        distMap.set(periCode, poloDistances);
-      }
-    }
-
-    return distMap;
-  }, [periferia, selectedUFs, filterByJoaoPessoaRadius, periferiaToPolosMap, polosValores]);
 
   // Polos filtrados baseado no input de busca
   const polosFiltrados = useMemo(() => {
@@ -1107,20 +1103,29 @@ export default function EstrategiaPage() {
 
     if (restrictedCodes.length > 0) {
       const base = poloOptions.filter(polo => restrictedCodes.includes(polo.value));
-      
-      // 🆕 Ordenar por distância se houver mapa de distâncias
+
+      // Ordenar por distância apenas quando uma periferia estiver selecionada e houver múltiplos polos
       let sorted = base;
       if (selectedMunicipioPeriferico !== 'ALL' && restrictedCodes.length > 1) {
-        const distancias = periferiaToPolosDistances.get(String(selectedMunicipioPeriferico));
-        if (distancias && distancias.size > 0) {
+        const selectedPeri = periferia.find(p => String(p.codigo_destino || p.municipio_destino) === String(selectedMunicipioPeriferico));
+        const periLat = selectedPeri?.latitude_munic_periferia;
+        const periLon = selectedPeri?.longitude_munic_periferia;
+
+        if (typeof periLat === 'number' && typeof periLon === 'number') {
           sorted = [...base].sort((a, b) => {
-            const distA = distancias.get(a.value) ?? Infinity;
-            const distB = distancias.get(b.value) ?? Infinity;
-            return distA - distB;
+            const poloA = polosValores.find(p => p.codigo_origem === a.value);
+            const poloB = polosValores.find(p => p.codigo_origem === b.value);
+            const dA = (poloA && typeof poloA.latitude_munic_polo === 'number' && typeof poloA.longitude_munic_polo === 'number')
+              ? calculateDistance(periLat, periLon, poloA.latitude_munic_polo!, poloA.longitude_munic_polo!)
+              : Number.POSITIVE_INFINITY;
+            const dB = (poloB && typeof poloB.latitude_munic_polo === 'number' && typeof poloB.longitude_munic_polo === 'number')
+              ? calculateDistance(periLat, periLon, poloB.latitude_munic_polo!, poloB.longitude_munic_polo!)
+              : Number.POSITIVE_INFINITY;
+            return dA - dB;
           });
         }
       }
-      
+
       if (!poloInputValue.trim()) return sorted;
       return sorted.filter(polo => polo.label.toLowerCase().includes(poloInputValue.toLowerCase()));
     }
@@ -1129,7 +1134,7 @@ export default function EstrategiaPage() {
     return poloOptions.filter(polo =>
       polo.label.toLowerCase().includes(poloInputValue.toLowerCase())
     );
-  }, [poloOptions, poloInputValue, showPoloSelectionWarning, filteredPolosByPeriferia, selectedMunicipioPeriferico, periferiaToPolosMap, periferiaToPolosDistances]);
+  }, [poloOptions, poloInputValue, showPoloSelectionWarning, filteredPolosByPeriferia, selectedMunicipioPeriferico, periferiaToPolosMap, periferia, polosValores]);
 
   // Periferias filtradas baseado no input de busca e filtro de João Pessoa - SIMPLIFICADO
   const periferiasFiltradas = useMemo(() => {

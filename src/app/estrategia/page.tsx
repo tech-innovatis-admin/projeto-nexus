@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo, KeyboardEvent, Fragment, useRef, useCallback } from 'react';
+import { useState, useEffect, useMemo, KeyboardEvent, Fragment, useRef, useCallback, memo } from 'react';
+import { useDebounce } from 'use-debounce';
 import { useEstrategiaData } from '../../contexts/EstrategiaDataContext';
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import Navbar from '@/components/Navbar';
@@ -167,7 +168,7 @@ interface SemTagMunicipio {
 // MapLibre não funciona no SSR; o componente MapLibrePolygons é client-only (este arquivo já é "use client")
 
 // Componente para contagem animada de valores
-function AnimatedCurrency({ targetValue, selectedPolo }: { targetValue: number; selectedPolo: string }) {
+const AnimatedCurrency = memo(function AnimatedCurrency({ targetValue, selectedPolo }: { targetValue: number; selectedPolo: string }) {
   const count = useMotionValue(0);
   const displayValue = useTransform(count, (latest) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -187,10 +188,10 @@ function AnimatedCurrency({ targetValue, selectedPolo }: { targetValue: number; 
   }, [count, targetValue, selectedPolo]); // Reexecuta quando o polo muda
 
   return <motion.span>{displayValue}</motion.span>;
-}
+});
 
 // Componente para contagem animada de números inteiros
-function AnimatedNumber({ targetValue, selectedPolo }: { targetValue: number; selectedPolo: string }) {
+const AnimatedNumber = memo(function AnimatedNumber({ targetValue, selectedPolo }: { targetValue: number; selectedPolo: string }) {
   const count = useMotionValue(0);
   const rounded = useTransform(count, (latest) => Math.round(latest));
 
@@ -203,10 +204,10 @@ function AnimatedNumber({ targetValue, selectedPolo }: { targetValue: number; se
   }, [count, targetValue, selectedPolo]); // Reexecuta quando o polo muda
 
   return <motion.span>{rounded}</motion.span>;
-}
+});
 
 // Componente para contagem animada de valores monetários
-function AnimatedMonetaryValue({ targetValue, selectedPolo }: { targetValue: number; selectedPolo: string }) {
+const AnimatedMonetaryValue = memo(function AnimatedMonetaryValue({ targetValue, selectedPolo }: { targetValue: number; selectedPolo: string }) {
   const count = useMotionValue(0);
   const rounded = useTransform(count, (latest) => latest); // Removido Math.round para preservar decimais
   const formattedValue = useTransform(rounded, (latest) => {
@@ -225,10 +226,10 @@ function AnimatedMonetaryValue({ targetValue, selectedPolo }: { targetValue: num
   }, [count, targetValue, selectedPolo]); // Reexecuta quando o polo muda
 
   return <motion.span>{formattedValue}</motion.span>;
-}
+});
 
 // Componente de Dropdown Portal para Estados/Regiões Unificado
-function EstadoDropdown({ 
+const EstadoDropdown = memo(function EstadoDropdown({ 
   isOpen, 
   buttonRef, 
   dropdownRef, 
@@ -406,10 +407,10 @@ function EstadoDropdown({
 
   // Renderizar via portal no body
   return typeof window !== 'undefined' ? createPortal(dropdownContent, document.body) : null;
-}
+});
 
 // Componente de Combobox para busca
-function Combobox({
+const Combobox = memo(function Combobox({
   value,
   onChange,
   options,
@@ -433,14 +434,23 @@ function Combobox({
   disabled?: boolean;
 }) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm] = useDebounce(searchTerm, 950);
+
+  // 🔥 OTIMIZAÇÃO: Pré-processar opções com campo normalizado
+  const optionsWithLower = useMemo(() => 
+    options.map(opt => ({
+      ...opt,
+      labelLower: opt.label.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    })),
+    [options]
+  );
 
   // Filtrar opções baseado no termo de busca
   const filteredOptions = useMemo(() => {
-    if (!searchTerm) return options;
-    return options.filter(option =>
-      option.label.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [options, searchTerm]);
+    if (!debouncedSearchTerm) return optionsWithLower;
+    const termLower = debouncedSearchTerm.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    return optionsWithLower.filter(option => option.labelLower.includes(termLower));
+  }, [optionsWithLower, debouncedSearchTerm]);
 
   // Reset search quando fecha
   useEffect(() => {
@@ -449,7 +459,7 @@ function Combobox({
     }
   }, [isOpen]);
 
-  const selectedOption = options.find(opt => opt.value === value);
+  const selectedOption = optionsWithLower.find(opt => opt.value === value);
 
   return (
     <div className="flex flex-col">
@@ -530,10 +540,10 @@ function Combobox({
       ), document.body)}
     </div>
   );
-}
+});
 
 // Componente para dropdown de Municípios Periféricos
-function MunicipioPerifericoDropdown({
+const MunicipioPerifericoDropdown = memo(function MunicipioPerifericoDropdown({
   isOpen,
   buttonRef,
   dropdownRef,
@@ -571,11 +581,15 @@ function MunicipioPerifericoDropdown({
 
   if (!isOpen) return null;
 
+  // 🔥 OTIMIZAÇÃO: Pré-processar termo de busca uma vez
+  const searchTermLower = searchTerm.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
   // Ordenar periferias alfabeticamente por município e filtrar por busca
   const periferiasOrdenadas = [...periferiasDisponiveis]
-    .filter(peri =>
-      peri.municipio_destino.toLowerCase().includes(searchTerm.toLowerCase())
-    )
+    .filter(peri => {
+      const municipioLower = peri.municipio_destino.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      return !searchTermLower || municipioLower.includes(searchTermLower);
+    })
     .sort((a, b) =>
     a.municipio_destino.localeCompare(b.municipio_destino, 'pt-BR')
   );
@@ -658,7 +672,7 @@ function MunicipioPerifericoDropdown({
 
   // Renderizar via portal no body
   return typeof window !== 'undefined' ? createPortal(dropdownContent, document.body) : null;
-}
+});
 
 export default function EstrategiaPage() {
   // Loga apenas uma vez no mount real (evita confundir re-render com remount)
@@ -709,6 +723,9 @@ export default function EstrategiaPage() {
   // Estados para inputs de busca
   const [poloInputValue, setPoloInputValue] = useState<string>('');
   const [periferiaInputValue, setPeriferiaInputValue] = useState<string>('');
+  // Debounced search inputs (delay filtering until user pauses typing)
+  const [debouncedPoloInput] = useDebounce(poloInputValue, 950);
+  const [debouncedPeriferiaInput] = useDebounce(periferiaInputValue, 700);
   const [isPoloDropdownOpen, setIsPoloDropdownOpen] = useState<boolean>(false);
   const [isPeriferiaDropdownOpen, setIsPeriferiaDropdownOpen] = useState<boolean>(false);
   const poloInputRef = useRef<HTMLDivElement>(null);
@@ -972,6 +989,7 @@ export default function EstrategiaPage() {
   // formatCurrency movida para escopo do módulo
 
   // Opções de polo vindas da base real (filtradas por João Pessoa se ativo)
+  // 🔥 OTIMIZAÇÃO: Pré-processamento para normalizar nomes e evitar toLowerCase() repetitivo durante busca
   const poloOptions = useMemo(() => {
     const seen = new Set<string>();
     let base = selectedUFs.length
@@ -988,7 +1006,11 @@ export default function EstrategiaPage() {
         seen.add(p.codigo_origem);
         return true;
       })
-      .map(p => ({ value: p.codigo_origem, label: p.municipio_origem }));
+      .map(p => ({ 
+        value: p.codigo_origem, 
+        label: p.municipio_origem,
+        labelLower: p.municipio_origem.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      }));
     // Ordena alfabeticamente pelo label
     return opts.sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
   }, [polosValores, selectedUFs, filterByJoaoPessoaRadius]);
@@ -1066,8 +1088,9 @@ export default function EstrategiaPage() {
   }, [periferia, polosValores, selectedUFs, filterByJoaoPessoaRadius]);
 
   // 🆕 Lista única de municípios periféricos (sem duplicatas)
+  // 🔥 OTIMIZAÇÃO: Pré-processamento para normalizar nomes municipais e evitar toLowerCase() repetitivo
   const municipiosPerifericosUnicos = useMemo(() => {
-    const uniqueMunicipios = new Map<string, PeriferiaProps>();
+    const uniqueMunicipios = new Map<string, PeriferiaProps & { municipioLower: string }>();
 
     let base = selectedUFs.length
       ? periferia.filter(p => selectedUFs.includes(String(p.UF)))
@@ -1084,7 +1107,10 @@ export default function EstrategiaPage() {
 
         // Mantém apenas a primeira ocorrência de cada município
         if (!uniqueMunicipios.has(codigoDestino)) {
-          uniqueMunicipios.set(codigoDestino, peri);
+          uniqueMunicipios.set(codigoDestino, {
+            ...peri,
+            municipioLower: peri.municipio_destino.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          });
         }
       }
     } else {
@@ -1095,7 +1121,10 @@ export default function EstrategiaPage() {
           if (!codigoDestino) continue;
 
           if (!uniqueMunicipios.has(codigoDestino)) {
-            uniqueMunicipios.set(codigoDestino, peri);
+            uniqueMunicipios.set(codigoDestino, {
+              ...peri,
+              municipioLower: peri.municipio_destino.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            });
           }
         }
       }
@@ -1107,6 +1136,9 @@ export default function EstrategiaPage() {
 
   // Polos filtrados baseado no input de busca
   const polosFiltrados = useMemo(() => {
+    // 🔥 OTIMIZAÇÃO: Pré-processar termo de busca uma vez (evitar toLowerCase repetitivo)
+    const searchTermLower = debouncedPoloInput.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    
     // Determinar se existe uma periferia selecionada com múltiplos polos relacionados
     let restrictedCodes: string[] = [];
     if (showPoloSelectionWarning && filteredPolosByPeriferia.length > 0) {
@@ -1145,32 +1177,34 @@ export default function EstrategiaPage() {
         }
       }
 
-      if (!poloInputValue.trim()) return sorted;
-      return sorted.filter(polo => polo.label.toLowerCase().includes(poloInputValue.toLowerCase()));
+      if (!searchTermLower) return sorted;
+      return sorted.filter(polo => polo.labelLower.includes(searchTermLower));
     }
 
-    if (!poloInputValue.trim()) return poloOptions;
-    return poloOptions.filter(polo =>
-      polo.label.toLowerCase().includes(poloInputValue.toLowerCase())
-    );
-  }, [poloOptions, poloInputValue, showPoloSelectionWarning, filteredPolosByPeriferia, selectedMunicipioPeriferico, periferiaToPolosMap, periferia, polosValores]);
+    if (!searchTermLower) return poloOptions;
+    return poloOptions.filter(polo => polo.labelLower.includes(searchTermLower));
+  }, [poloOptions, debouncedPoloInput, showPoloSelectionWarning, filteredPolosByPeriferia, selectedMunicipioPeriferico, periferiaToPolosMap, periferia, polosValores]);
 
   // Periferias filtradas baseado no input de busca e filtro de João Pessoa - SIMPLIFICADO
   const periferiasFiltradas = useMemo(() => {
     let base = municipiosPerifericosUnicos;
+    
+    // 🔥 OTIMIZAÇÃO: Pré-processar termo de busca uma vez
+    const searchTermLower = debouncedPeriferiaInput.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
-    if (!periferiaInputValue.trim()) return base;
-    return base.filter(peri =>
-      peri.municipio_destino.toLowerCase().includes(periferiaInputValue.toLowerCase())
-    );
-  }, [municipiosPerifericosUnicos, periferiaInputValue]);
+    if (!searchTermLower) return base;
+    return base.filter(peri => peri.municipioLower.includes(searchTermLower));
+  }, [municipiosPerifericosUnicos, debouncedPeriferiaInput]);
 
   // Lista combinada para o filtro "MUNICÍPIOS PRÓXIMO": periferias + sem tag
   type MunicipioProximoItem =
     | { tipo: 'periferia'; id: string; nome: string; UF: string; valor?: number; codigo_origem?: string }
-    | { tipo: 'semTag'; id: string; nome: string; UF: string; valor?: number; poloMaisProximo?: string };
+    | { tipo: 'semTag'; id: string; nome: string; nomeLower: string; UF: string; valor?: number; poloMaisProximo?: string };
 
   const municipiosProximosFiltrados = useMemo(() => {
+    // 🔥 OTIMIZAÇÃO: Pré-processar termo de busca uma vez
+    const searchTermLower = (debouncedPeriferiaInput || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    
     const normalize = (s: string) => s ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim() : '';
 
     const perif: MunicipioProximoItem[] = (periferiasFiltradas || []).map(p => ({
@@ -1187,8 +1221,11 @@ export default function EstrategiaPage() {
       ? semTagMunicipios.filter(s => selectedUFs.includes(String(s.UF || '')))
       : semTagMunicipios;
 
-    const term = (periferiaInputValue || '').toLowerCase();
-    let semTagFiltered = (!term ? baseSemTag : baseSemTag.filter(s => s.municipio.toLowerCase().includes(term)));
+    // 🔥 OTIMIZAÇÃO: Adicionar nomeLower aos semTag para evitar toLowerCase repetitivo
+    let semTagFiltered = (!searchTermLower 
+      ? baseSemTag 
+      : baseSemTag.filter(s => normalize(s.municipio).includes(searchTermLower))
+    );
 
     // Se um polo estiver selecionado, manter apenas Sem Tag cujo polo_mais_proximo corresponda ao nome do polo
     if (selectedPolo !== 'ALL') {
@@ -1203,6 +1240,7 @@ export default function EstrategiaPage() {
       tipo: 'semTag' as const,
       id: s.codigo,
       nome: s.municipio,
+      nomeLower: normalize(s.municipio),
       UF: String(s.UF || ''),
       valor: Number(s.valor_total_sem_tag || 0),
       poloMaisProximo: s.polo_mais_proximo,
@@ -1212,7 +1250,7 @@ export default function EstrategiaPage() {
     perif.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
     semTag.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
     return [...perif, ...semTag];
-  }, [periferiasFiltradas, semTagMunicipios, selectedUFs, periferiaInputValue, selectedPolo, poloOptions]);
+  }, [periferiasFiltradas, semTagMunicipios, selectedUFs, debouncedPeriferiaInput, selectedPolo, poloOptions]);
 
   // Opções filtradas por UFs selecionadas e filtro de João Pessoa (para o select de POLO)
   const filteredPoloOptions = useMemo(() => {

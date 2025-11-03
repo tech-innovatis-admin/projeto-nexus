@@ -360,7 +360,6 @@ export default function MapLibrePolygons({
       // Popup para polo
       const nome_polo = safe(properties.municipio_origem, 'Polo');
       const uf_polo = safe(properties.UF || properties.UF_origem);
-      const codigo_polo = safe(properties.codigo_origem);
       const somaDestino = Number(properties.soma_valor_total_destino) || 0;
       const valorOrigem = Number(properties.valor_total_origem) || 0;
       const total_polo = somaDestino + valorOrigem;
@@ -369,7 +368,6 @@ export default function MapLibrePolygons({
         <div class="nexus-popup-content">
           <div class="nexus-popup-title">${nome_polo}</div>
           <div class="nexus-popup-line">UF: ${uf_polo}</div>
-          <div class="nexus-popup-line">Código IBGE: ${codigo_polo}</div>
           <div class="nexus-popup-line">Valor Total Polo: ${formatCurrencyBRL(total_polo)}</div>
         </div>
       `;
@@ -1026,7 +1024,7 @@ export default function MapLibrePolygons({
                 <div class="nexus-popup-title">${nome}</div>
                 <div class="nexus-popup-line">UF: ${uf}</div>
                 <div class="nexus-popup-line">Código: ${codigo}</div>
-                <div class="nexus-popup-line">Valor Total (Sem Tag): ${formatCurrencyBRL(valorTotal)}</div>
+                <div class="nexus-popup-line">Valor Total: ${formatCurrencyBRL(valorTotal)}</div>
               </div>
             `)
             .addTo(map);

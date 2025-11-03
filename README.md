@@ -1390,6 +1390,32 @@ O sistema implementa um controle preventivo robusto contra custos excessivos da 
   - **Fallback Inteligente**: Haversine quando Google API indisponível
   - **Documentação Completa**: Setup, arquitetura técnica e guia executivo
 
+- **Página /estrategia – Estabilidade e Performance (Outubro 2025)**:
+  - **Correção de re-renders e loops**:
+    - Funções críticas estabilizadas com `useRef` (ex.: chamada ao Web Worker) para evitar reexecuções indevidas
+    - Efeitos com deduplicação por hash de parâmetros (pula chamadas repetidas com mesmos inputs)
+    - Debounces aumentados e unificados para reduzir churn de UI e workers
+  - **Coalescência de chamadas em voo (Web Worker)**:
+    - Dedupe em-flight por chave (hash) para agrupar múltiplas chamadas idênticas em uma única promessa
+    - Liberação automática da chave ao finalizar, evitando vazamentos
+  - **Inputs com debounce isolado (novo componente)**:
+    - Campo “POLO” e “MUNICÍPIOS PRÓXIMOS” migrados para um componente filho memoizado com estado local e `useDebounce`
+    - O componente pai só recebe o termo após a pausa de digitação → elimina re-render global a cada tecla
+    - Mantida sincronização programática (seleção/limpar preenche o texto do input)
+  - **Radar Estratégico – UX e consistência**:
+    - Efeito roda apenas em alternância real do toggle (sem disparos redundantes)
+    - Aplica filtros automaticamente ao alternar
+    - Preserva seleção de município/polo, limpando apenas se ficarem inválidos sob o novo raio/UFs
+  - **Slimming de GeoJSON no mapa**:
+    - Removido `...propriedadesOriginais` das features para reduzir memória
+    - Mantidos apenas campos essenciais no `properties` e um objeto `propriedadesOriginais` compacto para exportações
+    - Para periferias, preservados no topo de `properties` os campos de produtos `_destino` (compatibilidade com componentes do mapa)
+    - Efeito: redução significativa de RAM e custo de renderização do MapLibre
+  - **IBGE/Export compatíveis**:
+    - `codigo_destino` (periferias) e `codigo_origem` (polos) garantidos nas properties para popups/exports
+  - **Diagnósticos e logs**:
+    - `performance.mark/measure` e logs de depuração para avaliar tempo de chamadas e pulos por hash
+
 - **Controle Preventivo de Custos Google Maps API**:
   - **Kill Switch Global**: `MAPS_DISABLED=true` bloqueia todas as chamadas
   - **Limites Diários Configuráveis**: `MAPS_DAILY_CAP_ROUTES` e `MAPS_DAILY_CAP_GEOCODE`
@@ -1546,4 +1572,4 @@ Distribuído sob a **Licença MIT**. Consulte o arquivo `LICENSE` para mais deta
 
 ---
 
-**Última atualização**: Outubro 2025 - Sistema de Rotas Multimodal + Controle Preventivo de Custos Google Maps API + Integração Completa de Municípios Sem Tag + Integração Completa de Pistas de Voo + Otimização de Periferias Independentes + Filtro de Raio Estratégico de João Pessoa + Modo Vendas - Análise de Oportunidades implementado
+**Última atualização**: Outubro 2025 - Sistema de Rotas Multimodal + Controle Preventivo de Custos Google Maps API + Integração Completa de Municípios Sem Tag + Integração Completa de Pistas de Voo + Otimização de Periferias Independentes + Filtro de Raio Estratégico de João Pessoa + Modo Vendas - Análise de Oportunidades + Estabilidade/Performance da página /estrategia (debounce em filho, coalescência de workers, GeoJSON slimming, dedupe por hash)

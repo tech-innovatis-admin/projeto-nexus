@@ -433,6 +433,7 @@ export default function InformacoesMunicipio({ municipioSelecionado, modoVendas 
                       )}
                     </span>
                     <span className="text-xs sm:text-sm font-medium text-gray-300">
+                      {/* Nome do produto com ícones atrás */}
                       {linksProdutos[k] ? (
                         <a
                           href={linksProdutos[k]}
@@ -442,72 +443,113 @@ export default function InformacoesMunicipio({ municipioSelecionado, modoVendas 
                           style={{ textDecoration: 'none' }}
                         >
                           {nomesCustomizados[k] || k}
+                          {/* Ícones de status atrás do nome */}
+                          {k === 'VALOR_PD' && temPlanoDiretor && !planoDiretorVencido && (
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline ml-1" viewBox="0 0 200 200" fill="none">
+                              <path d="M50 110 L90 150 L160 60" stroke="#23d13a" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                            </svg>
+                          )}
+                          {k === 'VALOR_PD' && planoDiretorVencido && (
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline ml-1" viewBox="0 0 24 24" fill="none">
+                              <path d="M12 2L2 20h20L12 2z" fill="#FFD600"/>
+                              <circle cx="12" cy="16" r="1.5" fill="#222"/>
+                              <rect x="11" y="8" width="2" height="5" rx="1" fill="#222"/>
+                            </svg>
+                          )}
+                          {k === 'VALOR_PD' && !temPlanoDiretor && (
+                            <span title="Município não possui Plano Diretor">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline ml-1" viewBox="0 0 200 200" fill="none">
+                                <line x1="60" y1="60" x2="140" y2="140" stroke="#d12323" strokeWidth="24" strokeLinecap="round" />
+                                <line x1="140" y1="60" x2="60" y2="140" stroke="#d12323" strokeWidth="24" strokeLinecap="round" />
+                              </svg>
+                            </span>
+                          )}
+                          {k === 'VALOR_PMSB' && temPMSB && !pmsbVencido && (
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline ml-1" viewBox="0 0 200 200" fill="none">
+                              <path d="M50 110 L90 150 L160 60" stroke="#23d13a" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                            </svg>
+                          )}
+                          {k === 'VALOR_PMSB' && pmsbVencido && (
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline ml-1" viewBox="0 0 24 24" fill="none">
+                              <path d="M12 2L2 20h20L12 2z" fill="#FFD600"/>
+                              <circle cx="12" cy="16" r="1.5" fill="#222"/>
+                              <rect x="11" y="8" width="2" height="5" rx="1" fill="#222"/>
+                            </svg>
+                          )}
+                          {k === 'VALOR_PMSB' && !temPMSB && (
+                            <span title="Município não possui PMSB">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline ml-1" viewBox="0 0 200 200" fill="none">
+                                <line x1="60" y1="60" x2="140" y2="140" stroke="#d12323" strokeWidth="24" strokeLinecap="round" />
+                                <line x1="140" y1="60" x2="60" y2="140" stroke="#d12323" strokeWidth="24" strokeLinecap="round" />
+                              </svg>
+                            </span>
+                          )}
                         </a>
                       ) : (
-                        nomesCustomizados[k] || k
-                      )}
-                      {/* Mantém os ícones e textos extras */}
-                      {k === 'VALOR_PD' && (
                         <>
-                          {temPlanoDiretor ? (
-                            planoDiretorVencido ? (
-                              <span title="Plano Diretor vencido">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 inline ml-1" viewBox="0 0 24 24" fill="none">
-                                  <path d="M12 2L2 20h20L12 2z" fill="#FFD600"/>
-                                  <circle cx="12" cy="16" r="1.5" fill="#222"/>
-                                  <rect x="11" y="8" width="2" height="5" rx="1" fill="#222"/>
-                                </svg>
-                              </span>
-                            ) : (
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 inline ml-1" viewBox="0 0 200 200" fill="none">
-                                <path d="M50 110 L90 150 L160 60" stroke="#23d13a" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                              </svg>
-                            )
-                          ) : (
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 inline ml-1" viewBox="0 0 200 200" fill="none">
-                              <line x1="60" y1="60" x2="140" y2="140" stroke="#d12323" strokeWidth="24" strokeLinecap="round" />
-                              <line x1="140" y1="60" x2="60" y2="140" stroke="#d12323" strokeWidth="24" strokeLinecap="round" />
+                          {nomesCustomizados[k] || k}
+                          {/* Ícones de status atrás do nome */}
+                          {k === 'VALOR_PD' && temPlanoDiretor && !planoDiretorVencido && (
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline ml-1" viewBox="0 0 200 200" fill="none">
+                              <path d="M50 110 L90 150 L160 60" stroke="#23d13a" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" fill="none" />
                             </svg>
                           )}
-                          {/* Texto 'Em dia' abaixo do nome, apenas se tem plano diretor e não está vencido */}
-                          {temPlanoDiretor && !planoDiretorVencido && (
-                            <div className="text-xs text-slate-400 font-medium mt-1">Em dia</div>
+                          {k === 'VALOR_PD' && planoDiretorVencido && (
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline ml-1" viewBox="0 0 24 24" fill="none">
+                              <path d="M12 2L2 20h20L12 2z" fill="#FFD600"/>
+                              <circle cx="12" cy="16" r="1.5" fill="#222"/>
+                              <rect x="11" y="8" width="2" height="5" rx="1" fill="#222"/>
+                            </svg>
                           )}
-                          {planoDiretorVencido && (
-                            <div className="text-xs text-slate-400 font-medium mt-1">Vencido</div>
+                          {k === 'VALOR_PD' && !temPlanoDiretor && (
+                            <span title="Município não possui Plano Diretor">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline ml-1" viewBox="0 0 200 200" fill="none">
+                                <line x1="60" y1="60" x2="140" y2="140" stroke="#d12323" strokeWidth="24" strokeLinecap="round" />
+                                <line x1="140" y1="60" x2="60" y2="140" stroke="#d12323" strokeWidth="24" strokeLinecap="round" />
+                              </svg>
+                            </span>
+                          )}
+                          {k === 'VALOR_PMSB' && temPMSB && !pmsbVencido && (
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline ml-1" viewBox="0 0 200 200" fill="none">
+                              <path d="M50 110 L90 150 L160 60" stroke="#23d13a" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                            </svg>
+                          )}
+                          {k === 'VALOR_PMSB' && pmsbVencido && (
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline ml-1" viewBox="0 0 24 24" fill="none">
+                              <path d="M12 2L2 20h20L12 2z" fill="#FFD600"/>
+                              <circle cx="12" cy="16" r="1.5" fill="#222"/>
+                              <rect x="11" y="8" width="2" height="5" rx="1" fill="#222"/>
+                            </svg>
+                          )}
+                          {k === 'VALOR_PMSB' && !temPMSB && (
+                            <span title="Município não possui PMSB">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline ml-1" viewBox="0 0 200 200" fill="none">
+                                <line x1="60" y1="60" x2="140" y2="140" stroke="#d12323" strokeWidth="24" strokeLinecap="round" />
+                                <line x1="140" y1="60" x2="60" y2="140" stroke="#d12323" strokeWidth="24" strokeLinecap="round" />
+                              </svg>
+                            </span>
                           )}
                         </>
                       )}
-                      {k === 'VALOR_PMSB' && (
-                        <>
-                          {temPMSB ? (
-                            pmsbVencido ? (
-                              <span title="PMSB vencido">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 inline ml-1" viewBox="0 0 24 24" fill="none">
-                                  <path d="M12 2L2 20h20L12 2z" fill="#FFD600"/>
-                                  <circle cx="12" cy="16" r="1.5" fill="#222"/>
-                                  <rect x="11" y="8" width="2" height="5" rx="1" fill="#222"/>
-                                </svg>
-                              </span>
-                            ) : (
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 inline ml-1" viewBox="0 0 200 200" fill="none">
-                                <path d="M50 110 L90 150 L160 60" stroke="#23d13a" strokeWidth="24" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-                              </svg>
-                            )
-                          ) : (
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 inline ml-1" viewBox="0 0 200 200" fill="none">
-                              <line x1="60" y1="60" x2="140" y2="140" stroke="#d12323" strokeWidth="24" strokeLinecap="round" />
-                              <line x1="140" y1="60" x2="60" y2="140" stroke="#d12323" strokeWidth="24" strokeLinecap="round" />
-                            </svg>
-                          )}
-                          {/* Texto 'Em dia' abaixo do nome, apenas se tem PMSB e não está vencido */}
-                          {temPMSB && !pmsbVencido && (
-                            <div className="text-xs text-slate-400 font-medium mt-1">Em dia</div>
-                          )}
-                          {pmsbVencido && (
-                            <div className="text-xs text-slate-400 font-medium mt-1">Vencido</div>
-                          )}
-                        </>
+
+                      {/* Texto adicional abaixo do nome */}
+                      {k === 'VALOR_PD' && temPlanoDiretor && !planoDiretorVencido && (
+                        <div className="text-xs text-slate-400 font-medium mt-1">Em dia</div>
+                      )}
+                      {k === 'VALOR_PD' && planoDiretorVencido && (
+                        <div className="text-xs text-slate-400 font-medium mt-1">Vencido</div>
+                      )}
+                      {k === 'VALOR_PD' && !temPlanoDiretor && (
+                        <div className="text-xs text-slate-400 font-medium mt-1">Não possui</div>
+                      )}
+                      {k === 'VALOR_PMSB' && temPMSB && !pmsbVencido && (
+                        <div className="text-xs text-slate-400 font-medium mt-1">Em dia</div>
+                      )}
+                      {k === 'VALOR_PMSB' && pmsbVencido && (
+                        <div className="text-xs text-slate-400 font-medium mt-1">Vencido</div>
+                      )}
+                      {k === 'VALOR_PMSB' && !temPMSB && (
+                        <div className="text-xs text-slate-400 font-medium mt-1">Não possui</div>
                       )}
                       {k === 'PVA_fmt' && (
                         <div className="text-xs text-slate-400 font-medium mt-1">R$ 450,00/aluno</div>
@@ -515,7 +557,6 @@ export default function InformacoesMunicipio({ municipioSelecionado, modoVendas 
                       {k === 'VALOR_REURB' && (
                         <div className="text-xs text-slate-400 font-medium mt-1">Mín. 200 unid.</div>
                       )}
-                      {/* Ícone de dica removido do nome do produto para ficar ao lado dos valores */}
                     </span>
                   </div>
                 </td>

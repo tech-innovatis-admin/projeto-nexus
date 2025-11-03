@@ -148,13 +148,12 @@ export function readCssVar(varName: string, fallback: string): string {
  *   </div>
  */
 export function muniTooltipHtml(properties: MuniProps): string {
-  const { uf, ibge, nome } = extractMuniFields(properties);
+  const { uf, nome } = extractMuniFields(properties);
 
   return `
     <div class="t-muni">
       <div class="t-title">${escapeHtml(nome)}</div>
       <div class="t-row">UF: <b>${escapeHtml(uf)}</b></div>
-      <div class="t-row">IBGE: <b>${escapeHtml(ibge)}</b></div>
     </div>
   `.trim();
 }

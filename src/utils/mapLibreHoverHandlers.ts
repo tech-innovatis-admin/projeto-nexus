@@ -252,13 +252,12 @@ export function readCssVar(varName: string, fallback: string): string {
  * @returns String com HTML do tooltip
  */
 export function poloTooltipHtml(properties: MuniProps): string {
-  const { uf, ibge, nome } = extractPoloFields(properties);
+  const { uf, /* ibge, */ nome } = extractPoloFields(properties);
 
   return `
     <div class="t-muni">
       <div class="t-title">${escapeHtml(nome)}</div>
       <div class="t-row">UF: <b>${escapeHtml(uf)}</b></div>
-      <div class="t-row">IBGE: <b>${escapeHtml(ibge)}</b></div>
       <div class="t-row t-tipo"><span class="t-badge t-badge-polo">Polo</span></div>
     </div>
   `.trim();
@@ -273,13 +272,12 @@ export function poloTooltipHtml(properties: MuniProps): string {
  * @returns String com HTML do tooltip
  */
 export function periferiaTooltipHtml(properties: MuniProps): string {
-  const { uf, ibge, nome } = extractPeriferiaFields(properties);
+  const { uf, /* ibge, */ nome } = extractPeriferiaFields(properties);
 
   return `
     <div class="t-muni">
       <div class="t-title">${escapeHtml(nome)}</div>
       <div class="t-row">UF: <b>${escapeHtml(uf)}</b></div>
-      <div class="t-row">IBGE: <b>${escapeHtml(ibge)}</b></div>
       <div class="t-row t-tipo"><span class="t-badge t-badge-periferia">Periferia</span></div>
     </div>
   `.trim();
@@ -289,13 +287,12 @@ export function periferiaTooltipHtml(properties: MuniProps): string {
  * Gera HTML do tooltip para município SEM TAG
  */
 export function semTagTooltipHtml(properties: MuniProps): string {
-  const { uf, ibge, nome } = extractSemTagFields(properties);
+  const { uf, /* ibge, */ nome } = extractSemTagFields(properties);
 
   return `
     <div class="t-muni">
       <div class="t-title">${escapeHtml(nome)}</div>
       <div class="t-row">UF: <b>${escapeHtml(uf)}</b></div>
-      <div class="t-row">IBGE: <b>${escapeHtml(ibge)}</b></div>
       <div class="t-row t-tipo"><span class="t-badge t-badge-semtag">Sem Tag</span></div>
     </div>
   `.trim();

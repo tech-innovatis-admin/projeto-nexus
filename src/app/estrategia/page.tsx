@@ -36,6 +36,41 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c;
 }
 
+// ========== Diagnóstico/Debug ==========
+// Ative/desative logs de diagnóstico aqui. Pode ser sobrescrito via query string (?debug=0) ou localStorage('ESTRATEGIA_DEBUG'='0').
+function isDebugEnabled(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    if (window.location.search.includes('debug=0')) return false;
+    const ls = window.localStorage.getItem('ESTRATEGIA_DEBUG');
+    if (ls === '0') return false;
+  } catch {}
+  return true;
+}
+const DEBUG = isDebugEnabled();
+
+function dbg(...args: any[]) {
+  if (DEBUG) console.log('🧪[EstrategiaDBG]', ...args);
+}
+
+function timeStart(label: string) {
+  if (!DEBUG || typeof performance === 'undefined') return;
+  (performance as any).mark?.(`${label}-start`);
+}
+
+function timeEnd(label: string, extra?: any) {
+  if (!DEBUG || typeof performance === 'undefined') return;
+  try {
+    (performance as any).mark?.(`${label}-end`);
+    (performance as any).measure?.(label, `${label}-start`, `${label}-end`);
+    const entries = (performance as any).getEntriesByName?.(label) || [];
+    const last = entries[entries.length - 1];
+    const dur = last?.duration ?? null;
+    dbg(`⏱️ ${label}: ${dur?.toFixed ? dur.toFixed(2) : dur} ms`, extra ? { extra } : undefined);
+    (performance as any).clearMeasures?.(label);
+  } catch {}
+}
+
 // Outras constantes/funções puras movidas para módulo
 const MUNICIPIOS_PER_PAGE = 10; // paginação de municípios
 const PANEL_WIDTH = 420; // largura do painel (px)
@@ -166,6 +201,9 @@ interface SemTagMunicipio {
 }
 
 // MapLibre não funciona no SSR; o componente MapLibrePolygons é client-only (este arquivo já é "use client")
+// Worker helper types
+type WorkerMessage = { requestId: number; type: string; payload?: any };
+type WorkerResponse = { requestId: number; type: string; result?: any; error?: string };
 
 // Componente para contagem animada de valores
 const AnimatedCurrency = memo(function AnimatedCurrency({ targetValue, selectedPolo }: { targetValue: number; selectedPolo: string }) {
@@ -408,6 +446,59 @@ const EstadoDropdown = memo(function EstadoDropdown({
   // Renderizar via portal no body
   return typeof window !== 'undefined' ? createPortal(dropdownContent, document.body) : null;
 });
+
+  // Input debounced isolado com proteção de atualização externa
+  const DebouncedTextInput = memo(function DebouncedTextInput({
+    externalValue,
+    onDebouncedChange,
+    onOpen,
+    placeholder,
+    className,
+    delayMs = 1000,
+  }: {
+    externalValue: string;
+    onDebouncedChange: (value: string) => void;
+    onOpen?: () => void;
+    placeholder: string;
+    className?: string;
+    delayMs?: number;
+  }) {
+    const [text, setText] = useState(externalValue || '');
+    const [isExternalUpdate, setIsExternalUpdate] = useState(false);
+
+    // Quando o pai atualiza (seleção/limpar), refletir no input e pausar debounce
+    useEffect(() => {
+      setIsExternalUpdate(true);
+      setText(externalValue || '');
+    }, [externalValue]);
+
+    // Debounce manual apenas para digitação do usuário
+    useEffect(() => {
+      if (isExternalUpdate) {
+        // Consumir o flag e não disparar onDebouncedChange nesta virada
+        setIsExternalUpdate(false);
+        return;
+      }
+      const handler = setTimeout(() => {
+        onDebouncedChange(text);
+      }, delayMs);
+      return () => clearTimeout(handler);
+    }, [text, delayMs, onDebouncedChange, isExternalUpdate]);
+
+    return (
+      <input
+        type="text"
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value);
+          onOpen?.();
+        }}
+        onFocus={() => onOpen?.()}
+        placeholder={placeholder}
+        className={className}
+      />
+    );
+  });
 
 // Componente de Combobox para busca
 const Combobox = memo(function Combobox({
@@ -675,10 +766,22 @@ const MunicipioPerifericoDropdown = memo(function MunicipioPerifericoDropdown({
 });
 
 export default function EstrategiaPage() {
-  // Loga apenas uma vez no mount real (evita confundir re-render com remount)
+  // Identificação da instância e contadores de render
+  const instanceIdRef = useRef<string>(Math.random().toString(36).slice(2, 7));
+  const instanceId = instanceIdRef.current as string;
+  const renderCountRef = useRef<number>(0);
+  renderCountRef.current += 1;
+  dbg(`🔁 render #${renderCountRef.current} [inst:${instanceId}]`, {
+    time: new Date().toISOString()
+  });
+
+  // Loga mount/unmount
   useEffect(() => {
-    console.log('📊 [EstrategiaPage] Componente montado');
-  }, []);
+    dbg('📊 EstrategiaPage MOUNT', { instanceId });
+    return () => {
+      dbg('📉 EstrategiaPage UNMOUNT', { instanceId, renders: renderCountRef.current });
+    };
+  }, [instanceId]);
 
   // 🔥 USANDO O NOVO CONTEXTO - Resolve problema de remount-triggered fetching
   const { estrategiaData, loading: loadingData, error: errorData } = useEstrategiaData();
@@ -721,17 +824,15 @@ export default function EstrategiaPage() {
   const [appliedProducts, setAppliedProducts] = useState<string[]>([]);
 
   // Estados para inputs de busca
-  const [poloInputValue, setPoloInputValue] = useState<string>('');
+  const [poloInputValue, setPoloInputValue] = useState<string>('Todos os Polos');
   const [periferiaInputValue, setPeriferiaInputValue] = useState<string>('');
-  // Debounced search inputs (delay filtering until user pauses typing)
-  const [debouncedPoloInput] = useDebounce(poloInputValue, 950);
-  const [debouncedPeriferiaInput] = useDebounce(periferiaInputValue, 700);
+  // O debounce agora é aplicado no componente filho (DebouncedTextInput)
   const [isPoloDropdownOpen, setIsPoloDropdownOpen] = useState<boolean>(false);
   const [isPeriferiaDropdownOpen, setIsPeriferiaDropdownOpen] = useState<boolean>(false);
   const poloInputRef = useRef<HTMLDivElement>(null);
 
   // Estado para filtro de João Pessoa (raio de 1.300km)
-  const [isJoaoPessoaFilterActive, setIsJoaoPessoaFilterActive] = useState<boolean>(false);
+  const [isJoaoPessoaFilterActive, setIsJoaoPessoaFilterActive] = useState<boolean>(true);
 
   // 🆕 Estados para controlar periferias com múltiplos polos
   const [showPoloSelectionWarning, setShowPoloSelectionWarning] = useState<boolean>(false);
@@ -756,11 +857,118 @@ export default function EstrategiaPage() {
 
   // parsePtBrNumber movida para escopo do módulo
 
+  // ========== Web Worker para filtros/cálculos pesados ==========
+  const workerRef = useRef<Worker | null>(null);
+  const nextRequestId = useRef(1);
+  const pending = useRef(new Map<number, (res: WorkerResponse) => void>());
+  const workerCallsRef = useRef<number>(0);
+  const workerRecentCallsTsRef = useRef<number[]>([]);
+  // 🆕 Dedupe de chamadas em voo (por hash de parâmetros)
+  const inFlightByHashRef = useRef(new Map<string, Promise<any>>());
+
+  useEffect(() => {
+    // Instancia o worker apenas no client
+    const w = new Worker(new URL('../../workers/filterWorker.ts', import.meta.url));
+    workerRef.current = w;
+    dbg('🧵 Worker inicializado');
+    const onMessage = (e: MessageEvent) => {
+      const data = e.data as WorkerResponse;
+      const cb = pending.current.get(data.requestId);
+      if (cb) {
+        pending.current.delete(data.requestId);
+        cb(data);
+      }
+      dbg('📬 Worker resposta', { requestId: data.requestId, type: data.type, hasError: !!data.error });
+    };
+    const onError = (err: any) => {
+      console.error('❌ Worker error/event', err);
+      // Drena pendências
+      for (const [id, cb] of pending.current.entries()) {
+        pending.current.delete(id);
+        cb({ requestId: id, type: 'ERROR', error: (err?.message || 'Worker error') } as any);
+      }
+    };
+    w.addEventListener('message', onMessage);
+    w.addEventListener('error', onError);
+    w.addEventListener('messageerror', onError as any);
+    return () => {
+      w.removeEventListener('message', onMessage);
+      w.removeEventListener('error', onError);
+      w.removeEventListener('messageerror', onError as any);
+      w.terminate();
+      workerRef.current = null;
+      pending.current.clear();
+      dbg('🧵 Worker terminado (cleanup)');
+    };
+  }, []);
+
+  // 🔥 CRÍTICO: useRef para estabilizar callWorker e evitar loops
+  const callWorkerRef = useRef<(type: string, payload: any) => Promise<any>>(null as any);
+  
+  useEffect(() => {
+    callWorkerRef.current = (type: string, payload: any): Promise<any> => {
+      return new Promise((resolve, reject) => {
+        // Protege contra chamadas antes do worker estar pronto
+        if (!workerRef.current) {
+          return reject(new Error('Worker not ready'));
+        }
+
+        const id = nextRequestId.current++;
+
+        // Timeout de segurança para evitar pendências eternas
+        const timeoutId = window.setTimeout(() => {
+          if (pending.current.has(id)) {
+            pending.current.delete(id);
+            reject(new Error(`Worker timeout for request ${id}`));
+          }
+        }, 15000); // 15s
+
+        pending.current.set(id, (res: WorkerResponse) => {
+          window.clearTimeout(timeoutId);
+          if (res.type === 'ERROR') reject(new Error(res.error || 'Worker error'));
+          else resolve(res.result);
+        });
+
+        try {
+          // Contabiliza e detecta taxa anômala de chamadas
+          workerCallsRef.current += 1;
+          const now = Date.now();
+          const wnd = 3000; // janela 3s
+          workerRecentCallsTsRef.current = workerRecentCallsTsRef.current
+            .filter(ts => now - ts <= wnd)
+            .concat(now);
+          const rate = workerRecentCallsTsRef.current.length;
+          if (rate > 20) {
+            console.warn('⚠️ Taxa alta de chamadas ao Worker nos últimos 3s', { rate, type });
+          }
+          dbg('📤 Worker chamada', {
+            requestId: id,
+            type,
+            totalCalls: workerCallsRef.current,
+          });
+          workerRef.current!.postMessage({ requestId: id, type, payload } as WorkerMessage);
+        } catch (err: any) {
+          window.clearTimeout(timeoutId);
+          pending.current.delete(id);
+          reject(err);
+        }
+      });
+    };
+  }, []);
+
+  const callWorker = useCallback((type: string, payload: any) => {
+    if (!callWorkerRef.current) {
+      return Promise.reject(new Error('Worker not initialized'));
+    }
+    return callWorkerRef.current(type, payload);
+  }, []);
+
   // 🔥 NOVO: Processar dados do contexto (resolve remount-triggered fetching)
   useEffect(() => {
     if (!estrategiaData || loadingData) return;
 
-    console.log('📊 [EstrategiaPage] Processando dados do contexto...');
+    dbg('📊 [EstrategiaPage] Processando dados do contexto...');
+    timeStart('processar-dados-contexto');
 
     try {
       const origemMissingSamples: Array<{ codigo: string; key: string }> = [];
@@ -870,10 +1078,11 @@ export default function EstrategiaPage() {
       setPolosValores(valoresEnriched);
       setPeriferia(periEnriched);
 
-      console.log(`📊 [EstrategiaPage] Dados processados: ${valoresEnriched.length} polos, ${periEnriched.length} periferias`);
+      dbg(`📊 [EstrategiaPage] Dados processados`, { polos: valoresEnriched.length, periferias: periEnriched.length });
     } catch (err: any) {
       console.error('Erro ao processar dados estratégicos:', err);
     }
+    timeEnd('processar-dados-contexto');
   }, [estrategiaData, loadingData]);
 
   // Carregar base dos municípios Sem Tag para o filtro de "MUNICÍPIOS PRÓXIMO"
@@ -931,42 +1140,64 @@ export default function EstrategiaPage() {
   }, []);
 
   // Função para filtrar municípios dentro do raio de João Pessoa
-  const filterByJoaoPessoaRadius = useCallback((municipios: (PoloValoresProps | PeriferiaProps)[]) => {
-    if (!isJoaoPessoaFilterActive) return municipios;
+  // 🔥 CRÍTICO: Usar useRef para estabilizar a função e evitar loops
+  const filterByJoaoPessoaRadiusRef = useRef<(municipios: (PoloValoresProps | PeriferiaProps)[]) => (PoloValoresProps | PeriferiaProps)[]>(null as any);
+  
+  useEffect(() => {
+    filterByJoaoPessoaRadiusRef.current = (municipios: (PoloValoresProps | PeriferiaProps)[]) => {
+      if (!isJoaoPessoaFilterActive) return municipios;
 
-    return municipios.filter(municipio => {
-      // Preferir coordenadas diretas, evitando cálculo de centróide
-      let lat: number | undefined;
-      let lon: number | undefined;
+      return municipios.filter(municipio => {
+        // Preferir coordenadas diretas, evitando cálculo de centróide
+        let lat: number | undefined;
+        let lon: number | undefined;
 
-      const asAny = municipio as any;
-      if (typeof asAny.latitude_munic_polo === 'number' && typeof asAny.longitude_munic_polo === 'number') {
-        lat = asAny.latitude_munic_polo;
-        lon = asAny.longitude_munic_polo;
-      } else if (typeof asAny.latitude_munic_periferia === 'number' && typeof asAny.longitude_munic_periferia === 'number') {
-        lat = asAny.latitude_munic_periferia;
-        lon = asAny.longitude_munic_periferia;
-      } else {
-        // Fallback raro: tenta centróide se não houver coordenadas na base
-        const centroid = getCentroid((municipio as any).geom);
-        if (!centroid) return false;
-        lat = centroid[0];
-        lon = centroid[1];
-      }
+        const asAny = municipio as any;
+        if (typeof asAny.latitude_munic_polo === 'number' && typeof asAny.longitude_munic_polo === 'number') {
+          lat = asAny.latitude_munic_polo;
+          lon = asAny.longitude_munic_polo;
+        } else if (typeof asAny.latitude_munic_periferia === 'number' && typeof asAny.longitude_munic_periferia === 'number') {
+          lat = asAny.latitude_munic_periferia;
+          lon = asAny.longitude_munic_periferia;
+        } else {
+          // Fallback raro: tenta centróide se não houver coordenadas na base
+          const centroid = getCentroid((municipio as any).geom);
+          if (!centroid) return false;
+          lat = centroid[0];
+          lon = centroid[1];
+        }
 
-      const distance = calculateDistance(
-        JOAO_PESSOA_COORDS[0], JOAO_PESSOA_COORDS[1],
-        lat!, lon!
-      );
+        const distance = calculateDistance(
+          JOAO_PESSOA_COORDS[0], JOAO_PESSOA_COORDS[1],
+          lat!, lon!
+        );
 
-      return distance <= JOAO_PESSOA_RADIUS_KM;
-    });
+        return distance <= JOAO_PESSOA_RADIUS_KM;
+      });
+    };
   }, [isJoaoPessoaFilterActive]);
+
+  const filterByJoaoPessoaRadius = useCallback((municipios: (PoloValoresProps | PeriferiaProps)[]) => {
+    if (!filterByJoaoPessoaRadiusRef.current) return municipios;
+    return filterByJoaoPessoaRadiusRef.current(municipios);
+  }, []);
 
   // sumSelectedProducts movida para escopo do módulo (recebe appliedProducts e PRODUCTS.length explicitamente)
 
-  // Agregação por polo (codigo_origem) a partir da periferia filtrada
-  const periferiaAggByCodigo = useMemo(() => {
+  // Agregação por polo (codigo_origem) a partir da periferia filtrada - via Web Worker
+  const [periferiaAggByCodigo, setPeriferiaAggByCodigo] = useState<Map<string, number>>(new Map());
+  
+  // 🔥 CRÍTICO: Rastrear última chamada para evitar duplicatas
+  const lastAggCallRef = useRef<string>('');
+
+  useEffect(() => {
+    // 🔥 VERIFICAÇÃO: Não rodar se dados básicos não estiverem disponíveis
+    if (!periferia.length) {
+      dbg('⏭️ [AGG_PERIFERIA] Skipping: periferia vazia');
+      return;
+    }
+    
+    timeStart('agg-periferia-by-codigo');
     const ufUpper = String(appliedUF || '').toUpperCase();
     const inUFMode = appliedPolo === 'ALL' && ufUpper !== 'ALL' && ufUpper !== '';
     const inPoloMode = appliedPolo !== 'ALL';
@@ -974,17 +1205,64 @@ export default function EstrategiaPage() {
     if (appliedUFs.length) base = base.filter(p => appliedUFs.includes(String(p.UF)));
     if (inPoloMode) base = base.filter(p => p.codigo_origem === appliedPolo);
     else if (inUFMode) base = base.filter(p => String(p.UF || '').toUpperCase() === ufUpper);
-    
+
     // Aplicar filtro de João Pessoa se ativo
     base = filterByJoaoPessoaRadius(base) as PeriferiaProps[];
+
+    // 🔥 VERIFICAÇÃO: Criar hash dos parâmetros e pular se já foi executado
+    const callHash = JSON.stringify({
+      baseLen: base.length,
+      appliedProducts: appliedProducts.sort(),
+      appliedPolo,
+      appliedUF,
+      appliedUFs: appliedUFs.sort(),
+    });
     
-    const map = new Map<string, number>();
-    for (const f of base) {
-      const agg = sumSelectedProducts(f.productValues, Number(f.valor_total_destino) || 0, appliedProducts, PRODUCTS.length);
-      map.set(f.codigo_origem, (map.get(f.codigo_origem) || 0) + agg);
+    if (lastAggCallRef.current === callHash) {
+      dbg('⏭️ [AGG_PERIFERIA] Skipping: mesmos parâmetros da última chamada');
+      timeEnd('agg-periferia-by-codigo', { skipped: true });
+      return;
     }
-    return map;
-  }, [periferia, appliedUFs, appliedPolo, appliedUF, appliedProducts, filterByJoaoPessoaRadius]);
+    
+    lastAggCallRef.current = callHash;
+
+    const items = base.map(f => ({
+      codigo_origem: f.codigo_origem,
+      valor_total_destino: Number(f.valor_total_destino) || 0,
+      productValues: f.productValues as Record<string, number> | undefined,
+    }));
+
+    dbg('🧮 AGG_PERIFERIA_BY_CODIGO input', { base: base.length, items: items.length, appliedProducts: appliedProducts.length });
+
+    // 🆕 Coalescer chamadas idênticas em voo
+    const inFlightKey = `AGG_PERIFERIA_BY_CODIGO:${callHash}`;
+    const existing = inFlightByHashRef.current.get(inFlightKey);
+    const promise = existing ?? callWorker('AGG_PERIFERIA_BY_CODIGO', {
+      items,
+      appliedProducts,
+      totalProductCount: PRODUCTS.length,
+    });
+    if (!existing) inFlightByHashRef.current.set(inFlightKey, promise);
+
+    promise.then((result: Record<string, number>) => {
+      const m = new Map<string, number>();
+      for (const [k, v] of Object.entries(result || {})) m.set(k, Number(v || 0));
+      setPeriferiaAggByCodigo(m);
+      timeEnd('agg-periferia-by-codigo', { mapaSize: m.size });
+    }).catch((err) => {
+      console.warn('❌ Worker AGG_PERIFERIA_BY_CODIGO falhou, usando fallback', err);
+      // Fallback em caso de erro do worker: computa no main thread
+      const map = new Map<string, number>();
+      for (const f of items) {
+        const agg = sumSelectedProducts(f.productValues, f.valor_total_destino, appliedProducts, PRODUCTS.length);
+        map.set(f.codigo_origem, (map.get(f.codigo_origem) || 0) + agg);
+      }
+      setPeriferiaAggByCodigo(map);
+      timeEnd('agg-periferia-by-codigo', { mapaSize: map.size, fallback: true });
+    }).finally(() => {
+      inFlightByHashRef.current.delete(inFlightKey);
+    });
+  }, [periferia, appliedUFs, appliedPolo, appliedUF, appliedProducts, filterByJoaoPessoaRadius, callWorker]);
 
   // formatCurrency movida para escopo do módulo
 
@@ -1134,67 +1412,129 @@ export default function EstrategiaPage() {
   }, [periferia, selectedUFs, selectedPolo, filterByJoaoPessoaRadius]);
 
 
-  // Polos filtrados baseado no input de busca
-  const polosFiltrados = useMemo(() => {
-    // 🔥 OTIMIZAÇÃO: Pré-processar termo de busca uma vez (evitar toLowerCase repetitivo)
-    const searchTermLower = debouncedPoloInput.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  // Pré-compute mapa de coordenadas dos polos para o worker
+  const poloCoordsByCodigo = useMemo(() => {
+    const m = new Map<string, { lat?: number; lon?: number }>();
+    for (const p of polosValores) {
+      m.set(p.codigo_origem, {
+        lat: typeof p.latitude_munic_polo === 'number' ? p.latitude_munic_polo : undefined,
+        lon: typeof p.longitude_munic_polo === 'number' ? p.longitude_munic_polo : undefined,
+      });
+    }
+    return m;
+  }, [polosValores]);
+
+  // Polos filtrados baseado no input de busca - processado no Web Worker quando necessário
+  const [polosFiltrados, setPolosFiltrados] = useState<Array<{ value: string; label: string; labelLower: string }>>([]);
+  
+  // 🔥 CRÍTICO: Rastrear última chamada para evitar duplicatas
+  const lastPolosFilterCallRef = useRef<string>('');
+
+  useEffect(() => {
+    // 🔥 VERIFICAÇÃO: Não rodar se não houver opções de polo
+    if (!poloOptions.length) {
+      dbg('⏭️ [FILTER_POLOS] Skipping: poloOptions vazio');
+      return;
+    }
     
+    timeStart('filter-and-sort-polos');
+    // 🔥 OTIMIZAÇÃO: Pré-processar termo de busca uma vez
+    const rawPoloSearch = poloInputValue.trim();
+    const normalizedPoloSearch = rawPoloSearch.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    // Quando exibindo "Todos os Polos" no input, tratar como busca vazia para não filtrar a lista
+    const searchTermLower = normalizedPoloSearch === 'todos os polos' ? '' : normalizedPoloSearch;
+
     // Determinar se existe uma periferia selecionada com múltiplos polos relacionados
     let restrictedCodes: string[] = [];
     if (showPoloSelectionWarning && filteredPolosByPeriferia.length > 0) {
-      // Estado explícito de aviso já fornece a lista restrita
       restrictedCodes = filteredPolosByPeriferia;
     } else if (selectedMunicipioPeriferico !== 'ALL') {
-      // Restringir com base no município periférico selecionado (persistente mesmo após escolher/limpar o polo)
       const relacionados = periferiaToPolosMap.get(String(selectedMunicipioPeriferico)) || [];
       if (relacionados.length > 1) {
         restrictedCodes = relacionados.map(p => p.codigo_origem);
       }
     }
 
-    if (restrictedCodes.length > 0) {
-      const base = poloOptions.filter(polo => restrictedCodes.includes(polo.value));
+    const basePolos = restrictedCodes.length > 0
+      ? poloOptions.filter(p => restrictedCodes.includes(p.value))
+      : poloOptions;
 
-      // Ordenar por distância apenas quando uma periferia estiver selecionada e houver múltiplos polos
-      let sorted = base;
-      if (selectedMunicipioPeriferico !== 'ALL' && restrictedCodes.length > 1) {
-        const selectedPeri = periferia.find(p => String(p.codigo_destino || p.municipio_destino) === String(selectedMunicipioPeriferico));
-        const periLat = selectedPeri?.latitude_munic_periferia;
-        const periLon = selectedPeri?.longitude_munic_periferia;
-
-        if (typeof periLat === 'number' && typeof periLon === 'number') {
-          sorted = [...base].sort((a, b) => {
-            const poloA = polosValores.find(p => p.codigo_origem === a.value);
-            const poloB = polosValores.find(p => p.codigo_origem === b.value);
-            const dA = (poloA && typeof poloA.latitude_munic_polo === 'number' && typeof poloA.longitude_munic_polo === 'number')
-              ? calculateDistance(periLat, periLon, poloA.latitude_munic_polo!, poloA.longitude_munic_polo!)
-              : Number.POSITIVE_INFINITY;
-            const dB = (poloB && typeof poloB.latitude_munic_polo === 'number' && typeof poloB.longitude_munic_polo === 'number')
-              ? calculateDistance(periLat, periLon, poloB.latitude_munic_polo!, poloB.longitude_munic_polo!)
-              : Number.POSITIVE_INFINITY;
-            return dA - dB;
-          });
-        }
-      }
-
-      if (!searchTermLower) return sorted;
-      return sorted.filter(polo => polo.labelLower.includes(searchTermLower));
+    // Coordenadas da periferia (se necessário ordenar por distância)
+    let periLat: number | undefined;
+    let periLon: number | undefined;
+    if (selectedMunicipioPeriferico !== 'ALL' && restrictedCodes.length > 1) {
+      const selectedPeri = periferia.find(p => String(p.codigo_destino || p.municipio_destino) === String(selectedMunicipioPeriferico));
+      periLat = selectedPeri?.latitude_munic_periferia;
+      periLon = selectedPeri?.longitude_munic_periferia;
     }
 
-    if (!searchTermLower) return poloOptions;
-    return poloOptions.filter(polo => polo.labelLower.includes(searchTermLower));
-  }, [poloOptions, debouncedPoloInput, showPoloSelectionWarning, filteredPolosByPeriferia, selectedMunicipioPeriferico, periferiaToPolosMap, periferia, polosValores]);
+    // 🔥 VERIFICAÇÃO: Criar hash dos parâmetros e pular se já foi executado
+    const callHash = JSON.stringify({
+      basePolosLen: basePolos.length,
+      searchTermLower,
+      restrictedCodes: restrictedCodes.sort(),
+      hasPeriCoords: !!periLat && !!periLon,
+    });
+    
+    if (lastPolosFilterCallRef.current === callHash) {
+      dbg('⏭️ [FILTER_POLOS] Skipping: mesmos parâmetros da última chamada');
+      timeEnd('filter-and-sort-polos', { skipped: true });
+      return;
+    }
+    
+    lastPolosFilterCallRef.current = callHash;
+
+    // Montar carga para o worker (inclui coordenadas por código quando disponível)
+    const polosPayload = basePolos.map(p => {
+      const c = poloCoordsByCodigo.get(p.value);
+      return {
+        value: p.value,
+        label: p.label,
+        labelLower: (p as any).labelLower || p.label.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''),
+        lat: c?.lat,
+        lon: c?.lon,
+      };
+    });
+
+    dbg('🧮 FILTER_AND_SORT_POLOS input', { basePolos: basePolos.length, hasPeri: !!periLat && !!periLon, term: !!searchTermLower });
+
+    // 🆕 Coalescer chamadas idênticas em voo
+    const inFlightKey = `FILTER_AND_SORT_POLOS:${callHash}`;
+    const existing = inFlightByHashRef.current.get(inFlightKey);
+    const promise = existing ?? callWorker('FILTER_AND_SORT_POLOS', {
+      polos: polosPayload,
+      periLat,
+      periLon,
+      searchTermLower,
+    });
+    if (!existing) inFlightByHashRef.current.set(inFlightKey, promise);
+
+    promise.then((result: Array<{ value: string; label: string; labelLower: string }>) => {
+      setPolosFiltrados(result);
+      timeEnd('filter-and-sort-polos', { result: result.length });
+    }).catch((err) => {
+      console.warn('❌ Worker FILTER_AND_SORT_POLOS falhou, usando fallback', err);
+      // Fallback local simples
+      const filtered = (!searchTermLower)
+        ? polosPayload
+        : polosPayload.filter(p => p.labelLower.includes(searchTermLower));
+      setPolosFiltrados(filtered);
+      timeEnd('filter-and-sort-polos', { result: filtered.length, fallback: true });
+    }).finally(() => {
+      inFlightByHashRef.current.delete(inFlightKey);
+    });
+  }, [poloOptions, poloInputValue, showPoloSelectionWarning, filteredPolosByPeriferia, selectedMunicipioPeriferico, periferiaToPolosMap, periferia, callWorker, poloCoordsByCodigo]);
 
   // Periferias filtradas baseado no input de busca e filtro de João Pessoa - SIMPLIFICADO
   const periferiasFiltradas = useMemo(() => {
     let base = municipiosPerifericosUnicos;
     
     // 🔥 OTIMIZAÇÃO: Pré-processar termo de busca uma vez
-    const searchTermLower = debouncedPeriferiaInput.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const searchTermLower = periferiaInputValue.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
     if (!searchTermLower) return base;
     return base.filter(peri => peri.municipioLower.includes(searchTermLower));
-  }, [municipiosPerifericosUnicos, debouncedPeriferiaInput]);
+  }, [municipiosPerifericosUnicos, periferiaInputValue]);
 
   // Lista combinada para o filtro "MUNICÍPIOS PRÓXIMO": periferias + sem tag
   type MunicipioProximoItem =
@@ -1203,7 +1543,7 @@ export default function EstrategiaPage() {
 
   const municipiosProximosFiltrados = useMemo(() => {
     // 🔥 OTIMIZAÇÃO: Pré-processar termo de busca uma vez
-    const searchTermLower = (debouncedPeriferiaInput || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const searchTermLower = (periferiaInputValue || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     
     const normalize = (s: string) => s ? s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim() : '';
 
@@ -1250,7 +1590,7 @@ export default function EstrategiaPage() {
     perif.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
     semTag.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
     return [...perif, ...semTag];
-  }, [periferiasFiltradas, semTagMunicipios, selectedUFs, debouncedPeriferiaInput, selectedPolo, poloOptions]);
+  }, [periferiasFiltradas, semTagMunicipios, selectedUFs, periferiaInputValue, selectedPolo, poloOptions]);
 
   // Opções filtradas por UFs selecionadas e filtro de João Pessoa (para o select de POLO)
   const filteredPoloOptions = useMemo(() => {
@@ -1305,9 +1645,16 @@ export default function EstrategiaPage() {
     if (!exists) setSelectedMunicipioPeriferico('ALL');
   }, [selectedPolo, filteredPeriferiaOptions, selectedMunicipioPeriferico]);
 
-  // Resetar filtros quando o filtro de João Pessoa for ativado/desativado
+  // Rastrear estado anterior do Radar para só agir quando houver mudança
+  const prevRadarActiveRef = useRef<boolean>(isJoaoPessoaFilterActive);
+
+  // Resetar filtros (quando necessário) e aplicar automaticamente quando o Radar Estratégico muda
   useEffect(() => {
-    // Resetar polo selecionado se não existir mais nas opções filtradas
+    // Executa apenas quando o valor do Radar realmente muda
+    if (prevRadarActiveRef.current === isJoaoPessoaFilterActive) return;
+    prevRadarActiveRef.current = isJoaoPessoaFilterActive;
+
+    // Resetar polo selecionado se não existir mais nas opções filtradas pelo novo estado do Radar
     if (selectedPolo !== 'ALL') {
       const exists = poloOptions.some(o => o.value === selectedPolo);
       if (!exists) {
@@ -1316,16 +1663,38 @@ export default function EstrategiaPage() {
       }
     }
 
-    // Resetar município periférico
+    // Resetar município periférico somente se ficar inválido sob o novo filtro de Radar
     if (selectedMunicipioPeriferico !== 'ALL') {
-      setSelectedMunicipioPeriferico('ALL');
-      setPeriferiaInputValue('');
+      let base = selectedUFs.length
+        ? periferia.filter(p => selectedUFs.includes(String(p.UF)))
+        : periferia;
+      base = filterByJoaoPessoaRadius(base) as PeriferiaProps[];
+      const stillExists = base.some(p => String(p.codigo_destino || p.municipio_destino) === String(selectedMunicipioPeriferico));
+      if (!stillExists) {
+        setSelectedMunicipioPeriferico('ALL');
+        setPeriferiaInputValue('');
+      }
     }
 
-    // 🆕 Resetar aviso de seleção de polo
+    // Resetar aviso de seleção de polo
     setShowPoloSelectionWarning(false);
     setFilteredPolosByPeriferia([]);
-  }, [isJoaoPessoaFilterActive, poloOptions]);
+
+    // Aplicar filtros automaticamente quando o Radar Estratégico é ativado/desativado
+    dbg('🎯 [RADAR] Aplicando filtros automaticamente após mudança no Radar Estratégico', {
+      isJoaoPessoaFilterActive,
+      selectedPolo,
+      selectedUFs: selectedUFs.length
+    });
+
+    setAppliedPolo(selectedPolo);
+    setAppliedMunicipioPeriferico(selectedMunicipioPeriferico === 'ALL' ? 'ALL' : selectedMunicipioPeriferico);
+    setAppliedMinValor(minValor);
+    setAppliedMaxValor(maxValor);
+    setAppliedUFs(selectedUFs);
+    setAppliedProducts(selectedProducts.length === PRODUCTS.length ? [] : selectedProducts);
+    setAppliedUF(selectedUFs.length === 1 ? selectedUFs[0] : 'ALL');
+  }, [isJoaoPessoaFilterActive]);
 
   // 🆕 Resetar aviso quando UFs ou polo mudarem
   useEffect(() => {
@@ -1464,6 +1833,8 @@ export default function EstrategiaPage() {
 
   // GeoJSON minimal para o mapa (com geometria e apenas campos usados no mapa/popup)
   const polosFCForMap = useMemo(() => {
+    const tLabel = 'compute-polosFCForMap';
+    timeStart(tLabel);
     const ufUpper = String(appliedUF || '').toUpperCase();
     const inUFMode = appliedPolo === 'ALL' && ufUpper !== 'ALL' && ufUpper !== '';
     const inPoloMode = appliedPolo !== 'ALL';
@@ -1485,19 +1856,22 @@ export default function EstrategiaPage() {
           codigo_origem: p.codigo_origem,
           municipio_origem: p.municipio_origem,
           UF: String(p.UF || p.UF_origem || '').toUpperCase(),
-          UF_origem: p.UF_origem || '',
           soma_valor_total_destino: periferiaAggByCodigo.get(p.codigo_origem) || 0,
           valor_total_origem: Number(p.valor_total_origem) || 0,
           // Inclui productValues já calculados para uso no raio/export
           productValues: p.productValues,
-          // Inclui TODAS as propriedades originais para acesso aos valores de produtos
-          ...p.propriedadesOriginais,
+          // GeoJSON enxuto: não propagar todas as propriedades originais para o mapa
         }
       }));
-    return { type: 'FeatureCollection' as const, features };
+    const fc = { type: 'FeatureCollection' as const, features };
+    timeEnd(tLabel, { base: base.length, features: features.length, inUFMode, inPoloMode });
+    dbg('🗺️ polosFCForMap pronto', { features: features.length });
+    return fc;
   }, [polosValores, appliedUF, appliedPolo, appliedUFs, periferiaAggByCodigo, filterByJoaoPessoaRadius]);
 
   const periferiasFCForMap = useMemo(() => {
+    const tLabel = 'compute-periferiasFCForMap';
+    timeStart(tLabel);
     const ufUpper = String(appliedUF || '').toUpperCase();
     const inUFMode = appliedPolo === 'ALL' && ufUpper !== 'ALL' && ufUpper !== '';
     const inPoloMode = appliedPolo !== 'ALL';
@@ -1521,17 +1895,48 @@ export default function EstrategiaPage() {
           municipio_destino: p.municipio_destino,
           UF: String(p.UF || '').toUpperCase(),
           valor_total_destino: sumSelectedProducts(p.productValues, Number(p.valor_total_destino) || 0, appliedProducts, PRODUCTS.length),
+          // Campos individuais de produtos no topo para compatibilidade com componentes do mapa
+          valor_pd_num_destino: Number(p.propriedadesOriginais?.valor_pd_num_destino ?? (p as any).valor_pd_num_destino ?? 0),
+          valor_pmsb_num_destino: Number(p.propriedadesOriginais?.valor_pmsb_num_destino ?? (p as any).valor_pmsb_num_destino ?? 0),
+          valor_ctm_num_destino: Number(p.propriedadesOriginais?.valor_ctm_num_destino ?? (p as any).valor_ctm_num_destino ?? 0),
+          VALOR_DEC_AMBIENTAL_NUM_destino: Number(p.propriedadesOriginais?.VALOR_DEC_AMBIENTAL_NUM_destino ?? (p as any).VALOR_DEC_AMBIENTAL_NUM_destino ?? 0),
+          PLHIS_destino: Number(p.propriedadesOriginais?.PLHIS_destino ?? (p as any).PLHIS_destino ?? 0),
+          valor_start_iniciais_finais_destino: Number(p.propriedadesOriginais?.valor_start_iniciais_finais_destino ?? (p as any).valor_start_iniciais_finais_destino ?? 0),
+          LIVRO_FUND_1_2_destino: Number(p.propriedadesOriginais?.LIVRO_FUND_1_2_destino ?? (p as any).LIVRO_FUND_1_2_destino ?? 0),
+          PVA_destino: Number(p.propriedadesOriginais?.PVA_destino ?? (p as any).PVA_destino ?? 0),
+          educagame_destino: Number(p.propriedadesOriginais?.educagame_destino ?? (p as any).educagame_destino ?? 0),
+          valor_reurb_destino: Number(p.propriedadesOriginais?.valor_reurb_destino ?? (p as any).valor_reurb_destino ?? 0),
+          VALOR_DESERT_NUM_destino: Number(p.propriedadesOriginais?.VALOR_DESERT_NUM_destino ?? (p as any).VALOR_DESERT_NUM_destino ?? 0),
           // Inclui productValues já calculados para uso no raio/export
           productValues: p.productValues,
-          // Inclui TODAS as propriedades originais para acesso aos valores de produtos
-          ...p.propriedadesOriginais,
+          // GeoJSON enxuto: incluir somente campos necessários para export detalhado
+          propriedadesOriginais: {
+            codigo_origem: String(p.propriedadesOriginais?.codigo_origem || p.codigo_origem || ''),
+            codigo_destino: String(p.propriedadesOriginais?.codigo_destino || (p as any).codigo_destino || (p as any).codigo || (p as any).codigo_ibge || ''),
+            valor_pd_num_destino: Number(p.propriedadesOriginais?.valor_pd_num_destino || 0),
+            valor_pmsb_num_destino: Number(p.propriedadesOriginais?.valor_pmsb_num_destino || 0),
+            valor_ctm_num_destino: Number(p.propriedadesOriginais?.valor_ctm_num_destino || 0),
+            VALOR_DEC_AMBIENTAL_NUM_destino: Number(p.propriedadesOriginais?.VALOR_DEC_AMBIENTAL_NUM_destino || 0),
+            PLHIS_destino: Number(p.propriedadesOriginais?.PLHIS_destino || 0),
+            valor_start_iniciais_finais_destino: Number(p.propriedadesOriginais?.valor_start_iniciais_finais_destino || 0),
+            LIVRO_FUND_1_2_destino: Number(p.propriedadesOriginais?.LIVRO_FUND_1_2_destino || 0),
+            PVA_destino: Number(p.propriedadesOriginais?.PVA_destino || 0),
+            educagame_destino: Number(p.propriedadesOriginais?.educagame_destino || 0),
+            valor_reurb_destino: Number(p.propriedadesOriginais?.valor_reurb_destino || 0),
+            VALOR_DESERT_NUM_destino: Number(p.propriedadesOriginais?.VALOR_DESERT_NUM_destino || 0),
+          },
         } as any
       }));
-    return { type: 'FeatureCollection' as const, features };
+    const fc = { type: 'FeatureCollection' as const, features };
+    timeEnd(tLabel, { base: base.length, features: features.length, inUFMode, inPoloMode });
+    dbg('🗺️ periferiasFCForMap pronto', { features: features.length });
+    return fc;
   }, [periferia, appliedUF, appliedPolo, appliedUFs, appliedProducts, filterByJoaoPessoaRadius]);
 
   // Cálculos derivados para cards com base no polo aplicado
   const derived = useMemo(() => {
+    const tLabel = 'compute-derived-cards';
+    timeStart(tLabel);
     const ufUpper = String(appliedUF || '').toUpperCase();
     const inUFMode = appliedPolo === 'ALL' && ufUpper !== 'ALL' && ufUpper !== '';
     const inPoloMode = appliedPolo !== 'ALL';
@@ -1613,7 +2018,7 @@ export default function EstrategiaPage() {
         ? `UF ${ufUpper}`
         : 'Todos os Polos';
 
-    console.log('📈 [EstrategiaPage] Métricas calculadas – Valor do Polo', {
+    dbg('📈 [EstrategiaPage] Métricas calculadas – Valor do Polo', {
       contexto: poloLabel,
       appliedUF,
       appliedPolo,
@@ -1623,7 +2028,7 @@ export default function EstrategiaPage() {
       valorPolo,
     });
 
-    return {
+    const result = {
       valorPolo,
       top3,
       municipiosList,
@@ -1631,6 +2036,8 @@ export default function EstrategiaPage() {
       totalMunicipios: municipiosList.length,
       poloLabel
     };
+    timeEnd(tLabel, { municipios: municipiosList.length, top3: top3.length });
+    return result;
   }, [appliedPolo, appliedUF, appliedUFs, appliedProducts, appliedMinValor, appliedMaxValor, polosValores, periferia, poloOptions, periferiaAggByCodigo, filterByJoaoPessoaRadius]);
 
   // Reset da lista de municípios quando o polo mudar
@@ -2183,17 +2590,22 @@ export default function EstrategiaPage() {
                     )}
                     
                     <button
-                      onClick={() => setIsJoaoPessoaFilterActive(!isJoaoPessoaFilterActive)}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-slate-800 ${
-                        isJoaoPessoaFilterActive ? 'bg-sky-600' : 'bg-slate-600'
+                      onClick={() => {
+                        const newState = !isJoaoPessoaFilterActive;
+                        setIsJoaoPessoaFilterActive(newState);
+                        dbg('🎯 [RADAR] Toggle clicado', { newState });
+                      }}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-slate-800 ${
+                        isJoaoPessoaFilterActive ? 'bg-sky-600 shadow-lg shadow-sky-500/50' : 'bg-slate-600'
                       }`}
                       role="switch"
                       aria-checked={isJoaoPessoaFilterActive}
                       aria-label="Ativar filtro de raio de João Pessoa"
+                      title={isJoaoPessoaFilterActive ? 'Desativar Radar Estratégico' : 'Ativar Radar Estratégico'}
                     >
                       <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          isJoaoPessoaFilterActive ? 'translate-x-6' : 'translate-x-1'
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-all duration-300 ${
+                          isJoaoPessoaFilterActive ? 'translate-x-6 scale-110' : 'translate-x-1'
                         }`}
                       />
                     </button>
@@ -2273,17 +2685,11 @@ export default function EstrategiaPage() {
                         </div>
                       )}
                       <div className="relative" ref={poloInputRef}>
-                        <input
-                          type="text"
-                          value={poloInputValue}
-                          onChange={(e) => {
-                            setPoloInputValue(e.target.value);
-                            setIsPoloDropdownOpen(true);
-                          }}
-                          onFocus={() => {
-                            // Apenas abre o dropdown; não limpar o valor automaticamente
-                            setIsPoloDropdownOpen(true);
-                          }}
+                        <DebouncedTextInput
+                          externalValue={poloInputValue}
+                          onDebouncedChange={(v) => setPoloInputValue(v)}
+                          onOpen={() => setIsPoloDropdownOpen(true)}
+                          delayMs={1200}
                           placeholder="Digite o nome do polo..."
                           className={`w-full rounded-md bg-[#1e293b] text-white placeholder-slate-400 border px-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:border-sky-500 text-left ${
                             showPoloSelectionWarning 
@@ -2357,17 +2763,11 @@ export default function EstrategiaPage() {
                       <label className="text-slate-300 text-sm mb-0.5 text-center font-bold">MUNICÍPIOS PRÓXIMOS</label>
                       <div className="flex gap-2">
                         <div className="relative flex-1" ref={periferiaDropdownRef}>
-                          <input
-                            type="text"
-                            value={periferiaInputValue}
-                            onChange={(e) => {
-                              setPeriferiaInputValue(e.target.value);
-                              setIsPeriferiaDropdownOpen(true);
-                            }}
-                            onFocus={() => {
-                              // Apenas abre o dropdown; não limpar o valor automaticamente
-                              setIsPeriferiaDropdownOpen(true);
-                            }}
+                          <DebouncedTextInput
+                            externalValue={periferiaInputValue}
+                            onDebouncedChange={(v) => setPeriferiaInputValue(v)}
+                            onOpen={() => setIsPeriferiaDropdownOpen(true)}
+                            delayMs={1000}
                             placeholder="Digite o nome do município..."
                             className="appearance-none w-full rounded-md bg-[#1e293b] text-white placeholder-slate-400 border border-slate-600 px-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-left cursor-text"
                           />
@@ -2394,6 +2794,7 @@ export default function EstrategiaPage() {
                                     // 🆕 Limpar aviso ao selecionar "Todos"
                                     setShowPoloSelectionWarning(false);
                                     setFilteredPolosByPeriferia([]);
+                                    // 🆕 Limpar Sem Tag aplicado
                                     setAppliedSemTagMunicipio('ALL');
                                   }}
                                   className="w-full text-left px-3 py-2 text-sm text-white hover:bg-slate-600 transition-colors"
@@ -2429,19 +2830,10 @@ export default function EstrategiaPage() {
                                             setPeriferiaInputValue(item.nome);
                                             setShowPoloSelectionWarning(false);
                                             setFilteredPolosByPeriferia([]);
-
-                                            // Aplicar filtros imediatamente (auto buscar)
-                                            setAppliedPolo(selectedPolo);
-                                            setAppliedMunicipioPeriferico(municipioId);
-                                            setAppliedSemTagMunicipio('ALL');
-                                            setAppliedMinValor(minValor);
-                                            setAppliedMaxValor(maxValor);
-                                            setAppliedUFs(selectedUFs);
-                                            setAppliedProducts(selectedProducts.length === PRODUCTS.length ? [] : selectedProducts);
-                                            setAppliedUF(selectedUFs.length === 1 ? selectedUFs[0] : 'ALL');
                                           }
 
                                           setIsPeriferiaDropdownOpen(false);
+                                          // 🆕 Ao selecionar periferia, limpar Sem Tag aplicado
                                           setAppliedSemTagMunicipio('ALL');
                                         }}
                                         className="w-full text-left px-3 py-2 text-sm text-white hover:bg-slate-600 transition-colors"
@@ -2467,21 +2859,15 @@ export default function EstrategiaPage() {
                                             return;
                                           }
 
-                                          // Preencher o campo de POLO e aplicar a busca automaticamente
-                                          setSelectedPolo(match.codigo_origem);
+                                          // 🆕 Destacar município Sem Tag no mapa
+                                          setAppliedSemTagMunicipio(item.id);
+                                          // Limpar seleção de periferia (mutuamente exclusivo para destaque)
+                                          setSelectedMunicipioPeriferico('ALL');
+                                          setAppliedMunicipioPeriferico('ALL');
+                                          setPeriferiaInputValue(item.nome);
                                           setPoloInputValue(`${match.municipio_origem} (Mais Próximo)`);
                                           setSelectedMunicipioPeriferico('ALL');
                                           setPeriferiaInputValue(item.nome);
-
-                                          // Aplicar filtros imediatamente (auto buscar)
-                                          setAppliedPolo(match.codigo_origem);
-                                          setAppliedMunicipioPeriferico('ALL');
-                                          setAppliedSemTagMunicipio(item.id);
-                                          setAppliedMinValor(minValor);
-                                          setAppliedMaxValor(maxValor);
-                                          setAppliedUFs(selectedUFs);
-                                          setAppliedProducts(selectedProducts.length === PRODUCTS.length ? [] : selectedProducts);
-                                          setAppliedUF(selectedUFs.length === 1 ? selectedUFs[0] : 'ALL');
 
                                           setShowPoloSelectionWarning(false);
                                           setFilteredPolosByPeriferia([]);
@@ -2516,13 +2902,13 @@ export default function EstrategiaPage() {
                           <button
                             onClick={() => {
                               setSelectedMunicipioPeriferico('ALL');
-                              setAppliedMunicipioPeriferico('ALL');
-                              setAppliedSemTagMunicipio('ALL');
                               setPeriferiaInputValue('');
                               setIsPeriferiaDropdownOpen(false);
                               // 🆕 Limpar aviso ao limpar seleção
                               setShowPoloSelectionWarning(false);
                               setFilteredPolosByPeriferia([]);
+                              // 🆕 Limpar Sem Tag aplicado
+                              setAppliedSemTagMunicipio('ALL');
                             }}
                             className="bg-red-600/80 hover:bg-red-600 text-white px-2 py-1.5 rounded-md font-medium transition-colors duration-200 flex items-center justify-center min-h-[40px]"
                             title="Limpar seleção do município periférico"
@@ -3028,7 +3414,9 @@ export default function EstrategiaPage() {
                           onExportXLSX={handleExportRadiusXLSX}
                           onMunicipioPerifericoClick={(municipioId) => {
                             setSelectedMunicipioPeriferico(municipioId);
-                            setAppliedMunicipioPeriferico(municipioId);
+                            // Refletir no input sem aplicar filtros globais
+                            const p = periferia.find(pp => String(pp.codigo_destino || pp.municipio_destino) === String(municipioId));
+                            if (p?.municipio_destino) setPeriferiaInputValue(p.municipio_destino);
                           }}
                           municipioPerifericoSelecionado={appliedMunicipioPeriferico}
                           municipioSemTagSelecionado={appliedSemTagMunicipio !== 'ALL' ? appliedSemTagMunicipio : undefined}
@@ -3096,7 +3484,8 @@ export default function EstrategiaPage() {
                         onExportXLSX={handleExportRadiusXLSX}
                         onMunicipioPerifericoClick={(municipioId) => {
                           setSelectedMunicipioPeriferico(municipioId);
-                          setAppliedMunicipioPeriferico(municipioId);
+                          const p = periferia.find(pp => String(pp.codigo_destino || pp.municipio_destino) === String(municipioId));
+                          if (p?.municipio_destino) setPeriferiaInputValue(p.municipio_destino);
                         }}
                         municipioPerifericoSelecionado={appliedMunicipioPeriferico}
                         municipioSemTagSelecionado={appliedSemTagMunicipio !== 'ALL' ? appliedSemTagMunicipio : undefined}

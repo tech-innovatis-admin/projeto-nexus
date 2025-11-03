@@ -2689,7 +2689,7 @@ export default function EstrategiaPage() {
                           externalValue={poloInputValue}
                           onDebouncedChange={(v) => setPoloInputValue(v)}
                           onOpen={() => setIsPoloDropdownOpen(true)}
-                          delayMs={1200}
+                          delayMs={1000}
                           placeholder="Digite o nome do polo..."
                           className={`w-full rounded-md bg-[#1e293b] text-white placeholder-slate-400 border px-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:border-sky-500 text-left ${
                             showPoloSelectionWarning 

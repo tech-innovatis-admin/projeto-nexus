@@ -52,7 +52,7 @@ export default function ConfiguracaoRotas({
               step="10"
               value={configuracao.velocidadeMediaVooKmh}
               onChange={(e) => onConfiguracao({
-                velocidadeMediaVooKmh: parseInt(e.target.value) || 220
+                velocidadeMediaVooKmh: parseInt(e.target.value) || 300
               })}
               className="w-36 px-4 py-4 text-lg font-medium text-black border-2 border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-center"
             />
@@ -66,24 +66,24 @@ export default function ConfiguracaoRotas({
           
           <div className="flex justify-center space-x-2">
             <button
-              onClick={() => onConfiguracao({ velocidadeMediaVooKmh: 150 })}
-              className={`px-4 py-2 text-sm rounded-full transition-colors ${
-                configuracao.velocidadeMediaVooKmh === 150 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-              }`}
-            >
-              150 km/h
-            </button>
-            <button
               onClick={() => onConfiguracao({ velocidadeMediaVooKmh: 180 })}
               className={`px-4 py-2 text-sm rounded-full transition-colors ${
-                configuracao.velocidadeMediaVooKmh === 180 
+                configuracao.velocidadeMediaVooKmh === 180
                 ? 'bg-blue-600 text-white' 
                 : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
               }`}
             >
               180 km/h
+            </button>
+            <button
+              onClick={() => onConfiguracao({ velocidadeMediaVooKmh: 220 })}
+              className={`px-4 py-2 text-sm rounded-full transition-colors ${
+                configuracao.velocidadeMediaVooKmh === 220
+                ? 'bg-blue-600 text-white'
+                : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+              }`}
+            >
+              220 km/h
             </button>
             <button
               onClick={() => onConfiguracao({ velocidadeMediaVooKmh: 270 })}

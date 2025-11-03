@@ -4,8 +4,11 @@ Sistema completo para planejamento de rotas otimizadas entre municípios polos e
 
 ## � Últimas alterações
 
+- **Layout responsivo em cards**: Substituição do layout com sidebar fixa por grid com cards estilizados, similar à tela /mapa, com bordas, sombras e separação visual profissional.
+- **Estilo de mapa satélite**: Troca do estilo raster do OpenStreetMap para imagens de satélite do Esri World Imagery, proporcionando melhor visualização geográfica.
+- **Velocidade padrão ajustada**: Alteração da velocidade média de voo padrão de 220 km/h para 300 km/h para melhor adequação a helicópteros maiores.
+- **Painel de configuração mais largo**: Ajuste na grid responsiva para dar mais espaço ao painel de "Configuração de Rotas" em telas grandes (xl:grid-cols-[460px_minmax(0,1fr)]).
 - Registro da instância do mapa em `mapRegistry` para permitir que visualizações externas (ex.: `RotaMapVisualization`) adicionem camadas corretamente.
-- Substituição do estilo por tiles raster do OpenStreetMap para evitar dependência de provedores terceiros.
 - Formatação do tempo total da rota para exibir horas e minutos (ex.: `5 horas e 48 min`) no lugar de apenas minutos.
 - Adição da prop opcional `hideHeader` em `RotasComponent` para permitir ocultar o cabeçalho quando a página já exibe um título principal.
 - Substituição de um SVG inline pelo ícone "gauge" da biblioteca Lucide no componente `ConfiguracaoRotas` e pequeno ajuste de espaçamento.
@@ -115,7 +118,7 @@ const {
 
 ```typescript
 const configuracao = {
-  velocidadeMediaVooKmh: 220,        // Helicóptero médio
+  velocidadeMediaVooKmh: 300,        // Helicóptero médio
   preferirVooEntrePolos: true,       // Voo automático entre polos
   limitarDistanciaMaximaTerrestreKm: 400, // Limite para forçar voo
   otimizarOrdemPolos: true,          // TSP entre polos
@@ -124,12 +127,6 @@ const configuracao = {
 ```
 
 ## 🎯 Regras de Negócio
-
-### Classificação de Municípios
-
-- **Polos**: População > 50.000 habitantes
-- **Periferias**: População ≤ 50.000 habitantes
-- **Aeroportos**: Todos os polos têm aeroporto disponível (independente da população)
 
 ### Lógica de Rotas
 

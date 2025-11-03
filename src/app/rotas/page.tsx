@@ -392,178 +392,183 @@ export default function RotasPage() {
             </div>
           </div>
 
-          {/* Conteúdo scrollável */}
+          {/* Conteúdo scrollável com cartões e separação visual (similar à tela /mapa) */}
           <div className="flex-1 overflow-hidden">
-            <div className="h-full flex">
-              {/* Painel de controle - lado esquerdo */}
-              <div className="w-[430px] xl:w-[460px] bg-slate-800/50 border-r border-slate-700/50 flex flex-col">
-                <div className="p-4 border-b border-slate-700/50">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Settings className="w-5 h-5 text-blue-400" />
-                    <h2 className="text-lg font-semibold text-white">Configuração de Rotas</h2>
-                  </div>
-                </div>
-                
-                <div className="flex-1 overflow-hidden">
-                  {/* Loading/Error states */}
-                  {loadingData && (
-                    <div className="p-4">
-                      <div className="bg-slate-700 border border-slate-600 rounded-lg p-3 text-slate-300 text-sm flex items-center gap-2">
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        Carregando dados dos municípios...
+            <div className="w-full max-w-[1400px] mx-auto p-3 lg:p-4 h-full">
+              <div className="grid grid-cols-1 xl:grid-cols-[460px_minmax(0,1fr)] gap-3 lg:gap-4 h-full">
+                {/* Painel de controle (card) */}
+                <div className="bg-[#1e293b] rounded-lg shadow-lg p-0.5 border border-slate-600 h-full">
+                  <div className="bg-[#0f172a] rounded-lg border border-slate-700 h-full flex flex-col">
+                    <div className="p-4 border-b border-slate-700/50">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Settings className="w-5 h-5 text-blue-400" />
+                        <h2 className="text-lg font-semibold text-white">Planejamento de Rotas</h2>
                       </div>
+                      <p className="text-slate-400 text-xs">Selecione polos e periferias, ajuste opções e gere a rota.</p>
                     </div>
-                  )}
-                  {errorData && (
-                    <div className="p-4">
-                      <div className="bg-red-900/30 border border-red-700/50 rounded-lg p-3 text-red-200 text-sm flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4" />
-                        {errorData}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Componente de rotas - Removidos título e subtítulo */}
-                  {!loadingData && !errorData && municipiosParaRotas.length > 0 && (
-                    <RotasComponent
-                      municipios={municipiosParaRotas}
-                      onRotaChange={setRotaAtiva}
-                      hideHeader={true}
-                    />
-                  )}
-                  
-                  {!loadingData && !errorData && municipiosParaRotas.length === 0 && (
-                    <div className="p-4">
-                      <div className="bg-yellow-900/30 border border-yellow-700/50 rounded-lg p-3 text-yellow-200 text-sm flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4" />
-                        Nenhum município disponível para rotas. Verifique se há dados carregados na análise estratégica.
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
 
-              {/* Área do mapa - lado direito */}
-              <div className="flex-1 relative">
-                <div className="absolute inset-0">
-                  {!loadingData && estrategiaData ? (
-                    <>
-                      <RotaMapa
-                        polos={estrategiaData.poloValores || { type: 'FeatureCollection', features: [] }}
-                        periferias={estrategiaData.poloPeriferia || { type: 'FeatureCollection', features: [] }}
-                        appliedUF=""
-                        appliedPolo=""
-                        appliedUFs={[]}
-                        appliedMinValor={0}
-                        appliedMaxValor={0}
-                        appliedProducts={[]}
-                        onRadiusResult={() => {}}
-                        onExportXLSX={() => {}}
-                        onMunicipioPerifericoClick={() => {}}
-                        municipioPerifericoSelecionado=""
-                      />
-                      
-                      {/* Componente invisível que adiciona as rotas ao mapa */}
-                      {rotaAtiva && (
-                        <RotaMapVisualization
-                          rota={rotaAtiva}
-                          showLabels={true}
-                          showDirections={false}
-                          key={`rota-viz-${forceMapUpdate}`}
+                    <div className="flex-1 overflow-auto p-3">
+                      {/* Loading/Error states */}
+                      {loadingData && (
+                        <div className="">
+                          <div className="bg-slate-800/60 border border-slate-600 rounded-lg p-3 text-slate-300 text-sm flex items-center gap-2">
+                            <RefreshCw className="w-4 h-4 animate-spin" />
+                            Carregando dados dos municípios...
+                          </div>
+                        </div>
+                      )}
+                      {errorData && (
+                        <div className="">
+                          <div className="bg-red-900/30 border border-red-700/50 rounded-lg p-3 text-red-200 text-sm flex items-center gap-2">
+                            <AlertTriangle className="w-4 h-4" />
+                            {errorData}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Componente de rotas - título interno oculto */}
+                      {!loadingData && !errorData && municipiosParaRotas.length > 0 && (
+                        <RotasComponent
+                          municipios={municipiosParaRotas}
+                          onRotaChange={setRotaAtiva}
+                          hideHeader={true}
                         />
                       )}
-                    </>
-                  ) : (
-                    <div className="flex items-center justify-center h-full bg-slate-900/50">
-                      <div className="text-center text-slate-400">
-                        <div className="flex justify-center mb-4">
-                          <MapIcon className="w-24 h-24 text-blue-400" />
+
+                      {!loadingData && !errorData && municipiosParaRotas.length === 0 && (
+                        <div className="">
+                          <div className="bg-yellow-900/30 border border-yellow-700/50 rounded-lg p-3 text-yellow-200 text-sm flex items-center gap-2">
+                            <AlertTriangle className="w-4 h-4" />
+                            Nenhum município disponível para rotas. Verifique se há dados carregados na análise estratégica.
+                          </div>
                         </div>
-                        <p className="text-lg font-medium mb-2">Carregando Mapa</p>
-                        <p className="text-sm">Aguarde enquanto os dados são processados...</p>
-                      </div>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
 
-                {/* Informações da rota ativa - overlay */}
-                <AnimatePresence>
-                  {rotaAtiva && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 20 }}
-                      transition={{ duration: 0.3 }}
-                      className="absolute top-4 right-4 bg-slate-800/95 backdrop-blur-sm border border-slate-600/50 rounded-lg p-4 max-w-sm shadow-xl"
-                    >
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <h3 className="font-semibold text-white mb-1 flex items-center gap-2">
-                            <CheckCircle className="w-4 h-4 text-green-400" />
-                            {rotaAtiva.nome}
-                          </h3>
-                          <p className="text-xs text-slate-400">Rota calculada</p>
-                        </div>
-                        <button
-                          onClick={() => {
-                            setRotaAtiva(null);
-                            setForceMapUpdate(prev => prev + 1);
-                          }}
-                          className="text-slate-400 hover:text-white p-1 rounded"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                      
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-slate-300">Distância Total:</span>
-                          <span className="text-blue-300 font-medium">
-                            {rotaAtiva.estatisticas.distanciaTotalKm.toFixed(1)} km
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-300">Tempo Total:</span>
-                          <span className="text-green-300 font-medium">
-                            {formatarTempo(rotaAtiva.estatisticas.tempoTotalMinutos)}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-300">Trechos Aéreos:</span>
-                          <span className="text-sky-300 font-medium">
-                            {rotaAtiva.estatisticas.quantidadeTrechosVoo}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-slate-300">Trechos Terrestres:</span>
-                          <span className="text-emerald-300 font-medium">
-                            {rotaAtiva.estatisticas.quantidadeTrechosTerrestres}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      <div className="mt-3 pt-3 border-t border-slate-600/50 space-y-2">
-                        <button
-                          onClick={() => {
-                            setForceMapUpdate(prev => prev + 1);
-                          }}
-                          className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors flex items-center justify-center gap-2"
-                        >
-                          <RefreshCw className="w-4 h-4" />
-                          Recentralizar no Mapa
-                        </button>
+                {/* Mapa (card) */}
+                <div className="rounded-lg overflow-hidden shadow-lg bg-[#0f172a] border border-slate-600 relative min-h-[520px]">
+                  <div className="absolute inset-0">
+                    {!loadingData && estrategiaData ? (
+                      <>
+                        <RotaMapa
+                          polos={estrategiaData.poloValores || { type: 'FeatureCollection', features: [] }}
+                          periferias={estrategiaData.poloPeriferia || { type: 'FeatureCollection', features: [] }}
+                          appliedUF=""
+                          appliedPolo=""
+                          appliedUFs={[]}
+                          appliedMinValor={0}
+                          appliedMaxValor={0}
+                          appliedProducts={[]}
+                          onRadiusResult={() => {}}
+                          onExportXLSX={() => {}}
+                          onMunicipioPerifericoClick={() => {}}
+                          municipioPerifericoSelecionado=""
+                        />
 
-                        <button
-                          onClick={exportarRotaPDFHandler}
-                          className="w-full px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-md transition-colors flex items-center justify-center gap-2"
-                        >
-                          <Download className="w-4 h-4" />
-                          Exportar Relatório PDF
-                        </button>
+                        {/* Camada de rotas sobre o mapa */}
+                        {rotaAtiva && (
+                          <RotaMapVisualization
+                            rota={rotaAtiva}
+                            showLabels={true}
+                            showDirections={false}
+                            key={`rota-viz-${forceMapUpdate}`}
+                          />
+                        )}
+                      </>
+                    ) : (
+                      <div className="flex items-center justify-center h-full bg-slate-900/30">
+                        <div className="text-center text-slate-400">
+                          <div className="flex justify-center mb-4">
+                            <MapIcon className="w-24 h-24 text-blue-400" />
+                          </div>
+                          <p className="text-lg font-medium mb-2">Carregando Mapa</p>
+                          <p className="text-sm">Aguarde enquanto os dados são processados...</p>
+                        </div>
                       </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                    )}
+                  </div>
+
+                  {/* Informações da rota ativa - overlay */}
+                  <AnimatePresence>
+                    {rotaAtiva && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 20 }}
+                        transition={{ duration: 0.3 }}
+                        className="absolute top-4 right-4 bg-slate-800/95 backdrop-blur-sm border border-slate-600/50 rounded-lg p-4 max-w-sm shadow-xl"
+                      >
+                        <div className="flex justify-between items-start mb-3">
+                          <div>
+                            <h3 className="font-semibold text-white mb-1 flex items-center gap-2">
+                              <CheckCircle className="w-4 h-4 text-green-400" />
+                              {rotaAtiva.nome}
+                            </h3>
+                            <p className="text-xs text-slate-400">Rota calculada</p>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setRotaAtiva(null);
+                              setForceMapUpdate(prev => prev + 1);
+                            }}
+                            className="text-slate-400 hover:text-white p-1 rounded"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="text-slate-300">Distância Total:</span>
+                            <span className="text-blue-300 font-medium">
+                              {rotaAtiva.estatisticas.distanciaTotalKm.toFixed(1)} km
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-300">Tempo Total:</span>
+                            <span className="text-green-300 font-medium">
+                              {formatarTempo(rotaAtiva.estatisticas.tempoTotalMinutos)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-300">Trechos Aéreos:</span>
+                            <span className="text-sky-300 font-medium">
+                              {rotaAtiva.estatisticas.quantidadeTrechosVoo}
+                            </span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-slate-300">Trechos Terrestres:</span>
+                            <span className="text-emerald-300 font-medium">
+                              {rotaAtiva.estatisticas.quantidadeTrechosTerrestres}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 pt-3 border-t border-slate-600/50 space-y-2">
+                          <button
+                            onClick={() => {
+                              setForceMapUpdate(prev => prev + 1);
+                            }}
+                            className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors flex items-center justify-center gap-2"
+                          >
+                            <RefreshCw className="w-4 h-4" />
+                            Recentralizar no Mapa
+                          </button>
+
+                          <button
+                            onClick={exportarRotaPDFHandler}
+                            className="w-full px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-md transition-colors flex items-center justify-center gap-2"
+                          >
+                            <Download className="w-4 h-4" />
+                            Exportar Relatório PDF
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
               </div>
             </div>
           </div>

@@ -322,7 +322,7 @@ export default function RotasComponent({
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
-          Configuração
+          Parâmetros
         </button>
         <button
           onClick={() => setAbaSelecionada('resultado')}

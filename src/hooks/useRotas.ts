@@ -17,7 +17,7 @@ import {
 } from '@/utils/routingUtils';
 
 const CONFIGURACAO_PADRAO: ConfiguracaoRota = {
-  velocidadeMediaVooKmh: 220, // Helicóptero médio
+  velocidadeMediaVooKmh: 300, // Helicóptero médio
   preferirVooEntrePolos: true,
   otimizarOrdemPolos: true,
   otimizarRotasPeriferias: true,

@@ -142,22 +142,36 @@ export default function RotasPage() {
 
       // Processar periferias
       if (Array.isArray(periferiaJson?.features)) {
-        const periferiasProcessadas = periferiaJson.features.map((feature: any) => ({
-          codigo_origem: feature.properties?.codigo_origem || '',
-          municipio_destino: feature.properties?.municipio_destino || '',
-          valor_total_destino: Number(feature.properties?.valor_total_destino) || 0,
-          UF: feature.properties?.UF_destino || feature.properties?.UF_origem || feature.properties?.UF || feature.properties?.uf || '',
-          geom: feature.geometry,
-          codigo_destino: feature.properties?.codigo_destino || '',
-          propriedadesOriginais: feature.properties
-        }));
+        const periferiasProcessadas = periferiaJson.features.map((feature: any) => {
+          const props = feature.properties || {};
+          // Normaliza UF lendo múltiplas variantes e aplicando trim/uppercase
+          const rawUF =
+            props.UF_destino ?? props.uf_destino ?? props.UF_origem ?? props.uf_origem ?? props.UF ?? props.uf ?? '';
+          const UF = String(rawUF).trim().toUpperCase();
+
+          // Fallbacks para código IBGE do destino
+          const codigo_destino = String(
+            props.codigo_destino ?? props.codigo_ibge ?? props.cod_municipio ?? props.cod_ibge ?? ''
+          ).trim();
+
+          return {
+            codigo_origem: props.codigo_origem || '',
+            municipio_destino: props.municipio_destino || '',
+            valor_total_destino: Number(props.valor_total_destino) || 0,
+            UF,
+            geom: feature.geometry,
+            codigo_destino,
+            propriedadesOriginais: props
+          } as PeriferiaProps;
+        });
         setPeriferia(periferiasProcessadas);
-        
+
         // Log para diagnóstico
-        console.log('🛣️ [RotasPage] Sample de periferias processadas:', 
-          periferiasProcessadas.slice(0, 3).map((p: any) => ({ 
-            nome: p.municipio_destino, 
-            UF: p.UF
+        console.log('🛣️ [RotasPage] Sample de periferias processadas:',
+          periferiasProcessadas.slice(0, 5).map((p: any) => ({
+            nome: p.municipio_destino,
+            UF: p.UF,
+            codigo: p.codigo_destino
           }))
         );
       }
@@ -232,23 +246,27 @@ export default function RotasPage() {
       }
     });
     
-    // Adicionar periferias (deduplicas por nome do município)
+    // Adicionar periferias (deduplicação por código IBGE do destino; fallback: nome+UF)
     const periferiasUnicas: Map<string, any> = new Map();
-    
-    // Primeiro passo: coletar periferias únicas baseadas no municipio_destino
+
     periferia.forEach((periferiaItem) => {
-      const chaveMunicipio = periferiaItem.municipio_destino;
-      
-      if (!periferiasUnicas.has(chaveMunicipio)) {
-        periferiasUnicas.set(chaveMunicipio, periferiaItem);
+      const ufNorm = String(periferiaItem.UF || '').trim().toUpperCase();
+      const nomeNorm = String(periferiaItem.municipio_destino || '').trim();
+      const codigoNorm = String(periferiaItem.codigo_destino || '').trim();
+
+      // Preferir chave por código IBGE; se ausente, usar nome+UF
+      const chave = codigoNorm || `${nomeNorm}__${ufNorm}`;
+
+      if (!periferiasUnicas.has(chave)) {
+        periferiasUnicas.set(chave, periferiaItem);
       } else {
         // Se já existe, manter o que tem maior valor total ou mais dados completos
-        const existente = periferiasUnicas.get(chaveMunicipio);
+        const existente = periferiasUnicas.get(chave);
         const valorExistente = Number(existente.valor_total_destino) || 0;
         const valorAtual = Number(periferiaItem.valor_total_destino) || 0;
-        
+
         if (valorAtual > valorExistente || (periferiaItem.geom && !existente.geom)) {
-          periferiasUnicas.set(chaveMunicipio, periferiaItem);
+          periferiasUnicas.set(chave, periferiaItem);
         }
       }
     });
@@ -292,16 +310,21 @@ export default function RotasPage() {
       }
       
       // Usar código IBGE real para permitir join com pistas
-      const codigoPeriferia = String(periferiaItem.codigo_destino || '').trim();
+      const codigoPeriferia = String(
+        periferiaItem.codigo_destino ||
+        periferiaItem.propriedadesOriginais?.codigo_ibge ||
+        periferiaItem.propriedadesOriginais?.cod_municipio ||
+        ''
+      ).trim();
 
       if (codigoPeriferia && !codigosUsados.has(codigoPeriferia)) {
-        const ufPeriferia = periferiaItem.UF || 'BR';
+        const ufPeriferia = String(periferiaItem.UF || 'BR').trim().toUpperCase();
         const nomeEstadoCompleto = ufParaNomeCompleto[ufPeriferia] || ufPeriferia;
 
         codigosUsados.add(codigoPeriferia);
         municipios.push({
           codigo: codigoPeriferia,
-          nome: periferiaItem.municipio_destino,
+          nome: String(periferiaItem.municipio_destino || '').trim(),
           estado: nomeEstadoCompleto,
           uf: ufPeriferia,
           latitude: latitude,
@@ -311,6 +334,16 @@ export default function RotasPage() {
         });
       }
     });
+
+    // Log específico para conferir "Bom Jesus" PB
+    const bomJesusPB = municipios.find(
+      (m) => m.tipo === 'periferia' && m.nome.toUpperCase() === 'BOM JESUS' && m.uf === 'PB'
+    );
+    if (!bomJesusPB) {
+      console.warn('🛣️ [RotasPage] Bom Jesus (PB) não encontrado após processamento.');
+    } else {
+      console.log('🛣️ [RotasPage] Bom Jesus (PB) presente:', bomJesusPB);
+    }
     
     console.log('🛣️ [RotasPage] Municípios transformados para rotas:', {
       total: municipios.length,

@@ -687,6 +687,17 @@ function MapaPageContent() {
                 </div>
               </div>
               
+                <button
+                  className="w-full md:w-auto bg-sky-700 hover:bg-sky-800 text-white font-semibold py-1.5 px-4 rounded-md flex items-center justify-center gap-2 transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-[#0f172a]"
+                  type="submit"
+                  onClick={() => console.log(`🔍 [MapaPage] ${userInfo} - Botão "Buscar" clicado`)}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 104.5 4.5a7.5 7.5 0 0012.15 12.15z" />
+                  </svg>
+                  Buscar
+                </button>
+
               <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
                 {/* Botão de Exportar com menu e opção avançada */}
                 <ExportMenu
@@ -706,17 +717,6 @@ function MapaPageContent() {
                   onLogExport={logExport}
                   mapData={mapData}
                 />
-
-                <button
-                  className="w-full md:w-auto bg-sky-600 hover:bg-sky-700 text-white font-semibold py-1.5 px-4 rounded-md flex items-center justify-center gap-2 transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-[#0f172a]"
-                  type="submit"
-                  onClick={() => console.log(`🔍 [MapaPage] ${userInfo} - Botão "Buscar" clicado`)}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 104.5 4.5a7.5 7.5 0 0012.15 12.15z" />
-                  </svg>
-                  Buscar
-                </button>
 
                 {/* Botão de Limpar Seleção */}
                 <button

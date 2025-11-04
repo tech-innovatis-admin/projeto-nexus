@@ -173,7 +173,8 @@ interface PeriferiaProps {
   codigo_origem: string;
   municipio_destino: string;
   valor_total_destino: number;
-  UF?: string; // UF herdada do polo de origem (para colorização)
+  UF?: string; // UF do município de destino (para filtros e exibição)
+  UF_destino?: string; // UF explícita do destino quando disponível na base
   // Geometria do município periférico (Polygon/MultiPolygon) vinda do GeoJSON (feature.geometry ou properties.geom)
   geom?: any;
   productValues?: Record<string, number>;
@@ -454,7 +455,7 @@ const EstadoDropdown = memo(function EstadoDropdown({
     onOpen,
     placeholder,
     className,
-    delayMs = 1000,
+    delayMs = 800,
   }: {
     externalValue: string;
     onDebouncedChange: (value: string) => void;
@@ -1037,29 +1038,38 @@ export default function EstrategiaPage() {
         : [];
 
       const peri: PeriferiaProps[] = Array.isArray(periferiaJson?.features)
-        ? periferiaJson.features.map((f: any) => ({
-            codigo_origem: String(f?.properties?.codigo_origem ?? ''),
-            municipio_destino: String(f?.properties?.municipio_destino ?? ''),
-            valor_total_destino: parsePtBrNumber(f?.properties?.valor_total_destino),
-            ...(f?.properties?.codigo_destino ? { codigo_destino: String(f.properties.codigo_destino) } : {}),
-            // Preserve a geometria
-            geom: f?.geometry ?? f?.properties?.geom ?? null,
-            // Coordenadas diretas da periferia (se fornecidas na base)
-            latitude_munic_periferia: f?.properties?.latitude_munic_periferia != null ? Number(f.properties.latitude_munic_periferia) : undefined,
-            longitude_munic_periferia: f?.properties?.longitude_munic_periferia != null ? Number(f.properties.longitude_munic_periferia) : undefined,
-            productValues: PRODUCTS.reduce((acc: Record<string, number>, p) => {
-              // Para periferias, usar somente valores de DESTINO
-              const destinoKey = (p as any).destinovalorKey as string;
-              const raw = f?.properties?.[destinoKey];
-              if ((raw === undefined || raw === null) && destinoMissingSamples.length < 8) {
-                destinoMissingSamples.push({ codigo: String(f?.properties?.codigo_origem ?? ''), key: destinoKey });
-              }
-              acc[p.key] = parsePtBrNumber(raw);
-              return acc;
-            }, {}),
-            // Preserva TODAS as propriedades originais para acesso posterior
-            propriedadesOriginais: f?.properties || {},
-          }))
+        ? periferiaJson.features.map((f: any) => {
+            const ufDestinoRaw = String(
+              f?.properties?.UF_destino ?? f?.properties?.uf_destino ?? f?.properties?.UF ?? ''
+            );
+            const ufDestino = ufDestinoRaw ? ufDestinoRaw.toUpperCase() : '';
+            return {
+              codigo_origem: String(f?.properties?.codigo_origem ?? ''),
+              municipio_destino: String(f?.properties?.municipio_destino ?? ''),
+              valor_total_destino: parsePtBrNumber(f?.properties?.valor_total_destino),
+              ...(f?.properties?.codigo_destino ? { codigo_destino: String(f.properties.codigo_destino) } : {}),
+              // UF do destino para filtros por UF/Região
+              UF: ufDestino,
+              UF_destino: ufDestino,
+              // Preserve a geometria
+              geom: f?.geometry ?? f?.properties?.geom ?? null,
+              // Coordenadas diretas da periferia (se fornecidas na base)
+              latitude_munic_periferia: f?.properties?.latitude_munic_periferia != null ? Number(f.properties.latitude_munic_periferia) : undefined,
+              longitude_munic_periferia: f?.properties?.longitude_munic_periferia != null ? Number(f.properties.longitude_munic_periferia) : undefined,
+              productValues: PRODUCTS.reduce((acc: Record<string, number>, p) => {
+                // Para periferias, usar somente valores de DESTINO
+                const destinoKey = (p as any).destinovalorKey as string;
+                const raw = f?.properties?.[destinoKey];
+                if ((raw === undefined || raw === null) && destinoMissingSamples.length < 8) {
+                  destinoMissingSamples.push({ codigo: String(f?.properties?.codigo_origem ?? ''), key: destinoKey });
+                }
+                acc[p.key] = parsePtBrNumber(raw);
+                return acc;
+              }, {}),
+              // Preserva TODAS as propriedades originais para acesso posterior
+              propriedadesOriginais: f?.properties || {},
+            } as PeriferiaProps;
+          })
         : [];
 
       if (origemMissingSamples.length) {
@@ -1070,10 +1080,10 @@ export default function EstrategiaPage() {
         console.warn('⚠️ [EstrategiaPage] Valores de destino ausentes/nulos identificados', destinoMissingSamples);
       }
 
-      // Enriquecer UF nas periferias herdando do polo (via codigo_origem)
-      const ufByCodigo = new Map(valores.map(v => [v.codigo_origem, String(v.UF || v.UF_origem || '').toUpperCase()]));
-      const valoresEnriched = valores.map(v => ({ ...v, UF: String(v.UF || v.UF_origem || '').toUpperCase() }));
-      const periEnriched = peri.map(v => ({ ...v, UF: ufByCodigo.get(v.codigo_origem) || '' }));
+  // Normalizar UF em maiúsculas
+  const valoresEnriched = valores.map(v => ({ ...v, UF: String(v.UF || v.UF_origem || '').toUpperCase() }));
+  // Manter UF das periferias como UF do destino (não herdar do polo)
+  const periEnriched = peri.map(v => ({ ...v, UF: String(v.UF || v.UF_destino || '').toUpperCase() }));
 
       setPolosValores(valoresEnriched);
       setPeriferia(periEnriched);
@@ -1875,8 +1885,8 @@ export default function EstrategiaPage() {
     const ufUpper = String(appliedUF || '').toUpperCase();
     const inUFMode = appliedPolo === 'ALL' && ufUpper !== 'ALL' && ufUpper !== '';
     const inPoloMode = appliedPolo !== 'ALL';
-    let base = periferia;
-    if (appliedUFs.length) base = base.filter(p => appliedUFs.includes(String(p.UF)));
+  let base = periferia;
+  if (appliedUFs.length) base = base.filter(p => appliedUFs.includes(String(p.UF)));
     if (inPoloMode) base = base.filter(p => p.codigo_origem === appliedPolo);
     else if (inUFMode) base = base.filter(p => String(p.UF || '').toUpperCase() === ufUpper);
     
@@ -1893,7 +1903,7 @@ export default function EstrategiaPage() {
           codigo_origem: p.codigo_origem,
           codigo_destino: String((p as any).codigo_destino ?? (p as any).codigo ?? (p as any).codigo_ibge ?? ''),
           municipio_destino: p.municipio_destino,
-          UF: String(p.UF || '').toUpperCase(),
+          UF: String(p.UF || p.UF_destino || '').toUpperCase(),
           valor_total_destino: sumSelectedProducts(p.productValues, Number(p.valor_total_destino) || 0, appliedProducts, PRODUCTS.length),
           // Campos individuais de produtos no topo para compatibilidade com componentes do mapa
           valor_pd_num_destino: Number(p.propriedadesOriginais?.valor_pd_num_destino ?? (p as any).valor_pd_num_destino ?? 0),
@@ -1973,43 +1983,75 @@ export default function EstrategiaPage() {
       });
     }
 
-    // Card 1: soma por produtos selecionados na periferia (fallback para total quando nada selecionado) + valor_total_origem dos polos
+    // Card 1: duas regras
+    // - Visão de único polo: manter lógica atual (origem + destinos desse polo)
+    // - Visões agregadas (Brasil/Região/UF/Abertura/Radar): somar ORIGEM (polos) + DESTINO (periferias) com deduplicação por município (codigo_destino)
     let somaOrigemSelecionada = 0;
-    let somaPeriferiaSelecionada = 0;
+    let valorDestinosDedup = 0;
 
-    const valorPolo = valoresFiltrados.reduce((acc, polo) => {
-      const valorPeriferias = periferiaAggByCodigo.get(polo.codigo_origem) || 0;
+    // Soma de origem sempre é a soma dos polos filtrados (produto selecionado ou total)
+    for (const polo of valoresFiltrados) {
       const valorOrigem = sumSelectedProducts(polo.productValues, Number(polo.valor_total_origem) || 0, appliedProducts, PRODUCTS.length);
-      somaPeriferiaSelecionada += valorPeriferias;
       somaOrigemSelecionada += valorOrigem;
-      return acc + valorPeriferias + valorOrigem;
-    }, 0);
-
-    // Consolidar por município_destino e pegar Top 3
-    const aggMap = new Map<string, number>();
-    for (const p of periferiaFiltrada) {
-      const nome = p.municipio_destino || '';
-      const val = sumSelectedProducts(p.productValues, Number(p.valor_total_destino) || 0, appliedProducts, PRODUCTS.length);
-      if (!nome) continue;
-      aggMap.set(nome, (aggMap.get(nome) || 0) + val);
     }
-    const top3: MunicipioRanking[] = Array.from(aggMap.entries())
-      .map(([nome, valor]) => ({ nome, valor }))
+
+    const inPoloModeFinal = inPoloMode; // alias para legibilidade
+    if (inPoloModeFinal) {
+      // manter comportamento atual: usar agregação por polo (sem dedup global)
+      let somaPeriferiaSelecionada = 0;
+      for (const polo of valoresFiltrados) {
+        somaPeriferiaSelecionada += (periferiaAggByCodigo.get(polo.codigo_origem) || 0);
+      }
+      valorDestinosDedup = somaPeriferiaSelecionada;
+    } else {
+      // visão agregada: deduplicar periferias por codigo_destino
+      const poloCodigos = new Set(valoresFiltrados.map(v => String(v.codigo_origem)));
+      const destinosByCodigo = new Map<string, number>();
+      for (const p of periferiaFiltrada) {
+        const codigo = String(p.codigo_destino || p.propriedadesOriginais?.codigo_destino || p.municipio_destino || '');
+        if (!codigo) continue;
+        // Se um município aparece como polo e também como destino, considerar apenas o polo (evita dupla contagem)
+        if (poloCodigos.has(codigo)) continue;
+        const val = sumSelectedProducts(p.productValues, Number(p.valor_total_destino) || 0, appliedProducts, PRODUCTS.length);
+        if (!destinosByCodigo.has(codigo)) destinosByCodigo.set(codigo, val);
+        else destinosByCodigo.set(codigo, Math.max(destinosByCodigo.get(codigo) || 0, val));
+      }
+      valorDestinosDedup = Array.from(destinosByCodigo.values()).reduce((a, b) => a + b, 0);
+    }
+
+    const valorPolo = somaOrigemSelecionada + valorDestinosDedup;
+
+    // Consolidar Top 3 por municipio único (dedup por codigo_destino)
+    const topMap = new Map<string, { nome: string; valor: number }>();
+    for (const p of periferiaFiltrada) {
+      const codigo = String(p.codigo_destino || p.propriedadesOriginais?.codigo_destino || p.municipio_destino || '');
+      if (!codigo) continue;
+      const val = sumSelectedProducts(p.productValues, Number(p.valor_total_destino) || 0, appliedProducts, PRODUCTS.length);
+      const nome = p.municipio_destino || codigo;
+      if (!topMap.has(codigo)) topMap.set(codigo, { nome, valor: val });
+      else {
+        const cur = topMap.get(codigo)!;
+        // manter o maior valor observado para evitar subcontagem caso haja divergências
+        if (val > cur.valor) topMap.set(codigo, { nome, valor: val });
+      }
+    }
+    const top3: MunicipioRanking[] = Array.from(topMap.values())
       .sort((a, b) => b.valor - a.valor)
       .slice(0, 3);
 
     // Card 3 (flip): lista e total de municípios (destinos)
-    const municipiosSet = new Set(periferiaFiltrada.map(p => p.municipio_destino).filter(Boolean));
-    const municipiosList = Array.from(municipiosSet).sort((a, b) => a.localeCompare(b, 'pt-BR'));
-
-    // 🆕 Criar mapa de municipio_destino para codigo_destino para o card
-    const municipiosCodigoMap = new Map<string, string>();
+    // Lista de municípios únicos (dedup por codigo_destino)
+    const codigoToNome = new Map<string, string>();
     for (const p of periferiaFiltrada) {
-      const codigoDestino = p.codigo_destino || p.municipio_destino;
-      if (p.municipio_destino && codigoDestino) {
-        municipiosCodigoMap.set(p.municipio_destino, codigoDestino);
+      const codigoDestino = String(p.codigo_destino || p.propriedadesOriginais?.codigo_destino || p.municipio_destino || '');
+      if (!codigoDestino) continue;
+      if (!codigoToNome.has(codigoDestino) && p.municipio_destino) {
+        codigoToNome.set(codigoDestino, p.municipio_destino);
       }
     }
+    const municipiosList = Array.from(codigoToNome.values()).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    // mapa nome -> codigo (mantém compatibilidade com interação atual do card)
+    const municipiosCodigoMap = new Map<string, string>(Array.from(codigoToNome.entries()).map(([codigo, nome]) => [nome, codigo]));
 
     // Subtítulo com label de contexto
     const poloLabel = inPoloMode
@@ -2024,7 +2066,7 @@ export default function EstrategiaPage() {
       appliedPolo,
       appliedProducts,
       somaOrigemSelecionada,
-      somaPeriferiaSelecionada,
+      somaDestinos: valorDestinosDedup,
       valorPolo,
     });
 
@@ -2164,7 +2206,7 @@ export default function EstrategiaPage() {
       title: 'Valor do Polo',
       value: derived.valorPolo, // valor numérico real calculado
       subtitle: derived.poloLabel,
-      description: appliedProducts.length ? 'Soma dos produtos selecionados' : 'Soma total (todos os produtos)'
+      description: (appliedPolo === 'ALL' ? 'Oficial (sem duplicidade) • ' : '') + (appliedProducts.length ? 'Soma dos produtos selecionados' : 'Soma total (todos os produtos)')
     },
     {
       id: 'top_municipios',
@@ -2689,7 +2731,7 @@ export default function EstrategiaPage() {
                           externalValue={poloInputValue}
                           onDebouncedChange={(v) => setPoloInputValue(v)}
                           onOpen={() => setIsPoloDropdownOpen(true)}
-                          delayMs={1000}
+                          delayMs={800}
                           placeholder="Digite o nome do polo..."
                           className={`w-full rounded-md bg-[#1e293b] text-white placeholder-slate-400 border px-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:border-sky-500 text-left ${
                             showPoloSelectionWarning 
@@ -2767,7 +2809,7 @@ export default function EstrategiaPage() {
                             externalValue={periferiaInputValue}
                             onDebouncedChange={(v) => setPeriferiaInputValue(v)}
                             onOpen={() => setIsPeriferiaDropdownOpen(true)}
-                            delayMs={1000}
+                            delayMs={800}
                             placeholder="Digite o nome do município..."
                             className="appearance-none w-full rounded-md bg-[#1e293b] text-white placeholder-slate-400 border border-slate-600 px-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-left cursor-text"
                           />

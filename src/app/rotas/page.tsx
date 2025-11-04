@@ -368,8 +368,8 @@ export default function RotasPage() {
         {/* Sidebar */}
         <Sidebar />
         
-        {/* Conteúdo principal */}
-        <main className="flex-1 flex flex-col overflow-hidden max-h-screen">
+  {/* Conteúdo principal */}
+  <main className="flex-1 flex flex-col overflow-hidden min-h-0">
           {/* Header da página */}
           <div className="p-4 border-b border-slate-700/50">
             <div className="max-w-7xl mx-auto">
@@ -380,8 +380,8 @@ export default function RotasPage() {
                 className="flex flex-col gap-2"
               >
                 <div className="flex items-center gap-3">
-                  <Route className="w-8 h-8 text-blue-400" />
-                  <h1 className="text-3xl font-bold text-white">
+                  <Route className="w-6 h-6 sm:w-8 sm:h-8 text-blue-400" />
+                  <h1 className="text-2xl sm:text-3xl font-bold text-white">
                     Otimização de <span className="text-blue-400">Rotas</span>
                   </h1>
                 </div>
@@ -393,21 +393,21 @@ export default function RotasPage() {
           </div>
 
           {/* Conteúdo scrollável com cartões e separação visual (similar à tela /mapa) */}
-          <div className="flex-1 overflow-hidden">
-            <div className="w-full max-w-[1400px] mx-auto p-3 lg:p-4 h-full">
-              <div className="grid grid-cols-1 xl:grid-cols-[460px_minmax(0,1fr)] gap-3 lg:gap-4 h-full">
+          <div className="flex-1 overflow-hidden min-h-0">
+            <div className="w-full max-w-[1400px] mx-auto p-2 sm:p-3 lg:p-4 h-full">
+              <div className="grid grid-cols-1 lg:grid-cols-[350px_minmax(0,1fr)] xl:grid-cols-[400px_minmax(0,1fr)] gap-2 sm:gap-3 lg:gap-4 h-full min-h-0">
                 {/* Painel de controle (card) */}
                 <div className="bg-[#1e293b] rounded-lg shadow-lg p-0.5 border border-slate-600 h-full">
                   <div className="bg-[#0f172a] rounded-lg border border-slate-700 h-full flex flex-col">
-                    <div className="p-4 border-b border-slate-700/50">
+                    <div className="p-3 sm:p-4 border-b border-slate-700/50">
                       <div className="flex items-center gap-2 mb-1">
                         <Settings className="w-5 h-5 text-blue-400" />
-                        <h2 className="text-lg font-semibold text-white">Planejamento de Rotas</h2>
+                        <h2 className="text-base sm:text-lg font-semibold text-white">Planejamento de Rotas</h2>
                       </div>
                       <p className="text-slate-400 text-xs">Selecione polos e periferias, ajuste opções e gere a rota.</p>
                     </div>
 
-                    <div className="flex-1 overflow-auto p-3">
+                    <div className="flex-1 overflow-auto p-2 sm:p-3">
                       {/* Loading/Error states */}
                       {loadingData && (
                         <div className="">
@@ -448,7 +448,7 @@ export default function RotasPage() {
                 </div>
 
                 {/* Mapa (card) */}
-                <div className="rounded-lg overflow-hidden shadow-lg bg-[#0f172a] border border-slate-600 relative min-h-[520px]">
+                <div className="rounded-lg overflow-hidden shadow-lg bg-[#0f172a] border border-slate-600 relative min-h-[350px] sm:min-h-[400px] lg:min-h-[500px] xl:min-h-[600px]">
                   <div className="absolute inset-0">
                     {!loadingData && estrategiaData ? (
                       <>
@@ -498,7 +498,7 @@ export default function RotasPage() {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 20 }}
                         transition={{ duration: 0.3 }}
-                        className="absolute top-4 right-4 bg-slate-800/95 backdrop-blur-sm border border-slate-600/50 rounded-lg p-4 max-w-sm shadow-xl"
+                        className="absolute top-2 right-2 sm:top-4 sm:right-4 bg-slate-800/95 backdrop-blur-sm border border-slate-600/50 rounded-lg p-2 sm:p-4 max-w-[280px] sm:max-w-sm shadow-xl"
                       >
                         <div className="flex justify-between items-start mb-3">
                           <div>
@@ -519,7 +519,7 @@ export default function RotasPage() {
                           </button>
                         </div>
 
-                        <div className="space-y-2 text-sm">
+                        <div className="space-y-1 sm:space-y-2 text-xs sm:text-sm">
                           <div className="flex justify-between">
                             <span className="text-slate-300">Distância Total:</span>
                             <span className="text-blue-300 font-medium">
@@ -546,22 +546,22 @@ export default function RotasPage() {
                           </div>
                         </div>
 
-                        <div className="mt-3 pt-3 border-t border-slate-600/50 space-y-2">
+                        <div className="mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-slate-600/50 space-y-1.5 sm:space-y-2">
                           <button
                             onClick={() => {
                               setForceMapUpdate(prev => prev + 1);
                             }}
-                            className="w-full px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors flex items-center justify-center gap-2"
+                            className="w-full px-2 sm:px-3 py-1.5 sm:py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-medium rounded-md transition-colors flex items-center justify-center gap-1.5 sm:gap-2"
                           >
-                            <RefreshCw className="w-4 h-4" />
+                            <RefreshCw className="w-3 h-3 sm:w-4 sm:h-4" />
                             Recentralizar no Mapa
                           </button>
 
                           <button
                             onClick={exportarRotaPDFHandler}
-                            className="w-full px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-md transition-colors flex items-center justify-center gap-2"
+                            className="w-full px-2 sm:px-3 py-1.5 sm:py-2 bg-purple-600 hover:bg-purple-700 text-white text-xs sm:text-sm font-medium rounded-md transition-colors flex items-center justify-center gap-1.5 sm:gap-2"
                           >
-                            <Download className="w-4 h-4" />
+                            <Download className="w-3 h-3 sm:w-4 sm:h-4" />
                             Exportar Relatório PDF
                           </button>
                         </div>

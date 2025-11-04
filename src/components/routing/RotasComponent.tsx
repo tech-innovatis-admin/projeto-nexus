@@ -584,6 +584,7 @@ export default function RotasComponent({
           <ConfiguracaoRotas
             configuracao={configuracao}
             onConfiguracao={atualizarConfiguracao}
+            rota={rotaAtual}
           />
         )}
 

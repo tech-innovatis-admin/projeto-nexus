@@ -282,7 +282,7 @@ export async function POST(request: NextRequest) {
 // Health check
 export async function GET() {
   const apiKey = process.env.GOOGLE_ROUTES_API_KEY;
-  
+  // Serviço Google Routes Optimization
   return NextResponse.json({
     status: 'ok',
     service: 'Google Routes Optimization',

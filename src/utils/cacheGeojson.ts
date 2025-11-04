@@ -86,7 +86,7 @@ export async function fetchGeoJSONWithCache(
       // Need fresh GET
       const getResp = await fetch(url, { method: 'GET' });
       if (!getResp.ok) {
-        // fallback to cached if valid by age
+        // retornar ao cache se for válido por idade
         const cached = returnCachedIfValid();
         if (cached) return cached;
         return { data: null, fromCache: false };
@@ -98,12 +98,12 @@ export async function fetchGeoJSONWithCache(
       return { data: json, fromCache: false };
     }
   } catch {
-    // HEAD failed (CORS/offline). Try age-based cache, else GET
+    // Falha no HEAD (CORS/offline). Tente o cache baseado em idade, caso contrário, use GET
     const cached = returnCachedIfValid();
     if (cached) return cached;
   }
 
-  // 3) Fallback: GET and cache
+  // Fallback: GET e cache
   try {
     const resp = await fetch(url);
     if (!resp.ok) {

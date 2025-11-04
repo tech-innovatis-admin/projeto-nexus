@@ -178,15 +178,16 @@ interface ResultadoOSRM {
  */
 export async function calcularRotaTerrestre(
   origem: MunicipioPolo | MunicipioPeriferia,
-  destino: MunicipioPolo | MunicipioPeriferia
+  destino: MunicipioPolo | MunicipioPeriferia,
+  permitirPoloParaPolo: boolean = false
 ): Promise<TrechoTerrestre> {
   try {
     console.log(`🚗 [routingUtils] Calculando rota terrestre: ${origem.nome} → ${destino.nome}`);
 
-    // Validar que não é rota Polo → Polo (deve ser voo)
-    if (origem.tipo === 'polo' && destino.tipo === 'polo') {
-      console.warn(`⚠️ [routingUtils] Tentativa de rota terrestre entre polos: ${origem.nome} → ${destino.nome}`);
-      throw new Error('Rotas entre polos devem ser calculadas como voo, não como rota terrestre');
+    // Validar que não é rota Polo → Polo, a menos que explicitamente permitido
+    if (origem.tipo === 'polo' && destino.tipo === 'polo' && !permitirPoloParaPolo) {
+      console.warn(`⚠️ [routingUtils] Tentativa de rota terrestre entre polos sem permissão: ${origem.nome} → ${destino.nome}`);
+      throw new Error('Rotas entre polos devem ser voo, a menos que configuradas explicitamente como terrestres');
     }
 
     // Usar nova API Google Routes com coordenadas diretas (sem geocoding!)
@@ -581,9 +582,10 @@ export function traduzirInstrucaoOSRM(step: any): InstrucaoRota {
  */
 export async function criarTrechoTerrestre(
   origem: MunicipioPolo | MunicipioPeriferia,
-  destino: MunicipioPolo | MunicipioPeriferia
+  destino: MunicipioPolo | MunicipioPeriferia,
+  permitirPoloParaPolo: boolean = false
 ): Promise<TrechoTerrestre> {
-  const resultado = await calcularRotaTerrestre(origem, destino);
+  const resultado = await calcularRotaTerrestre(origem, destino, permitirPoloParaPolo);
   
   if (!resultado || !resultado.geometria) {
     throw new Error('Nenhuma rota encontrada');

@@ -100,6 +100,12 @@ export interface ConfiguracaoRota {
   limitarDistanciaMaximaTerrestreKm?: number;
   otimizarOrdemPolos: boolean; // TSP entre polos
   otimizarRotasPeriferias: boolean; // TSP local para cada polo
+  /**
+   * Overrides explícitos definidos pelo usuário para trechos entre polos.
+   * Chave no formato "<codigoOrigem>-><codigoDestino>", valor: 'voo' | 'terrestre'.
+   * Quando não definido, o padrão é 'voo'.
+   */
+  poloToPoloOverrides?: Record<string, 'voo' | 'terrestre'>;
 }
 
 export interface ResultadoOSRM {

@@ -397,6 +397,30 @@ O Sistema de Rotas é uma página independente (`/rotas`) com **otimização mul
 
 **Resultado**: Agora rotas entre periferias começam pelo primeiro município selecionado e otimizam a sequência dos demais, reduzindo distâncias e tempo total de deslocamento.
 
+#### 🎯 **Configuração Manual de Modal por Trecho (Novembro 2025)**
+**Funcionalidade Implementada**: Permite ao usuário escolher manualmente entre "Avião" ou "Carro" para cada trecho entre polos, após calcular a rota inicialmente.
+
+**Como Funciona**:
+1. **Cálculo Inicial**: Usuário seleciona polos e periferias e calcula a rota normalmente (todos trechos polo→polo usam avião por padrão)
+2. **Aba Parâmetros**: Após o cálculo, na aba "Parâmetros" aparece uma nova seção "Deslocamento entre Polos"
+3. **Configuração por Trecho**: Para cada trecho polo→polo (ex.: "João Pessoa → Campina Grande"), o usuário pode escolher:
+   - **Avião** (padrão): Mantém voo entre polos
+   - **Carro**: Permite rota terrestre entre polos (usando Google Routes API)
+4. **Recálculo Manual**: Após ajustar as opções, o usuário clica em "Calcular Rota" para aplicar as mudanças
+
+**Implementação Técnica**:
+- ✅ **Overrides por Trecho**: Campo `poloToPoloOverrides` no `ConfiguracaoRota` armazena escolhas por chave "codigoOrigem->codigoDestino"
+- ✅ **UI Dinâmica**: Seção "Deslocamento entre Polos" só aparece após calcular uma rota com trechos polo→polo
+- ✅ **Recálculo Inteligente**: Não invalida a rota ao alterar overrides (evita fechamento da seção), apenas recalcula ao clicar no botão
+- ✅ **Validação Segura**: Rota terrestre entre polos só é permitida quando explicitamente configurada via override
+- ✅ **Fallback Automático**: Se Google Routes falhar, usa cálculo haversine como backup
+
+**Benefícios**:
+- **Flexibilidade Total**: Usuário decide quando usar carro vs avião entre polos (ex.: distâncias curtas)
+- **Controle Granular**: Configuração individual por trecho, não global
+- **UX Intuitiva**: Interface clara com radios "Avião"/"Carro" e dica de recálculo
+- **Performance Otimizada**: Evita recálculos desnecessários até confirmação do usuário
+
 #### 🗺️ **Visualização Multimodal Avançada**
 - **Linhas diferenciadas**: Azul tracejado para voos, verde contínuo para rotas terrestres
 - **Marcadores especializados**: Polos com ícones de aeroporto, Periferias com marcadores simples
@@ -444,6 +468,199 @@ O Sistema de Rotas é uma página independente (`/rotas`) com **otimização mul
 - ✅ **Rate limiting avançado**: 60 req/min com proteção automática contra abuso
 - ✅ **Health check completo**: Monitoramento de APIs Google com status detalhado
 - ✅ **Modo Vendas - Análise de Oportunidades**: Botão toggle que filtra produtos elegíveis para venda (PD/PMSB por regras, outros sempre visíveis)
+
+#### 📁 **Estrutura dos Arquivos do Sistema de Rotas**
+```
+src/
+├── types/
+│   └── routing.ts                    # Interfaces TypeScript para rotas
+├── utils/
+│   └── routingUtils.ts              # Funções utilitárias (TSP, OSRM, cálculos)
+├── hooks/
+│   └── useRotas.ts                  # Hook React para gerenciar estado das rotas
+└── components/
+    └── routing/
+        ├── index.ts                 # Exportações centralizadas
+        ├── RotasComponent.tsx       # Componente principal de interface
+        ├── ConfiguracaoRotas.tsx    # Configurações de rota
+        ├── RotaMapVisualization.tsx # Visualização no mapa MapLibre
+        └── ExemploIntegracao.tsx    # Guia de integração
+```
+
+#### 🚀 **Como Usar o Sistema de Rotas**
+
+##### **1. Importação Básica**
+```typescript
+import { RotasComponent, RotaMapVisualization } from '@/components/routing';
+import type { RotaCompleta } from '@/types/routing';
+```
+
+##### **2. Componente Principal**
+```tsx
+<RotasComponent
+  municipios={municipiosSelecionados}
+  onRotaChange={(rota) => setRotaAtiva(rota)}
+  className="shadow-lg"
+/>
+```
+
+##### **3. Visualização no Mapa**
+```tsx
+<RotaMapVisualization
+  map={mapRef.current}
+  rota={rotaAtiva}
+  showLabels={true}
+  showDirections={false}
+/>
+```
+
+##### **4. Hook de Estado**
+```typescript
+const {
+  polosSelecionados,
+  periferiasSelecionadas,
+  rotaAtual,
+  configuracao,
+  carregando,
+  calcularRota
+} = useRotas();
+```
+
+#### ⚙️ **Configurações Disponíveis**
+```typescript
+const configuracao = {
+  velocidadeMediaVooKmh: 300,        // Helicóptero médio
+  preferirVooEntrePolos: true,       // Voo automático entre polos
+  limitarDistanciaMaximaTerrestreKm: 400, // Limite para forçar voo
+  otimizarOrdemPolos: true,          // TSP entre polos
+  otimizarRotasPeriferias: true      // TSP local por polo
+};
+```
+
+#### 🎯 **Regras de Negócio do Sistema**
+1. **Entre Polos**: Preferencialmente aéreo (se otimizado)
+2. **Polo → Periferia**: Sempre terrestre
+3. **Periferia → Periferia**: Sempre terrestre, dentro do mesmo polo
+4. **Otimização**: TSP aplicado separadamente para polos e periferias
+
+##### **Algoritmo TSP Simplificado**
+- **Polos**: Nearest neighbor com tentativa de força bruta (≤ 8 polos)
+- **Periferias**: Nearest neighbor por polo
+
+#### 🗺️ **Integração com MapLibre GL**
+##### **Camadas Adicionadas**
+- `rotas-trechos-voo`: Linhas tracejadas azuis
+- `rotas-trechos-terrestres`: Linhas sólidas verdes  
+- `rotas-polos`: Círculos vermelhos (raio 8px)
+- `rotas-periferias`: Círculos amarelos (raio 6px)
+- `rotas-labels`: Labels dos municípios (opcional)
+
+##### **Interatividade**
+- **Click**: Popups com informações detalhadas
+- **Hover**: Cursor pointer nos elementos clicáveis
+- **Fit Bounds**: Ajuste automático para mostrar rota completa
+
+#### 📊 **Estatísticas Calculadas**
+```typescript
+interface EstatisticasRota {
+  distanciaTotalKm: number;           // Distância total
+  tempoTotalMinutos: number;          // Tempo total
+  distanciaVooKm: number;             // Apenas trechos aéreos
+  tempoVooMinutos: number;            // Apenas tempo de voo
+  distanciaTerrestreKm: number;       // Apenas trechos terrestres
+  tempoTerrestreMinutos: number;      // Apenas tempo terrestre
+  numeroPolos: number;                // Polos únicos visitados
+  numeroPeriferias: number;           // Periferias únicas visitadas
+  quantidadeTrechosVoo: number;       // Contagem de voos
+  quantidadeTrechosTerrestres: number; // Contagem terrestre
+}
+```
+
+#### 🔗 **Integração com Google Routes API**
+##### **Estado Atual**
+- **Primária**: Google Routes API para roteamento terrestre preciso
+- **Fallback**: Distância haversine + tempo estimado quando indisponível
+
+##### **Quando Google Routes Está Ativo**
+```typescript
+// As funções já estão preparadas:
+const trechoTerrestre = await criarTrechoTerrestre(origem, destino);
+// Automaticamente usa Google Routes se disponível e não bloqueado
+```
+
+#### 🎨 **Estilos CSS do Sistema**
+##### **Cores Padrão**
+```css
+:root {
+  --rota-voo: #3B82F6;        /* Azul */
+  --rota-terrestre: #10B981;  /* Verde */
+  --rota-polo: #EF4444;       /* Vermelho */
+  --rota-periferia: #F59E0B;  /* Amarelo */
+}
+```
+
+##### **Classes Customizáveis**
+- `.custom-tooltip`: Tooltips dos labels
+- `.custom-div-icon`: Ícones personalizados (quando usar Leaflet)
+
+#### ⚡ **Performance e Otimizações**
+##### **Otimizações Implementadas**
+- **Cache de Rotas**: Evita recálculos idênticos
+- **Debounce**: Previne calls excessivos à API
+- **Lazy Loading**: Componentes carregados sob demanda
+- **Memoização**: useMemo para cálculos pesados
+
+##### **Limites Recomendados**
+- **Polos**: Máximo 12 para performance ideal do TSP
+- **Periferias**: Máximo 20 por polo
+- **Cache**: Máximo 50 rotas em memória
+
+#### 🔧 **Troubleshooting do Sistema de Rotas**
+##### **Problemas Comuns**
+1. **Mapa não carrega rotas**
+   - Verificar se `map` ref está definido
+   - Confirmar que MapLibre está inicializado
+
+2. **TSP muito lento**
+   - Reduzir número de polos (usar força bruta apenas para ≤ 8)
+   - Considerar heurísticas para grandes volumes
+
+3. **Google Routes não responde**
+   - Sistema usa fallback automático para haversine
+   - Verificar logs no console para status da API
+
+##### **Debug**
+```typescript
+// Ativar logs detalhados
+localStorage.setItem('nexus-rotas-debug', 'true');
+```
+
+#### 📈 **Próximos Passos do Sistema**
+##### **Melhorias Futuras**
+1. **Algoritmos Avançados**: Genetic Algorithm para TSP grandes
+2. **Machine Learning**: Predição de tempos baseada em histórico
+3. **Otimização Multi-Objetivo**: Balancear tempo, custo, conforto
+4. **Integração com Tráfego**: APIs de trânsito em tempo real
+5. **Rotas Alternativas**: Múltiplas opções por trecho
+
+##### **Integração com NEXUS**
+1. **Exportação PDF**: Adicionar rotas aos relatórios existentes
+2. **Dashboard**: Métricas de rotas no painel principal  
+3. **Histórico**: Salvar rotas calculadas por usuário
+4. **Compartilhamento**: URLs para rotas específicas
+
+#### 🤝 **Contribuição para o Sistema de Rotas**
+##### **Estrutura para Novos Recursos**
+1. **Tipos**: Adicionar em `src/types/routing.ts`
+2. **Lógica**: Implementar em `src/utils/routingUtils.ts`
+3. **Interface**: Criar componente em `src/components/routing/`
+4. **Estado**: Extender `useRotas` hook se necessário
+
+##### **Convenções**
+- **Nomes**: camelCase para variáveis, PascalCase para componentes
+- **Tipos**: Sempre tipagem explícita
+- **Erros**: Tratamento graceful com fallbacks
+- **Performance**: Memoização para cálculos custosos
 
 #### Próximas Evoluções (Roadmap Futuro)
 - ✅ **Exportação PDF**: Relatórios profissionais das rotas calculadas
@@ -495,6 +712,12 @@ Além da evolução do Sistema de Rotas detalhada acima, permanecem como itens d
   - Interface simplificada (remoção controles desnecessários)
   - Tratamento robusto de erros e validações completas
   - Performance otimizada (eliminação cálculos redundantes)
+- [x] **Configuração Manual de Modal por Trecho** (Novembro 2025)
+  - Seção "Deslocamento entre Polos" na aba "Parâmetros"
+  - Escolha individual "Avião" ou "Carro" para cada trecho polo→polo
+  - Overrides por trecho armazenados em `poloToPoloOverrides`
+  - Recálculo manual após ajustes (não automático para evitar fechamento da UI)
+  - Validação segura: rota terrestre entre polos só com override explícito
 
 ### 🗺️ Estratégia / Análise
 - [ ] Clusterização dinâmica de polos em níveis de zoom distintos

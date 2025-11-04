@@ -161,7 +161,7 @@ export default function RotaMapa({
     const ensurePlaneImage = () => {
       if (map.current!.hasImage(imageId)) return;
       const svg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="darkblue" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.7">
   <path d="M2 22h20" />
   <path d="M9.5 12.5 3 10l1-2 8 2 5-5 3 1-5 5 2 8-2 1-2.5-6.5-3.5 3.5v3l-2 1v-4l3.5-3.5Z" />
 </svg>`;

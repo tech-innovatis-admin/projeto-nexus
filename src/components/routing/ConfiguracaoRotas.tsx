@@ -1,18 +1,38 @@
-import React from 'react';
-import { Plane } from 'lucide-react';
-import type { ConfiguracaoRota } from '@/types/routing';
+import React, { useMemo, useState } from 'react';
+import { Plane, Car, ChevronDown } from 'lucide-react';
+import type { ConfiguracaoRota, RotaCompleta, TrechoVoo, TrechoTerrestre } from '@/types/routing';
 
 interface ConfiguracaoRotasProps {
   configuracao: ConfiguracaoRota;
   onConfiguracao: (novaConfiguracao: Partial<ConfiguracaoRota>) => void;
   className?: string;
+  rota?: RotaCompleta | null;
 }
 
 export default function ConfiguracaoRotas({ 
   configuracao, 
   onConfiguracao, 
-  className = '' 
+  className = '',
+  rota
 }: ConfiguracaoRotasProps) {
+  const [secaoDeslocPolosAberta, setSecaoDeslocPolosAberta] = useState<boolean>(false);
+
+  const trechosPoloPolo = useMemo(() => {
+    const t = (rota?.trechos || []).filter(
+      (tr): tr is TrechoVoo | TrechoTerrestre => !!tr
+    ).filter(tr => tr.origem.tipo === 'polo' && tr.destino.tipo === 'polo');
+    return t.map(tr => ({
+      origem: tr.origem,
+      destino: tr.destino,
+      key: `${tr.origem.codigo}->${tr.destino.codigo}`
+    }));
+  }, [rota]);
+
+  const setOverride = (key: string, modo: 'voo' | 'terrestre') => {
+    const atual = configuracao.poloToPoloOverrides || {};
+    onConfiguracao({ poloToPoloOverrides: { ...atual, [key]: modo } });
+  };
+
   return (
     <div className={`space-y-4 ${className}`}>
       <h3 className="text-lg font-semibold text-gray-800 mb-3">
@@ -179,12 +199,70 @@ export default function ConfiguracaoRotas({
         )}
       </div>
 
+      {/* Deslocamento entre Polos (após cálculo de rota) */}
+      <div className="mt-4">
+        <button
+          type="button"
+          onClick={() => setSecaoDeslocPolosAberta(!secaoDeslocPolosAberta)}
+          className="w-full flex items-center justify-between p-3 bg-gray-50 border border-gray-200 rounded-md hover:bg-gray-100"
+        >
+          <div className="text-sm font-medium text-gray-800">Deslocamento entre Polos</div>
+          <ChevronDown className={`w-4 h-4 text-gray-600 transition-transform ${secaoDeslocPolosAberta ? 'rotate-180' : ''}`} />
+        </button>
+
+        {secaoDeslocPolosAberta && (
+          <div className="mt-2 space-y-2">
+            {trechosPoloPolo.length === 0 ? (
+              <div className="text-xs text-gray-600 p-3 bg-white border border-gray-200 rounded-md">
+                Nenhum trecho entre polos disponível. Calcule uma rota para configurar estes deslocamentos.
+              </div>
+            ) : (
+              trechosPoloPolo.map(({ origem, destino, key }) => {
+                const selecionado = configuracao.poloToPoloOverrides?.[key] || 'voo';
+                return (
+                  <div key={key} className="p-3 bg-white border border-gray-200 rounded-md">
+                    <div className="text-sm font-medium text-gray-800 mb-2">
+                      {origem.nome} → {destino.nome}
+                    </div>
+                    <div className="flex items-center gap-4 text-sm">
+                      <label className="inline-flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name={`modo-${key}`}
+                          checked={selecionado === 'voo'}
+                          onChange={() => setOverride(key, 'voo')}
+                        />
+                        <Plane className="w-4 h-4 text-blue-600" /> Avião
+                      </label>
+                      <label className="inline-flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name={`modo-${key}`}
+                          checked={selecionado === 'terrestre'}
+                          onChange={() => setOverride(key, 'terrestre')}
+                        />
+                        <Car className="w-4 h-4 text-green-600" /> Carro
+                      </label>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+            {trechosPoloPolo.length > 0 && (
+              <p className="text-xs text-gray-500">
+                Dica: após ajustar os deslocamentos entre polos, clique em "Calcular Rota" para aplicar as mudanças.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Resumo da Configuração */}
       <div className="mt-6 p-3 bg-gray-50 rounded-lg">
         <h4 className="text-sm font-medium text-gray-700 mb-2">Parâmetros:</h4>
         <ul className="text-xs text-gray-600 space-y-1">
           <li>• Velocidade de voo: {configuracao.velocidadeMediaVooKmh} km/h</li>
-          <li>• Transporte Polo→Polo: <Plane className="inline w-3 h-3" /> Sempre voo</li>
+          <li>• Transporte Polo→Polo: {trechosPoloPolo.length > 0 ? 'definido por trecho' : 'padrão avião'}</li>
           <li>• Otimizar polos: {configuracao.otimizarOrdemPolos ? 'Sim' : 'Não'}</li>
           <li>• Otimizar periferias: {configuracao.otimizarRotasPeriferias ? 'Sim' : 'Não'}</li>
           {configuracao.limitarDistanciaMaximaTerrestreKm && (

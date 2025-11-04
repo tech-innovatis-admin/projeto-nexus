@@ -21,7 +21,8 @@ const CONFIGURACAO_PADRAO: ConfiguracaoRota = {
   preferirVooEntrePolos: true,
   otimizarOrdemPolos: true,
   otimizarRotasPeriferias: true,
-  limitarDistanciaMaximaTerrestreKm: undefined
+  limitarDistanciaMaximaTerrestreKm: undefined,
+  poloToPoloOverrides: {}
 };
 
 export function useRotas() {
@@ -105,11 +106,19 @@ export function useRotas() {
 
   // Atualizar configuração
   const atualizarConfiguracao = useCallback((novaConfiguracao: Partial<ConfiguracaoRota>) => {
-    setEstado(prev => ({
-      ...prev,
-      configuracao: { ...prev.configuracao, ...novaConfiguracao },
-      rotaAtual: null // Invalidar rota atual para recalcular
-    }));
+    setEstado(prev => {
+      const chaves = Object.keys(novaConfiguracao);
+      const apenasOverrides = chaves.length > 0 && chaves.every(k => k === 'poloToPoloOverrides');
+      const novaConfig = { ...prev.configuracao, ...novaConfiguracao } as ConfiguracaoRota;
+
+      return {
+        ...prev,
+        configuracao: novaConfig,
+        // Não invalidar a rota quando apenas os overrides polo→polo foram alterados;
+        // o usuário recalcula manualmente ao clicar em "Calcular Rota".
+        rotaAtual: apenasOverrides ? prev.rotaAtual : null
+      };
+    });
   }, []);
 
   // Vincular periferias aos polos mais próximos
@@ -251,11 +260,20 @@ export function useRotas() {
             }
           }
 
-          // 3.2. Voo para o próximo polo (se houver próximo polo)
+          // 3.2. Trecho entre polos (se houver próximo polo)
           if (i < polosOrdenados.length - 1) {
             const proximoPolo = polosOrdenados[i + 1];
-            // Por regra de negócio: Polo → Polo sempre é voo
-            trechos.push(criarTrechoVoo(poloAtual, proximoPolo, configuracao));
+            // Verificar override do usuário para este par de polos
+            const chaveOverride = `${poloAtual.codigo}->${proximoPolo.codigo}`;
+            const modo = configuracao.poloToPoloOverrides?.[chaveOverride] || (configuracao.preferirVooEntrePolos ? 'voo' : 'terrestre');
+
+            if (modo === 'terrestre') {
+              // Permitir explicitamente rota terrestre entre polos
+              const trecho = await criarTrechoTerrestre(poloAtual, proximoPolo, true);
+              trechos.push(trecho);
+            } else {
+              trechos.push(criarTrechoVoo(poloAtual, proximoPolo, configuracao));
+            }
           }
         }
       }

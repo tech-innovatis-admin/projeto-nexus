@@ -37,6 +37,32 @@ export async function middleware(request: NextRequest) {
         response.cookies.delete('auth_token');
         return response;
       }
+
+      // Regras adicionais: bloquear viewers restritos em /estrategia e /rotas
+      const restrictedPaths = ['/estrategia', '/rotas'];
+      const isRestrictedPage = restrictedPaths.some((path) => pathname.startsWith(path));
+      const role: string = String(verifyData?.user?.role || '').toLowerCase();
+
+      if (role === 'viewer' && isRestrictedPage) {
+        try {
+          // Consulta rápida ao backend para saber se o viewer é restrito (possui registros em municipio_acessos)
+          const acessosResp = await fetch(new URL('/api/municipios/acessos', request.url), {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+
+          if (acessosResp.ok) {
+            const acessosData = await acessosResp.json();
+            // Critério: viewer é "restrito" se possuir qualquer registro na tabela municipio_acessos
+            const totalAcessos = typeof acessosData?.totalAcessos === 'number' ? acessosData.totalAcessos : 0;
+            if (totalAcessos > 0) {
+              return NextResponse.redirect(new URL('/acesso-negado', request.url));
+            }
+          }
+          // Se a API falhar, mantemos o fluxo normal (não bloqueia) para evitar falso-positivo
+        } catch {
+          // Silencia e segue o fluxo normal
+        }
+      }
     } catch (error) {
       // Em caso de erro na verificação, redireciona para o login e limpa o cookie
       const response = NextResponse.redirect(new URL('/login', request.url));

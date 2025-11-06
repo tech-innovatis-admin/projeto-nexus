@@ -3,6 +3,7 @@
 import React, { useState, useLayoutEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useUser } from '@/contexts/UserContext';
+import { LockKeyhole } from 'lucide-react';
 
 interface SidebarProps {
   className?: string;
@@ -51,34 +52,23 @@ export default function Sidebar({ className = '' }: SidebarProps) {
   }
   
 
+  const isViewerRestricted = (user?.role || '').toLowerCase() === 'viewer' && user?.isRestricted;
+  const disabledIds = isViewerRestricted ? new Set(['estrategia', 'rotas']) : new Set<string>();
+
+  // Itens de menu sempre visíveis, com bloqueio visual/UX quando restrito
   const menuItems = [
-    {
-      id: 'home',
-      label: 'Dashboard',
-      icon: 'fa-solid fa-chart-line',
-      path: '/mapa'
-    },
-    {
-      id: 'estrategia',
-      label: 'Estratégia (Beta)',
-      icon: 'fa-solid fa-chess',
-      path: '/estrategia'
-    },
-    {
-      id: 'rotas',
-      label: 'Roteamento (Beta)',
-      icon: 'fa-solid fa-route',
-      path: '/rotas'
-    },
-    {
-      id: 'logout',
-      label: 'Logout',
-      icon: 'fa-solid fa-right-from-bracket',
-      path: '#'
-    }
+    { id: 'home', label: 'Dashboard', icon: 'fa-solid fa-chart-line', path: '/mapa' },
+    { id: 'estrategia', label: 'Estratégia', icon: 'fa-solid fa-chess', path: '/estrategia', disabled: disabledIds.has('estrategia') },
+    { id: 'rotas', label: 'Roteamento', icon: 'fa-solid fa-route', path: '/rotas', disabled: disabledIds.has('rotas') },
+    { id: 'logout', label: 'Logout', icon: 'fa-solid fa-right-from-bracket', path: '#' }
   ];
 
-  const handleNavigation = (path: string, itemId: string) => {
+  const handleNavigation = (path: string, itemId: string, disabled?: boolean) => {
+    if (disabled) {
+      // UX profissional: direciona para página de aviso
+      router.push('/acesso-negado');
+      return;
+    }
     if (itemId === 'logout') {
       handleLogout();
       return;
@@ -170,6 +160,7 @@ export default function Sidebar({ className = '' }: SidebarProps) {
             {menuItems.map((item) => {
               const isActive = pathname === item.path;
               const isLogoutItem = item.id === 'logout';
+              const isDisabled = Boolean((item as any).disabled);
               
               return (
                 <React.Fragment key={item.id}>
@@ -178,14 +169,15 @@ export default function Sidebar({ className = '' }: SidebarProps) {
                   <li
                     className={`
                       rounded-lg p-[14px] cursor-pointer transition-colors duration-200
-                      ${isActive 
-                        ? 'bg-sky-600' 
-                        : isLogoutItem
-                          ? 'text-gray-400 hover:bg-slate-700 hover:text-white'
-                          : 'hover:bg-slate-700'
-                      }
+                      ${isDisabled
+                        ? 'opacity-60 text-gray-400 cursor-not-allowed'
+                        : isActive 
+                          ? 'bg-sky-600' 
+                          : isLogoutItem
+                            ? 'text-gray-400 hover:bg-slate-700 hover:text-white'
+                            : 'hover:bg-slate-700'}
                     `}
-                    onClick={() => handleNavigation(item.path, item.id)}
+                    onClick={() => handleNavigation(item.path, item.id, isDisabled)}
                   >
                   <a 
                     href="#"
@@ -193,7 +185,7 @@ export default function Sidebar({ className = '' }: SidebarProps) {
                     className={`
                       no-underline flex items-center transition-all duration-300
                       ${isOpen ? 'justify-start gap-[14px]' : 'justify-center'}
-                      ${isActive ? 'text-white' : 'text-gray-300 hover:text-white'}
+                      ${isDisabled ? 'text-gray-400' : (isActive ? 'text-white' : 'text-gray-300 hover:text-white')}
                     `}
                   >
                     {item.id === 'logout' ? (
@@ -229,6 +221,9 @@ export default function Sidebar({ className = '' }: SidebarProps) {
                     >
                       {item.label}
                     </span>
+                    {isOpen && isDisabled && (
+                      <LockKeyhole size={16} className="ml-2 text-gray-400" />
+                    )}
                   </a>
                 </li>
                 </React.Fragment>

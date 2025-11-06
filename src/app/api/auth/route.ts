@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { sign } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
-import { Prisma } from '@prisma/client';
+// import { Prisma } from '@prisma/client';
 
 // Aviso em desenvolvimento se JWT_SECRET não estiver definido
 if (!process.env.JWT_SECRET) {
@@ -70,6 +70,45 @@ export async function POST(request: Request) {
         success: false,
         error: 'Usuário não possui acesso à plataforma nexus'
       }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+    }
+
+    // 🔐 Verificação adicional de validade para usuários do tipo "viewer"
+    if ((dbUser.role || '').toLowerCase() === 'viewer') {
+      try {
+        const acessos = await prisma.municipio_acessos.findMany({
+          where: { user_id: dbUser.id },
+          select: { valid_until: true },
+        });
+
+        // Regras:
+        // - Sem registros: permitir login (mapa aplicará restrição de visualização)
+        // - Qualquer registro com valid_until NULL: permitir
+        // - Qualquer registro com valid_until >= agora: permitir
+        // - Caso contrário (todos expirados): bloquear
+        if (acessos && acessos.length > 0) {
+          const now = new Date();
+          const hasValid = acessos.some((a: { valid_until: Date | null }) => {
+            if (!a.valid_until) return true; // sem prazo definido
+            const dt = new Date(a.valid_until);
+            return dt >= now; // ainda válido
+          });
+
+          if (!hasValid) {
+            console.warn(`🚫 Login bloqueado: viewer ${dbUser.email || dbUser.username} com acessos expirados`);
+            return new Response(JSON.stringify({
+              success: false,
+              error: 'Seu acesso expirou. Entre em contato com o administrador.'
+            }), { status: 403, headers: { 'Content-Type': 'application/json' } });
+          }
+        } else {
+          console.info(`ℹ️ Viewer ${dbUser.email || dbUser.username} sem registros em municipio_acessos. Permitindo login, mas acesso será restrito no mapa.`);
+        }
+      } catch (err) {
+        console.error('Erro ao validar validade de viewer em municipio_acessos:', err);
+        // Em caso de erro nessa checagem, optar por negar por segurança OU permitir?
+        // Seguindo especificação: bloqueia apenas quando claramente expirado.
+        // Portanto, se erro na checagem, não bloquear aqui.
+      }
     }
 
     // Criar token JWT

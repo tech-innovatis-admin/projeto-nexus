@@ -10,6 +10,7 @@ interface User {
   name: string | null;
   cargo: string | null;
   photo: string | null;
+  isRestricted?: boolean; // Viewer restrito (possui registros em municipio_acessos)
 }
 
 interface UserContextType {
@@ -34,7 +35,23 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       const data = await response.json();
 
       if (data.success && data.user) {
-        setUser(data.user);
+        let enrichedUser: User = data.user;
+        // Descobrir se o usuário é Viewer restrito (possui registros na tabela municipio_acessos)
+        if (String(enrichedUser.role || '').toLowerCase() === 'viewer') {
+          try {
+            const acessosResp = await fetch('/api/municipios/acessos', { credentials: 'include' });
+            if (acessosResp.ok) {
+              const acessosData = await acessosResp.json();
+              const totalAcessos = typeof acessosData?.totalAcessos === 'number' ? acessosData.totalAcessos : 0;
+              enrichedUser = { ...enrichedUser, isRestricted: totalAcessos > 0 };
+            } else {
+              enrichedUser = { ...enrichedUser, isRestricted: false };
+            }
+          } catch {
+            enrichedUser = { ...enrichedUser, isRestricted: false };
+          }
+        }
+        setUser(enrichedUser);
       } else {
         setUser(null);
       }

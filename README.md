@@ -31,6 +31,467 @@ O **NEXUS** é uma plataforma web desenvolvida pela *Data Science Team – Innov
 - **Middleware de Proteção** para rotas `/mapa` e `/estrategia`
 - **Logout Automático** com limpeza de sessão
 
+#### **Controle de Validade para Usuários Viewer (Novembro 2025)**
+O sistema implementa verificação automática de validade para usuários com perfil "Viewer" durante o processo de login, garantindo que apenas acessos válidos sejam permitidos.
+
+##### **Como Funciona:**
+1. **Login Inicial**: Usuário Viewer informa credenciais (username/email + senha)
+2. **Validação de Credenciais**: Senha verificada com bcryptjs
+3. **Verificação de Validade**: Consulta tabela `municipio_acessos` para o usuário
+4. **Regras de Validade**:
+   - **Acesso Válido**: `valid_until` é `null` (acesso permanente) OU `valid_until >= data_atual`
+   - **Acesso Expirado**: `valid_until < data_atual`
+5. **Decisão de Acesso**:
+   - ✅ **Permitido**: Pelo menos um acesso válido encontrado
+   - ❌ **Bloqueado**: Todos os acessos expirados → HTTP 403 com mensagem clara
+
+##### **Implementação Técnica:**
+```typescript
+// Verificação no /api/auth/route.ts
+if (user.role === 'Viewer') {
+  const acessos = await prisma.municipio_acessos.findMany({
+    where: { user_id: user.id }
+  });
+  
+  const hasValidAccess = acessos.some(acesso => 
+    !acesso.valid_until || acesso.valid_until >= new Date()
+  );
+  
+  if (!hasValidAccess) {
+    return NextResponse.json(
+      { error: 'Seu acesso expirou. Entre em contato com o administrador.' },
+      { status: 403 }
+    );
+  }
+}
+```
+
+##### **Benefícios:**
+- **Segurança Automática**: Bloqueio preventivo de acessos expirados no momento do login
+- **Experiência do Usuário**: Mensagem clara sobre expiração de acesso
+- **Controle Granular**: Validade por município via `municipio_acessos`
+- **Flexibilidade**: Suporte a acessos permanentes (`valid_until = null`) e temporários
+- **Integração Completa**: Funciona com middleware de proteção existente
+
+### 🎯 **Controle de Acesso para Usuários Viewer (Novembro 2025)**
+
+#### **Visão Geral da Funcionalidade**
+O sistema implementa um controle de acesso granular para usuários com perfil "Viewer", restringindo a visualização e interação apenas aos municípios e estados que possuem permissão explícita na tabela `municipio_acessos`. Esta implementação garante que usuários Viewer só possam acessar dados de municípios específicos ou estados completos, mantendo acesso total para perfis admin e gestor.
+
+#### **Componentes Técnicos Implementados**
+
+##### **1. Endpoint de Permissões (`/api/municipios/permitidos`)**
+- **Método**: GET
+- **Autenticação**: JWT token obrigatório
+- **Funcionalidade**: Retorna lista de estados e municípios permitidos para o usuário autenticado
+- **Lógica de Negócio**:
+  - **Acesso por Estado**: Se usuário tem acesso a qualquer município de um estado, ganha acesso completo ao estado
+  - **Acesso Específico**: Se tem acesso apenas a municípios específicos, vê apenas esses municípios
+  - **Validação de Expiração**: Apenas acessos válidos (`valid_until >= hoje` ou `valid_until = null`)
+
+##### **2. Interface de Usuário Filtrada (`/mapa`)**
+- **Dropdowns Dinâmicos**: Estados e municípios filtrados baseado em permissões
+- **Bloqueio de Busca**: Impede busca por municípios não autorizados
+- **Mensagens de Erro**: Feedback claro quando usuário tenta acessar conteúdo restrito
+- **Estados Visuais**: Interface adaptada para mostrar apenas opções permitidas
+
+#### **Fluxo de Funcionamento Detalhado**
+
+##### **1. Carregamento Inicial da Página**
+```
+Usuário Viewer acessa /mapa
+├── Verificação de autenticação (middleware)
+├── Busca permissões via /api/municipios/permitidos
+├── Filtragem de dropdowns (estados/municípios permitidos)
+└── Interface renderizada com opções restritas
+```
+
+##### **2. Interação com Dropdowns**
+```
+Usuário seleciona estado no dropdown
+├── Sistema verifica se estado está na lista permitida
+├── Se SIM: Carrega municípios do estado normalmente
+├── Se NÃO: Estado não aparece no dropdown (filtrado)
+└── Apenas estados com pelo menos um município autorizado são exibidos
+```
+
+##### **3. Busca por Município**
+```
+Usuário digita nome de município
+├── Sistema verifica se município está na lista permitida
+├── Se SIM: Permite busca e destaque no mapa
+├── Se NÃO: Bloqueia busca e mostra mensagem de erro
+└── Mensagem: "Você não tem acesso a este município"
+```
+
+##### **4. Tratamento de Estados vs Municípios Específicos**
+```
+Cenário A: Acesso por Estado Completo
+├── Usuário tem acesso a pelo menos 1 município de PE
+├── Ganha acesso completo ao estado "Pernambuco"
+└── Pode ver/buscar TODOS os municípios de PE
+
+Cenário B: Acesso a Municípios Específicos
+├── Usuário tem acesso apenas a "Recife" e "Olinda" em PE
+├── Estado "Pernambuco" aparece no dropdown
+├── Apenas "Recife" e "Olinda" são visíveis na busca
+└── Outros municípios de PE ficam inacessíveis
+```
+
+#### **Implementação Técnica**
+
+##### **Backend - Endpoint de Permissões**
+```typescript
+// src/app/api/municipios/permitidos/route.ts
+export async function GET(request: Request) {
+  try {
+    // 1. Extrair e validar JWT token
+    const token = request.cookies.get('token')?.value;
+    const payload = await verifyToken(token);
+    
+    // 2. Buscar acessos válidos do usuário
+    const acessos = await prisma.municipio_acessos.findMany({
+      where: {
+        user_id: payload.userId,
+        OR: [
+          { valid_until: null }, // Acesso permanente
+          { valid_until: { gte: new Date() } } // Ainda válido
+        ]
+      },
+      include: { municipio: true }
+    });
+    
+    // 3. Processar permissões por estado
+    const allowedStates = new Set<string>();
+    const allowedMunicipios = new Set<number>();
+    
+    acessos.forEach(acesso => {
+      if (acesso.uf) {
+        // Acesso completo ao estado
+        allowedStates.add(acesso.uf);
+      } else if (acesso.municipio_id) {
+        // Acesso específico ao município
+        allowedMunicipios.add(acesso.municipio_id);
+        // Também adiciona o estado para aparecer no dropdown
+        allowedStates.add(acesso.municipio.name_state);
+      }
+    });
+    
+    // 4. Retornar permissões estruturadas
+    return NextResponse.json({
+      allowedStates: Array.from(allowedStates),
+      allowedMunicipios: Array.from(allowedMunicipios),
+      fullAccess: false // Sempre false para viewers
+    });
+    
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Erro ao buscar permissões' },
+      { status: 500 }
+    );
+  }
+}
+```
+
+##### **Frontend - Filtragem de Interface**
+```typescript
+// src/app/mapa/page.tsx - Hook de permissões
+const [permissions, setPermissions] = useState<{
+  allowedStates: string[];
+  allowedMunicipios: number[];
+  fullAccess: boolean;
+} | null>(null);
+
+useEffect(() => {
+  if (user?.role === 'Viewer') {
+    fetchPermissions();
+  } else {
+    // Admin/Gestor têm acesso total
+    setPermissions({ allowedStates: [], allowedMunicipios: [], fullAccess: true });
+  }
+}, [user]);
+
+// Filtragem de dropdowns
+const filteredEstados = fullAccess 
+  ? allEstados 
+  : allEstados.filter(estado => permissions?.allowedStates.includes(estado));
+
+// Bloqueio de busca
+const handleMunicipioSearch = (municipioNome: string) => {
+  const municipio = municipios.find(m => m.properties.municipio === municipioNome);
+  
+  if (!fullAccess && municipio) {
+    const hasAccess = permissions?.allowedMunicipios.includes(municipio.properties.id) ||
+                     permissions?.allowedStates.includes(municipio.properties.name_state);
+    
+    if (!hasAccess) {
+      setErrorMessage('Você não tem acesso a este município');
+      return;
+    }
+  }
+  
+  // Prossegue com busca normal
+  performSearch(municipio);
+};
+```
+
+#### **Exemplos Práticos de Uso**
+
+##### **Cenário 1: Viewer com Acesso Regional**
+```
+Usuário: João Silva (Viewer)
+Permissões: Municípios de Pernambuco + Paraíba
+Resultado na Interface:
+├── Dropdown Estados: Mostra "Pernambuco" e "Paraíba"
+├── Busca: Permite apenas municípios desses estados
+├── Mapa: Destaque funciona apenas para municípios autorizados
+└── Erro: "Acesso negado" para outros estados
+```
+
+##### **Cenário 2: Viewer com Acesso Específico**
+```
+Usuário: Maria Santos (Viewer)
+Permissões: Apenas "Recife" e "São Paulo"
+Resultado na Interface:
+├── Dropdown Estados: Mostra "Pernambuco" e "São Paulo"
+├── Busca Recife: ✅ Permitido
+├── Busca São Paulo: ✅ Permitido
+├── Busca Olinda: ❌ "Você não tem acesso a este município"
+└── Busca Rio de Janeiro: ❌ "Você não tem acesso a este município"
+```
+
+##### **Cenário 3: Viewer sem Acesso Válido**
+```
+Usuário: Pedro Costa (Viewer)
+Permissões: Todas expiradas ou nenhuma
+Resultado:
+├── Login: Bloqueado na autenticação
+└── Mensagem: "Seu acesso expirou. Entre em contato com o administrador."
+```
+
+#### **Benefícios da Implementação**
+
+##### **Segurança Aprimorada**
+- **Controle Granular**: Acesso baseado em permissões específicas por município
+- **Validação em Tempo Real**: Verificações ocorrem em cada interação
+- **Impedimento de Bypass**: Interface fisicamente impede acesso não autorizado
+- **Auditoria Completa**: Logs de tentativas de acesso não autorizado
+
+##### **Experiência do Usuário Otimizada**
+- **Interface Limpa**: Apenas opções relevantes são exibidas
+- **Feedback Imediato**: Mensagens claras sobre restrições
+- **Navegação Fluida**: Sem opções inválidas que gerem confusão
+- **Performance**: Filtragem reduz carga de dados desnecessários
+
+##### **Flexibilidade Administrativa**
+- **Permissões Temporárias**: Controle de validade por data
+- **Acesso por Estado**: Concessão rápida de acesso regional
+- **Acesso Específico**: Controle fino por município individual
+- **Gestão Centralizada**: Tudo gerenciado via tabela `municipio_acessos`
+
+##### **Manutenibilidade Técnica**
+- **Separação de Responsabilidades**: Backend cuida da lógica, frontend da UI
+- **Reutilização de Código**: Permissões podem ser usadas em outras páginas
+- **Testabilidade**: Endpoint isolado facilita testes automatizados
+- **Escalabilidade**: Fácil extensão para novos tipos de permissão
+
+#### **Casos de Uso Estratégicos**
+
+##### **Equipe de Vendas Regional**
+- Viewer pode acessar apenas municípios da sua região de atuação
+- Impede visualização de dados concorrenciais de outras regiões
+- Facilita foco no trabalho específico
+
+##### **Consultores Externos**
+- Acesso temporário apenas aos municípios do projeto
+- Controle automático de expiração ao fim do contrato
+- Segurança adicional contra vazamento de dados
+
+##### **Auditorias Específicas**
+- Equipe de auditoria acessa apenas municípios sob análise
+- Isolamento completo de outros dados do sistema
+- Rastreabilidade total das consultas realizadas
+
+#### **Monitoramento e Logs**
+- **Tentativas de Acesso**: Registradas para auditoria
+- **Uso do Sistema**: Métricas de acesso por usuário
+- **Performance**: Tempos de resposta do endpoint
+- **Erros**: Monitoramento de falhas na validação
+
+### 🎯 **Reforço de Segurança para Usuários Viewer (Novembro 2025)**
+
+#### **Visão Geral da Implementação**
+Além do controle granular de acesso aos dados municipais, foi implementado um reforço de segurança que bloqueia completamente o acesso às páginas `/estrategia` e `/rotas` para usuários Viewer que possuem restrições (registros na tabela `municipio_acessos`). Esta implementação garante que viewers restritos só possam acessar a página `/mapa`, mantendo a integridade do sistema de permissões.
+
+#### **Componentes Técnicos Implementados**
+
+##### **1. Middleware Reforçado (`middleware.ts`)**
+- **Bloqueio Server-Side**: Verificação ocorre no middleware antes do carregamento da página
+- **Consulta Dinâmica**: Para viewers, consulta `/api/municipios/acessos` para verificar se possui restrições
+- **Redirecionamento Automático**: Viewers restritos são redirecionados para `/acesso-negado`
+- **Preservação de Segurança**: Mantém todas as validações de autenticação existentes
+
+##### **2. Página de Acesso Negado (`/acesso-negado`)**
+- **Interface Amigável**: Design profissional com ícone de cadeado (Lucide React)
+- **Mensagem Clara**: Explica que o perfil possui restrições
+- **Navegação Segura**: Botão para voltar ao mapa sem quebrar o fluxo
+
+##### **3. Sidebar Inteligente (`Sidebar.tsx`)**
+- **Itens Sempre Visíveis**: Estratégia e Rotas aparecem para todos os usuários
+- **Indicador Visual**: Ícone de cadeado (LockKeyhole) para itens restritos
+- **Estilo Desabilitado**: Opacidade reduzida e cursor not-allowed para viewers restritos
+- **Navegação Controlada**: Clique em itens restritos direciona para `/acesso-negado`
+
+##### **4. Contexto do Usuário Estendido (`UserContext.tsx`)**
+- **Flag isRestricted**: Propriedade booleana que indica se o viewer possui restrições
+- **Consulta Automática**: Para viewers, consulta `/api/municipios/acessos` no login
+- **Estado Reativo**: Atualização automática do estado da UI baseada nas permissões
+
+#### **Fluxo de Segurança Completo**
+
+##### **1. Autenticação e Verificação**
+```
+Usuário Viewer faz login
+├── Validação JWT via /api/auth/verify
+├── Se role === 'viewer': consulta /api/municipios/acessos
+├── Define user.isRestricted baseado em totalAcessos > 0
+└── Estado do usuário atualizado no contexto
+```
+
+##### **2. Bloqueio no Middleware (Server-Side)**
+```
+Tentativa de acesso a /estrategia ou /rotas
+├── Middleware intercepta a requisição
+├── Valida token JWT
+├── Para viewers: consulta /api/municipios/acessos
+├── Se totalAcessos > 0: redirect para /acesso-negado
+└── Senão: permite acesso normal
+```
+
+##### **3. Controle na Interface (Client-Side)**
+```
+Renderização da Sidebar
+├── Itens Estratégia/Rotas sempre visíveis
+├── Para viewers restritos: estilo desabilitado + ícone cadeado
+├── Clique em itens desabilitados: navegação para /acesso-negado
+└── UX consistente entre server e client
+```
+
+#### **Implementação Técnica Detalhada**
+
+##### **Middleware - Bloqueio Server-Side**
+```typescript
+// src/middleware.ts - Regras adicionais para viewers
+if (role === 'viewer' && isRestrictedPage) {
+  try {
+    const acessosResp = await fetch(new URL('/api/municipios/acessos', request.url), {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    
+    if (acessosResp.ok) {
+      const acessosData = await acessosResp.json();
+      const totalAcessos = typeof acessosData?.totalAcessos === 'number' ? acessosData.totalAcessos : 0;
+      if (totalAcessos > 0) {
+        return NextResponse.redirect(new URL('/acesso-negado', request.url));
+      }
+    }
+  } catch {
+    // Fallback: não bloqueia se houver erro na consulta
+  }
+}
+```
+
+##### **UserContext - Detecção de Restrição**
+```typescript
+// src/contexts/UserContext.tsx - Enriquecimento do usuário
+if (String(enrichedUser.role || '').toLowerCase() === 'viewer') {
+  try {
+    const acessosResp = await fetch('/api/municipios/acessos', { credentials: 'include' });
+    if (acessosResp.ok) {
+      const acessosData = await acessosResp.json();
+      const totalAcessos = typeof acessosData?.totalAcessos === 'number' ? acessosData.totalAcessos : 0;
+      enrichedUser = { ...enrichedUser, isRestricted: totalAcessos > 0 };
+    }
+  } catch {
+    enrichedUser = { ...enrichedUser, isRestricted: false };
+  }
+}
+```
+
+##### **Sidebar - Controle Visual**
+```typescript
+// src/components/Sidebar.tsx - Itens com controle de acesso
+const isViewerRestricted = (user?.role || '').toLowerCase() === 'viewer' && user?.isRestricted;
+const disabledIds = isViewerRestricted ? new Set(['estrategia', 'rotas']) : new Set<string>();
+
+const menuItems = [
+  { id: 'home', label: 'Dashboard', icon: 'fa-solid fa-chart-line', path: '/mapa' },
+  { id: 'estrategia', label: 'Estratégia (Beta)', icon: 'fa-solid fa-chess', path: '/estrategia', disabled: disabledIds.has('estrategia') },
+  { id: 'rotas', label: 'Roteamento (Beta)', icon: 'fa-solid fa-route', path: '/rotas', disabled: disabledIds.has('rotas') },
+  { id: 'logout', label: 'Logout', icon: 'fa-solid fa-right-from-bracket', path: '#' }
+];
+
+// Renderização com estilo condicional
+{isDisabled ? 'opacity-60 text-gray-400 cursor-not-allowed' : 'hover:bg-slate-700'}
+{isOpen && isDisabled && <LockKeyhole size={16} className="ml-2 text-gray-400" />}
+```
+
+#### **Cenários de Uso e Comportamento**
+
+##### **Cenário 1: Admin ou Gestor**
+```
+Acesso: Total a todas as páginas
+Sidebar: Estratégia e Rotas normais (sem cadeado)
+Middleware: Permite acesso completo
+```
+
+##### **Cenário 2: Viewer sem Restrição**
+```
+Acesso: Total a todas as páginas (igual admin/gestor)
+Sidebar: Estratégia e Rotas normais (sem cadeado)
+Middleware: Permite acesso completo
+```
+
+##### **Cenário 3: Viewer com Restrição**
+```
+Acesso: Apenas /mapa (bloqueado em /estrategia e /rotas)
+Sidebar: Estratégia e Rotas com cadeado e estilo desabilitado
+Middleware: Redireciona para /acesso-negado
+Clique na Sidebar: Navega para /acesso-negado
+```
+
+#### **Benefícios da Arquitetura de Segurança**
+
+##### **Defesa em Múltiplas Camadas**
+- **Server-Side**: Middleware bloqueia acesso direto por URL
+- **Client-Side**: UI desabilita itens visualmente
+- **API-Level**: Endpoints verificam permissões internamente
+
+##### **Experiência do Usuário Consistente**
+- **Feedback Imediato**: Ícone de cadeado indica restrição visualmente
+- **Navegação Segura**: Redirecionamento amigável para página de aviso
+- **Transparência**: Usuário entende por que não pode acessar
+
+##### **Manutenibilidade e Escalabilidade**
+- **Separação de Responsabilidades**: Middleware cuida do server, contexto da UI
+- **Reutilização**: Flag isRestricted pode ser usada em outros componentes
+- **Extensibilidade**: Fácil adicionar novas páginas restritas
+
+##### **Segurança Robusta**
+- **Impossível Bypass**: Bloqueio server-side previne manipulação client-side
+- **Validação em Tempo Real**: Consulta banco em cada acesso protegido
+- **Fallback Seguro**: Em caso de erro, não bloqueia (preserva funcionalidade)
+
+#### **Arquivos Modificados/Criados**
+- `src/middleware.ts`: Bloqueio server-side para viewers restritos
+- `src/app/acesso-negado/page.tsx`: Página de aviso profissional
+- `src/components/Sidebar.tsx`: Controle visual com ícone de cadeado
+- `src/contexts/UserContext.tsx`: Flag isRestricted para controle da UI
+
+Esta implementação garante que usuários Viewer com restrições tenham acesso controlado e seguro, com uma experiência de usuário profissional que comunica claramente as limitações de acesso.
+
+Esta implementação garante que usuários Viewer tenham acesso controlado e seguro aos dados, mantendo a integridade do sistema enquanto proporciona uma experiência de usuário adequada às suas permissões.
+
 ### 🗺️ **Mapa Interativo Avançado**
 - **Visualização de Camadas Temáticas**:
   - Municípios (base demográfica, política e produtos)
@@ -1795,4 +2256,4 @@ Distribuído sob a **Licença MIT**. Consulte o arquivo `LICENSE` para mais deta
 
 ---
 
-**Última atualização**: Outubro 2025 - Sistema de Rotas Multimodal + Controle Preventivo de Custos Google Maps API + Integração Completa de Municípios Sem Tag + Integração Completa de Pistas de Voo + Otimização de Periferias Independentes + Filtro de Raio Estratégico de João Pessoa + Modo Vendas - Análise de Oportunidades + Estabilidade/Performance da página /estrategia (debounce em filho, coalescência de workers, GeoJSON slimming, dedupe por hash)
+**Última atualização**: Novembro 2025 - Reforço de Segurança para Usuários Viewer + Controle de Acesso Server-Side + Interface Visual com Cadeado + Página de Acesso Negado + Sistema de Rotas Multimodal + Controle Preventivo de Custos Google Maps API + Integração Completa de Municípios Sem Tag + Integração Completa de Pistas de Voo + Otimização de Periferias Independentes + Filtro de Raio Estratégico de João Pessoa + Modo Vendas - Análise de Oportunidades + Estabilidade/Performance da página /estrategia (debounce em filho, coalescência de workers, GeoJSON slimming, dedupe por hash)

@@ -154,6 +154,7 @@ function MapaPageContent() {
   const [municipio, setMunicipio] = useState<string>("");
   const [estado, setEstado] = useState<string>("");
   const [erroBusca, setErroBusca] = useState<string | null>(null);
+  const [permissaoMensagem, setPermissaoMensagem] = useState<string | null>(null);
   const [estados, setEstados] = useState<string[]>([]);
   const [municipios, setMunicipios] = useState<string[]>([]);
   const [estadoSelecionado, setEstadoSelecionado] = useState<string>("");
@@ -173,6 +174,15 @@ function MapaPageContent() {
   const estadosDropdownRef = useRef<HTMLDivElement>(null);
   const municipiosDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Controle de permissões para viewers
+  const [fullAccess, setFullAccess] = useState<boolean | null>(null);
+  // Estados permitidos por UF (nome completo) → dá acesso a TODOS os municípios do estado
+  const allowedUFStatesSetRef = useRef<Set<string>>(new Set());
+  // Estados exibidos no dropdown (união de UFs permitidas + estados de municípios específicos)
+  const displayStatesSetRef = useRef<Set<string>>(new Set());
+  // Municípios específicos permitidos (chave: "municipio|name_state")
+  const allowedMunicipiosKeySetRef = useRef<Set<string>>(new Set());
+
   // Estados prioritários (Nordeste + Mato Grosso - abertura comercial)
   const estadosPrioritarios = [
     "Alagoas", "Bahia", "Ceará", "Maranhão", "Paraíba",
@@ -188,9 +198,14 @@ function MapaPageContent() {
       );
     }
 
+    // Para viewer com restrição, sempre exibir apenas a lista restrita (estados)
+    if (user?.role && String(user.role).toLowerCase() === 'viewer' && fullAccess === false) {
+      return estados;
+    }
+
     // PRIORIDADE 2: Sem texto digitado, respeitar a expansão
     return estadosExpanded ? estados : estadosPrioritarios;
-  }, [estados, estadosPrioritarios, estadosExpanded, estadoInputValue]);
+  }, [estados, estadosPrioritarios, estadosExpanded, estadoInputValue, user?.role, fullAccess]);
 
   // Municípios filtrados baseado no input
   const municipiosFiltrados = useMemo(() => {
@@ -306,17 +321,24 @@ function MapaPageContent() {
   // Extrair estados únicos do GeoJSON quando os dados forem carregados
   useEffect(() => {
     if (mapData?.dados && mapData.dados.features) {
-      const estadosUnicos = [...new Set(mapData.dados.features
+      let estadosUnicos = [...new Set(mapData.dados.features
         .map((feature: Feature) => feature.properties?.name_state)
         .filter(Boolean)
         .sort()
-      )];
+      )] as string[];
+
+      // Se viewer com restrição, filtrar estados conforme permissões (UFs e/ou municípios específicos)
+      if (user?.role && String(user.role).toLowerCase() === 'viewer' && fullAccess === false) {
+        const displayStates = displayStatesSetRef.current;
+        estadosUnicos = estadosUnicos.filter(e => displayStates.has(e));
+      }
+
       console.log(`📊 [MapaPage] ${userInfo} - Estados carregados: ${estadosUnicos.length} estados encontrados`);
-      setEstados(estadosUnicos as string[]);
+      setEstados(estadosUnicos);
     } else {
       console.log(`📊 [MapaPage] ${userInfo} - Aguardando dados do mapa...`);
     }
-  }, [mapData, userInfo]);
+  }, [mapData, userInfo, user?.role, fullAccess]);
   
   // Atualizar municípios quando um estado for selecionado
   useEffect(() => {
@@ -327,11 +349,21 @@ function MapaPageContent() {
 
     console.log(`🏛️ [MapaPage] ${userInfo} - Estado selecionado: ${estadoSelecionado}`);
 
-    const municipiosDoEstado = mapData.dados.features
+    let municipiosDoEstado = mapData.dados.features
       .filter((feature: Feature) => feature.properties?.name_state === estadoSelecionado)
       .map((feature: Feature) => feature.properties?.nome_municipio || feature.properties?.municipio)
       .filter(Boolean)
-      .sort();
+      .sort() as string[];
+
+    // Se viewer com restrição, aplicar filtro por permissões
+    if (user?.role && String(user.role).toLowerCase() === 'viewer' && fullAccess === false) {
+      const allowedUFStates = allowedUFStatesSetRef.current;
+      const allowedMunicipios = allowedMunicipiosKeySetRef.current;
+      if (!allowedUFStates.has(estadoSelecionado)) {
+        // Estado não está na lista de UFs permitidas → mostrar apenas municípios específicos permitidos neste estado
+        municipiosDoEstado = municipiosDoEstado.filter((m) => allowedMunicipios.has(`${m}|${estadoSelecionado}`));
+      }
+    }
 
     console.log(`🏛️ [MapaPage] ${userInfo} - Municípios encontrados para ${estadoSelecionado}: ${municipiosDoEstado.length}`);
     setMunicipios([...new Set(municipiosDoEstado)] as string[]);
@@ -386,6 +418,85 @@ function MapaPageContent() {
   function removerAcentos(str: string) {
     return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   }
+
+  // Buscar permissões do usuário viewer e preparar filtros da UI
+  useEffect(() => {
+    const loadPermissoes = async () => {
+      try {
+        if (!user?.role) return;
+        if (String(user.role).toLowerCase() !== 'viewer') {
+          setFullAccess(true);
+          setPermissaoMensagem(null);
+          return;
+        }
+        const resp = await fetch('/api/municipios/permitidos', { credentials: 'same-origin' });
+        if (!resp.ok) {
+          console.warn('Não foi possível carregar permissões do usuário. Status:', resp.status);
+          setFullAccess(null);
+          return;
+        }
+        const data = await resp.json();
+        if (data.fullAccess) {
+          setFullAccess(true);
+          setPermissaoMensagem(null);
+          return;
+        }
+        setFullAccess(false);
+
+        // Estados (nome completo)
+        const ufStatesSet = new Set<string>();
+        const displayStatesSet = new Set<string>();
+        const muniKeys = new Set<string>();
+        const estadosResp: Array<{ uf: string; uf_name: string }> = Array.isArray(data.estados) ? data.estados : [];
+        const municipiosResp: Array<{ id: number; municipio: string; name_state: string }> = Array.isArray(data.municipios) ? data.municipios : [];
+
+        for (const e of estadosResp) {
+          if (e?.uf_name) {
+            ufStatesSet.add(e.uf_name);
+            displayStatesSet.add(e.uf_name);
+          }
+        }
+        for (const m of municipiosResp) {
+          if (m?.municipio && m?.name_state) {
+            muniKeys.add(`${m.municipio}|${m.name_state}`);
+            // Garantir que o estado do município específico também apareça no dropdown de estados
+            displayStatesSet.add(m.name_state);
+          }
+        }
+
+        allowedUFStatesSetRef.current = ufStatesSet;
+        displayStatesSetRef.current = displayStatesSet;
+        allowedMunicipiosKeySetRef.current = muniKeys;
+
+        if (displayStatesSet.size === 0 && muniKeys.size === 0) {
+          setPermissaoMensagem('Você não possui acesso a nenhum município ou estado nesta plataforma.');
+        } else {
+          setPermissaoMensagem(null);
+        }
+
+        // Se já temos lista de estados carregada do mapa, reduzir imediatamente
+        if (mapData?.dados?.features) {
+          const todosEstados = [...new Set(mapData.dados.features
+            .map((f: Feature) => f.properties?.name_state)
+            .filter(Boolean)
+            .sort()
+          )] as string[];
+          const estadosFiltrados = todosEstados.filter(e => displayStatesSet.has(e));
+          setEstados(estadosFiltrados);
+          // Reset seleção se estado atual não estiver permitido
+          if (estadoSelecionado && !displayStatesSet.has(estadoSelecionado)) {
+            setEstadoSelecionado('');
+            setMunicipios([]);
+          }
+        }
+      } catch (err) {
+        console.error('Erro ao carregar permissões do usuário:', err);
+      }
+    };
+
+    loadPermissoes();
+    // Recarregar quando usuário mudar
+  }, [user, mapData]);
   function handleBuscarMunicipio(e: React.FormEvent) {
     e.preventDefault();
     console.log(`🔍 [MapaPage] ${userInfo} - Iniciando busca de município...`);
@@ -398,6 +509,17 @@ function MapaPageContent() {
     // Se temos o município selecionado no dropdown, usamos ele diretamente
     if (estadoSelecionado && municipioSelecionadoDropdown) {
       console.log(`🔍 [MapaPage] ${userInfo} - Busca por lista: ${municipioSelecionadoDropdown} - ${estadoSelecionado}`);
+
+      // Restrições para viewer
+      if (user?.role && String(user.role).toLowerCase() === 'viewer' && fullAccess === false) {
+        const allowedStates = allowedUFStatesSetRef.current;
+        const allowedMunicipios = allowedMunicipiosKeySetRef.current;
+        const permitido = allowedStates.has(estadoSelecionado) || allowedMunicipios.has(`${municipioSelecionadoDropdown}|${estadoSelecionado}`);
+        if (!permitido) {
+          setErroBusca('Você não possui acesso ao município ou estado selecionado.');
+          return;
+        }
+      }
 
       const municipioEncontrado = mapData.dados.features.find((feature: Feature) =>
         (feature.properties?.nome_municipio === municipioSelecionadoDropdown ||
@@ -461,6 +583,19 @@ function MapaPageContent() {
     });
 
     if (municipioEncontrado) {
+      // Restrições para viewer (busca por texto)
+      if (user?.role && String(user.role).toLowerCase() === 'viewer' && fullAccess === false) {
+        const nome = municipioEncontrado.properties?.nome_municipio || municipioEncontrado.properties?.municipio;
+        const ufName = municipioEncontrado.properties?.name_state;
+        const allowedStates = allowedUFStatesSetRef.current;
+        const allowedMunicipios = allowedMunicipiosKeySetRef.current;
+        const permitido = (ufName && allowedStates.has(ufName)) || (nome && ufName && allowedMunicipios.has(`${nome}|${ufName}`));
+        if (!permitido) {
+          console.warn(`🚫 [MapaPage] ${userInfo} - Acesso negado a ${nome} - ${ufName}`);
+          setErroBusca('Você não possui acesso ao município ou estado selecionado.');
+          return;
+        }
+      }
       console.log(`✅ [MapaPage] ${userInfo} - Município encontrado por texto: ${municipioEncontrado.properties?.nome_municipio || municipioEncontrado.properties?.municipio}`);
 
       let municipioFinal = municipioEncontrado;
@@ -731,7 +866,7 @@ function MapaPageContent() {
                     setMunicipioSelecionado(null);
                     setErroBusca(null);
                   }}
-                  className="w-full md:w-auto border border-slate-600 text-white bg-transparent hover:bg-red-900/30 font-semibold py-1.5 px-4 rounded-md transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-[#0f172a] flex items-center justify-center gap-2"
+                  className="w-full md:w-auto border border-slate-600 text-white bg-transparent hover:bg-red-700/30 font-semibold py-1.5 px-4 rounded-md transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-[#0f172a] flex items-center justify-center gap-2"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -792,6 +927,11 @@ function MapaPageContent() {
 
             {erroBusca && (
               <span className="text-red-400 mt-1 text-sm">{erroBusca}</span>
+            )}
+            {permissaoMensagem && (
+              <div className="mt-2 text-sm text-amber-300">
+                {permissaoMensagem}
+              </div>
             )}
           </section>
         </div>

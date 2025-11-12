@@ -15,13 +15,61 @@
 10. [Fluxo da Aplicação](#fluxo-da-aplicação)
 11. [Contribuindo](#contribuindo)
 12. [Licença](#licença)
+13. [Dockerização](#dockerização)
 
 ---
 
 ## Visão Geral
 O **NEXUS** é uma plataforma web desenvolvida pela *Data Science Team – Innovatis MC* que oferece uma visão unificada de dados municipais, com ênfase em **planos diretores**, **produtos** e **serviços** relacionados aos municípios do Brasil. Utilizando mapas interativos, a plataforma possibilita que a Diretoria de Estratégia e Mercado tome decisões baseadas em dados atualizados e confiáveis.
 
----
+
+## Dockerização
+
+Este repositório foi preparado para execução em containers usando Docker e Docker Compose. A dockerização facilita:
+
+- Execução isolada da aplicação e serviços (Postgres + PostGIS, Redis).
+- Reprodutibilidade do ambiente (mesmas versões das dependências).
+- Deploy em ambientes baseados em containers ou orquestradores.
+
+Arquivos e alterações principais adicionados:
+
+- `Dockerfile` — Multi-stage build otimizado para Next.js 15, Prisma e produção.
+- `docker-compose.yml` — Orquestração dos serviços: `nexus-app`, `postgres` (PostGIS), `redis` e `nginx` (opcional).
+- `.dockerignore` — Reduz o contexto de build para imagens menores e mais rápidas.
+- `docker/scripts/setup.ps1` e `docker/scripts/setup.sh` — Scripts automatizados para Windows e Unix, respectivamente.
+- `docker/scripts/init-db.sh` — Criação de extensões PostGIS e outras configurações iniciais do banco.
+- `src/app/api/health/route.ts` — Endpoint de health check usado pelo Docker e monitoramento.
+- `DOCKER_GUIDE.md` — Guia completo com passo-a-passo, troubleshooting e recomendações de produção.
+
+Como começar (resumo rápido):
+
+1. Garanta que o Docker Desktop (Windows) ou Docker Engine (Linux/Mac) esteja instalado e rodando.
+2. Copie ou configure o arquivo de ambiente `.env` com as variáveis essenciais (DATABASE_URL, JWT_SECRET, GOOGLE_MAPS_API_KEY, AWS_* etc.).
+3. No Windows (PowerShell) execute:
+
+```powershell
+cd "C:\Users\victo\OneDrive\Desktop\Arquivos Victor\NEXUS\projeto-nexus"
+.\docker\scripts\setup.ps1
+```
+
+Ou manualmente com Docker Compose:
+
+```powershell
+docker-compose build --no-cache nexus-app
+docker-compose up -d postgres redis
+docker-compose run --rm nexus-app npx prisma migrate deploy
+docker-compose up -d nexus-app
+```
+
+Após a inicialização acesse: http://localhost:3000 e verifique o health check em `/api/health`.
+
+Notas de segurança e produção:
+
+- Altere senhas e segredos padrão do `docker-compose.yml` antes de usar em produção.
+- Configure variáveis sensíveis (`JWT_SECRET`, chaves AWS, Google Maps) via `.env` ou secret manager.
+- Para produção considere expor a aplicação através de um proxy Nginx com TLS (configuração incluída como profile opcional no `docker-compose.yml`).
+
+Mais detalhes, exemplos de troubleshooting, e comandos extras estão em `DOCKER_GUIDE.md`.
 
 ## Principais Funcionalidades
 

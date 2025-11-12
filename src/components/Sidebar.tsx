@@ -51,7 +51,6 @@ export default function Sidebar({ className = '' }: SidebarProps) {
     );
   }
   
-
   const isViewerRestricted = (user?.role || '').toLowerCase() === 'viewer' && user?.isRestricted;
   const disabledIds = isViewerRestricted ? new Set(['estrategia', 'rotas']) : new Set<string>();
 

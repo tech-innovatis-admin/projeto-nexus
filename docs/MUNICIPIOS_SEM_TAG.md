@@ -4,7 +4,7 @@ Esta camada exibe municípios que não são Polo nem Periferia ("sem tag") como 
 
 ## Como fornecer os dados
 
-- O frontend consome via endpoint: `/api/proxy-geojson/base_sem_tag.json`, que acessa a origem (S3) e retorna JSON.
+- O frontend consome via endpoint: `/api/proxy-geojson/municipios_sem_tag.json`, que acessa a origem (S3) e retorna JSON.
 - Garanta que o backend/roteador esteja configurado para este caminho (já previsto no projeto).
 
 ### Formatos aceitos

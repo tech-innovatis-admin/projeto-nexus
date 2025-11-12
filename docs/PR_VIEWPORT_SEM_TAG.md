@@ -8,7 +8,7 @@ Resumo do PR
 
 Arquivos alterados
 - `src/app/layout.tsx`: remove `viewport` de `metadata` e adiciona `export const viewport` (Next 13.4+).
-- `src/components/MapLibrePolygons.tsx`: atualiza o fetch para `/api/proxy-geojson/base_sem_tag.json`, ajusta mensagens de log, mantém normalização e filtro por UF.
+- `src/components/MapLibrePolygons.tsx`: atualiza o fetch para `/api/proxy-geojson/municipios_sem_tag.json`, ajusta mensagens de log, mantém normalização e filtro por UF.
 - `docs/MUNICIPIOS_SEM_TAG.md`: atualiza instruções para uso do endpoint.
 
 Como validar localmente
@@ -18,8 +18,8 @@ Como validar localmente
 2. Acesse a página `/estrategia` e verifique o console do navegador:
    - Não deve aparecer o warning: `Unsupported metadata viewport is configured in metadata export`.
    - Deve aparecer o log: `Sem Tag carregado: 1723 municípios.` (ou a contagem correspondente do arquivo S3).
-3. Abra o DevTools > Network e filtre por `base_sem_tag.json`:
-   - Requisição para `/api/proxy-geojson/base_sem_tag.json` deve retornar `Status 200`.
+3. Abra o DevTools > Network e filtre por `municipios_sem_tag.json`:
+   - Requisição para `/api/proxy-geojson/municipios_sem_tag.json` deve retornar `Status 200`.
    - Response `Content-Type: application/json` e payload contendo 1723 registros (normalizados em `features`).
 4. No mapa, verifique visualmente:
    - A camada "Sem Tag" (cinza claro) aparece por baixo de Periferia e Polos.

@@ -13,7 +13,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Verifica se é uma rota protegida (/mapa, /estrategia ou /rotas)
-  if (pathname.startsWith('/mapa') || pathname.startsWith('/estrategia') || pathname.startsWith('/rotas')) {
+  if (pathname.startsWith('/mapa') || pathname.startsWith('/estrategia') || pathname.startsWith('/rotas') || pathname.startsWith('/perfil')) {
     const token = request.cookies.get('auth_token')?.value;
     
     // Se não houver token, redireciona para o login
@@ -24,9 +24,13 @@ export async function middleware(request: NextRequest) {
 
     try {
       // Verifica se o token é válido fazendo uma chamada para a API
-      const verifyResponse = await fetch(new URL('/api/auth/verify', request.url), {
+      const baseUrl = process.env.NODE_ENV === 'production' 
+        ? `http://localhost:3000` 
+        : request.url.split('/').slice(0, 3).join('/');
+      const verifyResponse = await fetch(`${baseUrl}/api/auth/verify`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'Cookie': `auth_token=${token}`
         }
       });
       const verifyData = await verifyResponse.json();
@@ -76,9 +80,13 @@ export async function middleware(request: NextRequest) {
     const token = request.cookies.get('auth_token')?.value;
     if (token) {
       try {
-        const verifyResponse = await fetch(new URL('/api/auth/verify', request.url), {
+        const baseUrl = process.env.NODE_ENV === 'production' 
+          ? `http://localhost:3000` 
+          : request.url.split('/').slice(0, 3).join('/');
+        const verifyResponse = await fetch(`${baseUrl}/api/auth/verify`, {
           headers: {
-            'Authorization': `Bearer ${token}`
+            'Authorization': `Bearer ${token}`,
+            'Cookie': `auth_token=${token}`
           }
         });
 
@@ -98,5 +106,5 @@ export async function middleware(request: NextRequest) {
 
 // Especifica os caminhos que o middleware deve ser executado
 export const config = {
-  matcher: ['/mapa/:path*', '/estrategia/:path*', '/rotas/:path*', '/login', '/data/:path*']
+  matcher: ['/mapa/:path*', '/estrategia/:path*', '/rotas/:path*', '/login', '/data/:path*', '/perfil/:path*']
 }; 

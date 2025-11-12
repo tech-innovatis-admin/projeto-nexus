@@ -221,7 +221,7 @@ export const ExemploIntegracaoCompleta = () => {
 
 export const configuracaoRotasNexus = {
   // Configuração padrão otimizada para o Brasil
-  velocidadeMediaVooKmh: 220, // Helicóptero médio
+  velocidadeMediaVooKmh: 300, // Helicóptero médio
   preferirVooEntrePolos: true,
   limitarDistanciaMaximaTerrestreKm: 400, // Acima de 400km, preferir voo
   otimizarOrdemPolos: true,

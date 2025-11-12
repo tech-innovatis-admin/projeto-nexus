@@ -1,0 +1,169 @@
+# =============================================================================
+# DOCKER COMPOSE - NEXUS Platform
+# =============================================================================
+# Orquestração completa dos serviços:
+# - PostgreSQL Database
+# - NEXUS Application (Next.js)
+# - Redis Cache (opcional)
+# - Volume persistente para dados
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # ---------------------------------------------------------------------------
+  # DATABASE: PostgreSQL com PostGIS para dados geoespaciais
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgis/postgis:15-3.4-alpine
+    container_name: nexus-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: nexus_db
+      POSTGRES_USER: nexus_user
+      POSTGRES_PASSWORD: nexus_password_2025
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    ports:
+      - "5432:5432"
+    volumes:
+      - nexus_postgres_data:/var/lib/postgresql/data
+      - ./prisma/init:/docker-entrypoint-initdb.d
+    networks:
+      - nexus-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexus_user -d nexus_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # CACHE: Redis para sessões e cache de dados
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: nexus-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - nexus_redis_data:/data
+    networks:
+      - nexus-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ---------------------------------------------------------------------------
+  # APPLICATION: NEXUS Platform (Next.js)
+  # ---------------------------------------------------------------------------
+  nexus-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    container_name: nexus-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      # Database Configuration
+      DATABASE_URL: "postgresql://nexus_user:nexus_password_2025@postgres:5432/nexus_db?schema=public"
+      
+      # Redis Configuration
+      REDIS_URL: "redis://redis:6379"
+      
+      # Application Configuration
+      NODE_ENV: production
+      NEXT_TELEMETRY_DISABLED: 1
+      PORT: 3000
+      HOSTNAME: "0.0.0.0"
+      
+      # JWT Configuration
+      JWT_SECRET: "nexus_jwt_secret_2025_production"
+      
+      # API Keys (configure conforme necessário)
+      GOOGLE_MAPS_API_KEY: "${GOOGLE_MAPS_API_KEY:-}"
+      AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID:-}"
+      AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY:-}"
+      AWS_REGION: "${AWS_REGION:-us-east-1}"
+      AWS_S3_BUCKET: "${AWS_S3_BUCKET:-}"
+      
+      # External APIs
+      OSRM_API_URL: "${OSRM_API_URL:-http://router.project-osrm.org}"
+      
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - nexus-network
+    volumes:
+      - nexus_app_uploads:/app/uploads
+      - nexus_app_cache:/app/.next/cache
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ---------------------------------------------------------------------------
+  # NGINX: Reverse Proxy e Load Balancer (opcional para produção)
+  # ---------------------------------------------------------------------------
+  nginx:
+    image: nginx:alpine
+    container_name: nexus-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - nexus_ssl_certs:/etc/ssl/certs
+    depends_on:
+      - nexus-app
+    networks:
+      - nexus-network
+    profiles:
+      - production
+
+# =============================================================================
+# NETWORKS: Rede isolada para comunicação entre containers
+# =============================================================================
+networks:
+  nexus-network:
+    driver: bridge
+    name: nexus-network
+
+# =============================================================================
+# VOLUMES: Armazenamento persistente
+# =============================================================================
+volumes:
+  # Database Data
+  nexus_postgres_data:
+    name: nexus_postgres_data
+    driver: local
+  
+  # Redis Data
+  nexus_redis_data:
+    name: nexus_redis_data
+    driver: local
+  
+  # Application Data
+  nexus_app_uploads:
+    name: nexus_app_uploads
+    driver: local
+  
+  nexus_app_cache:
+    name: nexus_app_cache
+    driver: local
+  
+  # SSL Certificates
+  nexus_ssl_certs:
+    name: nexus_ssl_certs
+    driver: local

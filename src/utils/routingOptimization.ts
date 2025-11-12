@@ -273,8 +273,8 @@ function gerarNomeRota(polos: MunicipioPolo[], periferias: MunicipioPeriferia[])
  * Valida se a configuração de rota é válida
  */
 export function validarConfiguracaoRota(config: ConfiguracaoRota): boolean {
-  if (config.velocidadeMediaVooKmh < 100 || config.velocidadeMediaVooKmh > 400) {
-    console.warn('[Validação] Velocidade de voo fora do intervalo válido (100-400 km/h)');
+  if (config.velocidadeMediaVooKmh < 100 || config.velocidadeMediaVooKmh > 1000) {
+    console.warn('[Validação] Velocidade de voo fora do intervalo válido (100-1000 km/h)');
     return false;
   }
 

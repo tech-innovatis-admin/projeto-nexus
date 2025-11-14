@@ -2973,8 +2973,15 @@ export default function EstrategiaPage() {
                         onClick={() => setIsProdutosOpen(v => !v)}
                         className="relative bg-[#1e293b] text-white border border-slate-600 rounded-md px-3 pr-8 py-1.5 text-left flex items-center min-h-[40px] focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500"
                       >
-                        <span className="text-sm">
-                          {selectedProducts.length === PRODUCTS.length ? 'Todos' : selectedProducts.length === 0 ? 'Nenhum' : selectedProducts.map(k => (PRODUCTS.find(p => p.key === k)?.label || k)).join(', ')}
+                        <span className="text-sm truncate block w-full">
+                          {selectedProducts.length === PRODUCTS.length
+                            ? 'Todos'
+                            : selectedProducts.length === 0
+                              ? 'Nenhum'
+                              : selectedProducts
+                                  .map(k => (PRODUCTS.find(p => p.key === k)?.label || k))
+                                  .join(', ')
+                          }
                         </span>
                         <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 text-slate-300 transition-transform absolute right-2 top-1/2 -translate-y-1/2 ${isProdutosOpen ? 'rotate-180' : ''}`} viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clipRule="evenodd"/></svg>
                       </button>

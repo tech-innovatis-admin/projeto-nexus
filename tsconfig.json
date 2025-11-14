@@ -4,6 +4,7 @@
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
+    "types": ["next", "next/image-types/global"],
     "strict": true,
     "noEmit": true,
     "esModuleInterop": true,
@@ -26,6 +27,6 @@
       "./src/types"
     ]
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "src/types/**/*.d.ts"],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "src/types/**/*.d.ts", "src/utils/mapHoverHandlers.examples.ts.example"],
   "exclude": ["node_modules"]
 }

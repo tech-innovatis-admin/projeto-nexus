@@ -22,6 +22,7 @@ const CONFIGURACAO_PADRAO: ConfiguracaoRota = {
   otimizarOrdemPolos: true,
   otimizarRotasPeriferias: true,
   limitarDistanciaMaximaTerrestreKm: undefined,
+  retornarParaOrigem: false,
   poloToPoloOverrides: {}
 };
 
@@ -265,7 +266,8 @@ export function useRotas() {
             const proximoPolo = polosOrdenados[i + 1];
             // Verificar override do usuário para este par de polos
             const chaveOverride = `${poloAtual.codigo}->${proximoPolo.codigo}`;
-            const modo = configuracao.poloToPoloOverrides?.[chaveOverride] || (configuracao.preferirVooEntrePolos ? 'voo' : 'terrestre');
+            const modo = configuracao.poloToPoloOverrides?.[chaveOverride] ||
+              (configuracao.preferirVooEntrePolos ? 'voo' : 'terrestre');
 
             if (modo === 'terrestre') {
               // Permitir explicitamente rota terrestre entre polos
@@ -274,6 +276,22 @@ export function useRotas() {
             } else {
               trechos.push(criarTrechoVoo(poloAtual, proximoPolo, configuracao));
             }
+          }
+        }
+
+        // 3.3. Opcionalmente fechar o ciclo retornando ao primeiro polo
+        if (configuracao.retornarParaOrigem && polosOrdenados.length > 1) {
+          const primeiroPolo = polosOrdenados[0];
+          const ultimoPolo = polosOrdenados[polosOrdenados.length - 1];
+          const chaveOverrideCiclo = `${ultimoPolo.codigo}->${primeiroPolo.codigo}`;
+          const modoCiclo = configuracao.poloToPoloOverrides?.[chaveOverrideCiclo] ||
+            (configuracao.preferirVooEntrePolos ? 'voo' : 'terrestre');
+
+          if (modoCiclo === 'terrestre') {
+            const trechoCiclo = await criarTrechoTerrestre(ultimoPolo, primeiroPolo, true);
+            trechos.push(trechoCiclo);
+          } else {
+            trechos.push(criarTrechoVoo(ultimoPolo, primeiroPolo, configuracao));
           }
         }
       }

@@ -28,26 +28,113 @@ function ModalOrcamento({ isOpen, onClose, mapData }) {
   // Load universe from mapData
   useEffect(() => {
     if (!isOpen) return;
-    try {
-      const states = [...new Set((mapData?.dados?.features || [])
-        .map(f => f?.properties?.name_state)
-        .filter(Boolean))].sort();
-      setAllStates(states);
+    
+    const loadPermissionsAndData = async () => {
+      try {
+        let allowedStates = new Set();
+        let allowedMunicipios = new Set(); // Set of "municipio|state" keys
+        let isRestricted = false;
 
-      const municipalities = (mapData?.dados?.features || []).map(f => {
-        const props = f?.properties || {};
-        const name = props?.nome_municipio || props?.municipio;
-        const state = props?.name_state;
-        return name && state ? ({ name, state, data: props }) : null;
-      }).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }));
-      setAllMunicipalities(municipalities);
+        // Check if user is a restricted viewer
+        if (user?.role && String(user.role).toLowerCase() === 'viewer') {
+          try {
+            const resp = await fetch('/api/municipios/permitidos', { credentials: 'same-origin' });
+            if (resp.ok) {
+              const data = await resp.json();
+              
+              if (!data.fullAccess) {
+                isRestricted = true;
+                console.log(`🔒 [ModalOrcamento] ${userInfo} - Viewer restrito detectado, aplicando filtros de permissão`);
+                
+                // Process allowed states (UFs with full access)
+                if (Array.isArray(data.estados)) {
+                  data.estados.forEach(e => {
+                    if (e?.uf_name) {
+                      allowedStates.add(e.uf_name);
+                    }
+                  });
+                }
+                
+                // Process allowed specific municipalities
+                if (Array.isArray(data.municipios)) {
+                  data.municipios.forEach(m => {
+                    if (m?.municipio && m?.name_state) {
+                      allowedMunicipios.add(`${m.municipio}|${m.name_state}`);
+                      // Also add the state to display in dropdown
+                      allowedStates.add(m.name_state);
+                    }
+                  });
+                }
 
-      console.log(`📤 [ModalOrcamento] ${userInfo} - Modal de exportação aberto`);
-      console.log(`📤 [ModalOrcamento] ${userInfo} - Dados carregados: ${states.length} estados, ${municipalities.length} municípios`);
-    } catch (e) {
-      console.warn('Erro ao montar universo de estados/municípios:', e);
-    }
-  }, [isOpen, mapData, userInfo]);
+                console.log(`🔒 [ModalOrcamento] ${userInfo} - Estados permitidos (UF completa):`, Array.from(allowedStates));
+                console.log(`🔒 [ModalOrcamento] ${userInfo} - Municípios específicos permitidos:`, allowedMunicipios.size);
+              }
+            }
+          } catch (err) {
+            console.warn('Erro ao carregar permissões do viewer:', err);
+          }
+        }
+
+        // Load all data
+        const allStatesRaw = [...new Set((mapData?.dados?.features || [])
+          .map(f => f?.properties?.name_state)
+          .filter(Boolean))].sort();
+        
+        const allMunicipalitiesRaw = (mapData?.dados?.features || []).map(f => {
+          const props = f?.properties || {};
+          const name = props?.nome_municipio || props?.municipio;
+          const state = props?.name_state;
+          return name && state ? ({ name, state, data: props }) : null;
+        }).filter(Boolean).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }));
+
+        // Apply filters if restricted
+        let filteredStates = allStatesRaw;
+        let filteredMunicipalities = allMunicipalitiesRaw;
+
+        if (isRestricted) {
+          // Filter states: only show states that user has access to
+          filteredStates = allStatesRaw.filter(state => allowedStates.has(state));
+
+          // Filter municipalities: show only if:
+          // 1. User has full access to the state (UF) OR
+          // 2. User has specific access to the municipality
+          filteredMunicipalities = allMunicipalitiesRaw.filter(m => {
+            const hasStateAccess = allowedStates.has(m.state);
+            const hasMunicipalityAccess = allowedMunicipios.has(`${m.name}|${m.state}`);
+            
+            // If user has full state access, all municipalities are allowed
+            if (hasStateAccess) {
+              // Check if this state access is from UF (not just from specific municipalities)
+              // This requires checking if at least one municipio from this state is in allowedMunicipios
+              // If no specific municipalities from this state, it means full UF access
+              const specificMunicipalitiesFromState = Array.from(allowedMunicipios)
+                .filter(key => key.endsWith(`|${m.state}`));
+              
+              // If there are no specific municipalities, it's full UF access
+              if (specificMunicipalitiesFromState.length === 0) {
+                return true;
+              }
+            }
+            
+            // Otherwise, only allow if specific municipality is granted
+            return hasMunicipalityAccess;
+          });
+
+          console.log(`🔒 [ModalOrcamento] ${userInfo} - Dados filtrados: ${filteredStates.length} estados, ${filteredMunicipalities.length} municípios (de ${allStatesRaw.length} estados e ${allMunicipalitiesRaw.length} municípios totais)`);
+        }
+
+        setAllStates(filteredStates);
+        setAllMunicipalities(filteredMunicipalities);
+
+        console.log(`📤 [ModalOrcamento] ${userInfo} - Modal de exportação aberto`);
+        console.log(`📤 [ModalOrcamento] ${userInfo} - Dados carregados: ${filteredStates.length} estados, ${filteredMunicipalities.length} municípios`);
+      } catch (e) {
+        console.warn('Erro ao montar universo de estados/municípios:', e);
+      }
+    };
+
+    loadPermissionsAndData();
+  }, [isOpen, mapData, userInfo, user]);
 
   const filteredStates = useMemo(() => {
     const q = searchState.trim().toLowerCase();

@@ -101,6 +101,11 @@ export interface ConfiguracaoRota {
   otimizarOrdemPolos: boolean; // TSP entre polos
   otimizarRotasPeriferias: boolean; // TSP local para cada polo
   /**
+   * Quando true, a rota entre polos deve ser fechada,
+   * retornando ao primeiro polo selecionado no final do trajeto.
+   */
+  retornarParaOrigem?: boolean;
+  /**
    * Overrides explícitos definidos pelo usuário para trechos entre polos.
    * Chave no formato "<codigoOrigem>-><codigoDestino>", valor: 'voo' | 'terrestre'.
    * Quando não definido, o padrão é 'voo'.

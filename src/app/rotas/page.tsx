@@ -546,7 +546,7 @@ export default function RotasPage() {
                           </div>
                         </div>
 
-                        <div className="mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-slate-600/50 space-y-1.5 sm:space-y-2">
+                        <div className="flex flex-col gap-1 mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-slate-600/50 space-y-1.5 sm:space-y-2">
                           <button
                             onClick={() => {
                               setForceMapUpdate(prev => prev + 1);

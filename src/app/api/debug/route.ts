@@ -15,11 +15,11 @@ export async function GET() {
 
   // Teste 1: Verificar acesso ao arquivo parceiros1.json
   try {
-    const buffer = await downloadS3File("parceiros1.json");
+    const data = await downloadS3File("parceiros1.json");
     results.tests.parceiros1 = {
       success: true,
-      size: buffer.length,
-      preview: buffer.toString("utf-8").substring(0, 50) + "..."
+      size: data.length,
+      preview: data.substring(0, 50) + "..."
     };
   } catch (error) {
     results.tests.parceiros1 = {

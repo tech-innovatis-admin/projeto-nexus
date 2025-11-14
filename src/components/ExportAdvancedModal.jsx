@@ -1,7 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { utils as XLSXUtils, write as XLSXWrite } from 'xlsx';
+import { useUser } from '@/contexts/UserContext';
 
 function ExportAdvancedModal({ isOpen, onClose, mapData }) {
+  const { user } = useUser();
   const [selectedStates, setSelectedStates] = useState([]);
   const [selectedMunicipalities, setSelectedMunicipalities] = useState([]);
   const [selectedColumns, setSelectedColumns] = useState([]);
@@ -62,35 +64,114 @@ function ExportAdvancedModal({ isOpen, onClose, mapData }) {
     { id: 'LIVRO_FUND_1_2', label: 'Valor Saber+ - Fundamental 1 e 2', checked: false }
   ];
 
-  // Extrair estados e municípios dos dados
+  // Extrair estados e municípios dos dados (com restrições para viewers)
   useEffect(() => {
-    if (mapData?.dados?.features) {
-      const states = [...new Set(mapData.dados.features
+    if (!mapData?.dados?.features) return;
+
+    const loadPermissionsAndData = async () => {
+      let allowedStates = new Set();
+      let allowedMunicipios = new Set(); // Set of "municipio|state" keys
+      let isRestricted = false;
+
+      // Check if user is a restricted viewer
+      if (user?.role && String(user.role).toLowerCase() === 'viewer') {
+        try {
+          const resp = await fetch('/api/municipios/permitidos', { credentials: 'same-origin' });
+          if (resp.ok) {
+            const data = await resp.json();
+            
+            if (!data.fullAccess) {
+              isRestricted = true;
+              console.log(`🔒 [ExportAdvancedModal] Viewer restrito detectado, aplicando filtros de permissão`);
+              
+              // Process allowed states (UFs with full access)
+              if (Array.isArray(data.estados)) {
+                data.estados.forEach(e => {
+                  if (e?.uf_name) {
+                    allowedStates.add(e.uf_name);
+                  }
+                });
+              }
+              
+              // Process allowed specific municipalities
+              if (Array.isArray(data.municipios)) {
+                data.municipios.forEach(m => {
+                  if (m?.municipio && m?.name_state) {
+                    allowedMunicipios.add(`${m.municipio}|${m.name_state}`);
+                    // Also add the state to display in dropdown
+                    allowedStates.add(m.name_state);
+                  }
+                });
+              }
+
+              console.log(`🔒 [ExportAdvancedModal] Estados permitidos (UF completa):`, Array.from(allowedStates));
+              console.log(`🔒 [ExportAdvancedModal] Municípios específicos permitidos:`, allowedMunicipios.size);
+            }
+          }
+        } catch (err) {
+          console.warn('Erro ao carregar permissões do viewer:', err);
+        }
+      }
+
+      // Extract all data
+      const statesRaw = [...new Set(mapData.dados.features
         .map(feature => feature.properties?.name_state)
         .filter(Boolean)
         .sort()
       )];
-      setAllStates(states);
 
-      const municipalities = mapData.dados.features.map(feature => ({
+      const municipalitiesRaw = mapData.dados.features.map(feature => ({
         name: feature.properties?.nome_municipio || feature.properties?.municipio,
         state: feature.properties?.name_state,
         data: feature.properties
       })).filter(item => item.name && item.state)
         .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }));
       
-      setAllMunicipalities(municipalities);
+      // Apply filters if restricted
+      let filteredStates = statesRaw;
+      let filteredMunicipalities = municipalitiesRaw;
 
-      // Opções de partidos (únicos)
-      const parties = [...new Set(municipalities
+      if (isRestricted) {
+        // Filter states: only show states that user has access to
+        filteredStates = statesRaw.filter(state => allowedStates.has(state));
+
+        // Filter municipalities: show only if user has access
+        filteredMunicipalities = municipalitiesRaw.filter(m => {
+          const hasStateAccess = allowedStates.has(m.state);
+          const hasMunicipalityAccess = allowedMunicipios.has(`${m.name}|${m.state}`);
+          
+          // If user has full state access, all municipalities are allowed
+          if (hasStateAccess) {
+            // Check if this state access is from UF (not just from specific municipalities)
+            const specificMunicipalitiesFromState = Array.from(allowedMunicipios)
+              .filter(key => key.endsWith(`|${m.state}`));
+            
+            // If there are no specific municipalities, it's full UF access
+            if (specificMunicipalitiesFromState.length === 0) {
+              return true;
+            }
+          }
+          
+          // Otherwise, only allow if specific municipality is granted
+          return hasMunicipalityAccess;
+        });
+
+        console.log(`🔒 [ExportAdvancedModal] Dados filtrados: ${filteredStates.length} estados, ${filteredMunicipalities.length} municípios`);
+      }
+
+      setAllStates(filteredStates);
+      setAllMunicipalities(filteredMunicipalities);
+
+      // Opções de partidos (únicos) - usando os municípios filtrados
+      const parties = [...new Set(filteredMunicipalities
         .map(m => m.data?.sigla_partido2024)
         .filter(Boolean)
         .sort()
       )];
       setPartyOptions(parties);
 
-      // Municípios com PMSB = 'Sim' e sem ano definido
-      const municipiosPmsbSemAno = municipalities
+      // Municípios com PMSB = 'Sim' e sem ano definido - usando os municípios filtrados
+      const municipiosPmsbSemAno = filteredMunicipalities
         .filter(m => {
           const hasPmsb = (m.data?.plano_saneamento_existe || '').toString().toLowerCase() === 'sim';
           const ano = m.data?.plano_saneamento_ano;
@@ -114,7 +195,7 @@ function ExportAdvancedModal({ isOpen, onClose, mapData }) {
       const keys = ['VALOR_PD', 'VALOR_PMSB', 'VALOR_CTM'];
       const next = {};
       keys.forEach((key) => {
-        const values = municipalities
+        const values = filteredMunicipalities
           .map(m => m.data?.[key])
           .filter(v => v !== null && v !== undefined && String(v).trim() !== '');
         const unique = Array.from(new Set(values.map(v => String(v))));
@@ -133,8 +214,10 @@ function ExportAdvancedModal({ isOpen, onClose, mapData }) {
       });
 
       setPriceOptions(next);
-    }
-  }, [mapData]);
+    };
+
+    loadPermissionsAndData();
+  }, [mapData, user]);
 
   // Inicializar colunas selecionadas com as padrão
   useEffect(() => {

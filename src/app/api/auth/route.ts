@@ -73,12 +73,14 @@ export async function POST(request: Request) {
     }
 
     // 🔐 Verificação adicional de validade para usuários do tipo "viewer"
+    let viewerAcessosCount = 0; // usado também para sinalizar isRestricted no payload de resposta
     if ((dbUser.role || '').toLowerCase() === 'viewer') {
       try {
         const acessos = await prisma.municipio_acessos.findMany({
           where: { user_id: dbUser.id },
           select: { valid_until: true },
         });
+        viewerAcessosCount = Array.isArray(acessos) ? acessos.length : 0;
 
         // Regras:
         // - Sem registros: permitir login (mapa aplicará restrição de visualização)
@@ -142,7 +144,9 @@ export async function POST(request: Request) {
         role: dbUser.role,
         name: dbUser.name,
         cargo: dbUser.cargo,
-        photo: dbUser.photo
+        photo: dbUser.photo,
+        // Viewers com registros em municipio_acessos são considerados "restritos" para fins de UI/permits
+        isRestricted: (dbUser.role || '').toLowerCase() === 'viewer' ? viewerAcessosCount > 0 : false
       }
     }), {
       status: 200,

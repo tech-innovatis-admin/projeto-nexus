@@ -75,7 +75,7 @@ export default function HomePage() {
         {showDescription && (
           <div className={styles.description}>
             <p>
-              A <strong>NEXUS</strong> é uma plataforma de produtos e dados municipais que oferece suporte estratégico à Diretoria de Estratégia e Mercado da Innovatis MC.
+              A <strong>NEXUS</strong> é uma plataforma de produtos e dados municipais que oferece suporte estratégico à Diretoria de Estratégia e Mercado da Innovatis.
             </p>
             {/* Botão de login com efeitos hover */}
             <button 

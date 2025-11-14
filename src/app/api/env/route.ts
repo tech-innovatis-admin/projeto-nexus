@@ -24,8 +24,7 @@ function parseEnv(content: string): Record<string, string> {
 export async function GET() {
   try {
     // Buscar o arquivo de configuração correto
-    const buffer = await downloadS3File('senhas_s3.json');
-    const envContent = buffer.toString('utf-8');
+    const envContent = await downloadS3File('senhas_s3.json');
     const envVars = JSON.parse(envContent);
     
     // IMPORTANTE: Apenas retorne variáveis que são seguras para o cliente!

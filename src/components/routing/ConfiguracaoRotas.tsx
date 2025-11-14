@@ -120,7 +120,7 @@ export default function ConfiguracaoRotas({
       </div>
 
       {/* Otimizar Ordem dos Polos */}
-      <div className="flex items-start space-x-5">
+      <div className="flex items-start space-x-5 gap-1">
         <input
           type="checkbox"
           id="otimizar-polos"
@@ -141,7 +141,7 @@ export default function ConfiguracaoRotas({
       </div>
 
       {/* Otimizar Rotas das Periferias */}
-      <div className="flex items-start space-x-5">
+      <div className="flex items-start space-x-5 gap-1">
         <input
           type="checkbox"
           id="otimizar-periferias"
@@ -155,15 +155,12 @@ export default function ConfiguracaoRotas({
           <label htmlFor="otimizar-periferias" className="text-sm font-medium text-gray-700">
             Otimizar rotas das periferias
           </label>
-          <p className="text-xs text-gray-500">
-            Calcular melhor sequência para visitar periferias de cada polo
-          </p>
         </div>
       </div>
 
       {/* Limitação de Distância Terrestre */}
       <div className="space-y-2">
-        <div className="flex items-center space-x-5">
+        <div className="flex items-center space-x-5 gap-1">
           <input
             type="checkbox"
             id="limitar-distancia"
@@ -197,6 +194,24 @@ export default function ConfiguracaoRotas({
             </p>
           </div>
         )}
+      </div>
+
+      {/* Retornar para a origem */}
+      <div className="flex items-start space-x-5 gap-1">
+        <input
+          type="checkbox"
+          id="retornar-origem"
+          checked={!!configuracao.retornarParaOrigem}
+          onChange={(e) => onConfiguracao({
+            retornarParaOrigem: e.target.checked
+          })}
+          className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+        />
+        <div>
+          <label htmlFor="retornar-origem" className="text-sm font-medium text-gray-700">
+            Retornar para a origem
+          </label>
+        </div>
       </div>
 
       {/* Deslocamento entre Polos (após cálculo de rota) */}
@@ -268,6 +283,7 @@ export default function ConfiguracaoRotas({
           {configuracao.limitarDistanciaMaximaTerrestreKm && (
             <li>• Limite terrestre: {configuracao.limitarDistanciaMaximaTerrestreKm} km</li>
           )}
+          <li>• Retornar para a origem: {configuracao.retornarParaOrigem ? 'Sim' : 'Não'}</li>
         </ul>
       </div>
     </div>

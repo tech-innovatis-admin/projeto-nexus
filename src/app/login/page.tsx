@@ -12,6 +12,7 @@ import { motion } from "framer-motion"; // Biblioteca de animações
 import Image from "next/image"; // Importação do componente Image
 import { FaEye, FaEyeSlash } from 'react-icons/fa'; // Ícones para mostrar/ocultar senha
 import { useUser } from "@/contexts/UserContext"; // Hook para dados do usuário
+import MiniFooter from "@/components/MiniFooter"; // Componente de rodapé
 
 export default function LoginPage() {
   // Estados para controle do formulário
@@ -237,10 +238,10 @@ export default function LoginPage() {
         </p>
       </motion.div>
 
-      {/* Rodapé com copyright */}
-      <footer className="absolute bottom-4 text-center text-xs text-slate-400 opacity-70 w-full px-4">
-        &copy; {new Date().getFullYear()} Innovatis MC. Todos os direitos reservados.
-      </footer>
+      {/* Componente MiniFooter */}
+      <div className="absolute bottom-0 w-full">
+        <MiniFooter />
+      </div>
     </div>
   );
 

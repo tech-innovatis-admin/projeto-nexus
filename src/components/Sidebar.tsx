@@ -3,7 +3,6 @@
 import React, { useState, useLayoutEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useUser } from '@/contexts/UserContext';
-import { LockKeyhole } from 'lucide-react';
 
 interface SidebarProps {
   className?: string;
@@ -51,23 +50,22 @@ export default function Sidebar({ className = '' }: SidebarProps) {
     );
   }
   
-  const isViewerRestricted = (user?.role || '').toLowerCase() === 'viewer' && user?.isRestricted;
-  const disabledIds = isViewerRestricted ? new Set(['estrategia', 'rotas']) : new Set<string>();
+  const isViewer = (user?.role || '').toLowerCase() === 'viewer';
 
-  // Itens de menu sempre visíveis, com bloqueio visual/UX quando restrito
-  const menuItems = [
+  // Itens base do menu
+  const baseMenuItems = [
     { id: 'home', label: 'Dashboard', icon: 'fa-solid fa-chart-line', path: '/mapa' },
-    { id: 'estrategia', label: 'Estratégia', icon: 'fa-solid fa-chess', path: '/estrategia', disabled: disabledIds.has('estrategia') },
-    { id: 'rotas', label: 'Roteamento', icon: 'fa-solid fa-route', path: '/rotas', disabled: disabledIds.has('rotas') },
+    { id: 'estrategia', label: 'Estratégia', icon: 'fa-solid fa-chess', path: '/estrategia' },
+    { id: 'rotas', label: 'Roteamento', icon: 'fa-solid fa-route', path: '/rotas' },
     { id: 'logout', label: 'Logout', icon: 'fa-solid fa-right-from-bracket', path: '#' }
   ];
 
-  const handleNavigation = (path: string, itemId: string, disabled?: boolean) => {
-    if (disabled) {
-      // UX profissional: direciona para página de aviso
-      router.push('/acesso-negado');
-      return;
-    }
+  // Para usuários viewer, ocultar completamente as páginas /estrategia e /rotas
+  const menuItems = isViewer
+    ? baseMenuItems.filter(item => item.id === 'home' || item.id === 'logout')
+    : baseMenuItems;
+
+  const handleNavigation = (path: string, itemId: string) => {
     if (itemId === 'logout') {
       handleLogout();
       return;
@@ -159,8 +157,7 @@ export default function Sidebar({ className = '' }: SidebarProps) {
             {menuItems.map((item) => {
               const isActive = pathname === item.path;
               const isLogoutItem = item.id === 'logout';
-              const isDisabled = Boolean((item as any).disabled);
-              
+
               return (
                 <React.Fragment key={item.id}>
                   {/* Linha divisória antes do Logout */}
@@ -168,15 +165,13 @@ export default function Sidebar({ className = '' }: SidebarProps) {
                   <li
                     className={`
                       rounded-lg p-[14px] cursor-pointer transition-colors duration-200
-                      ${isDisabled
-                        ? 'opacity-60 text-gray-400 cursor-not-allowed'
-                        : isActive 
-                          ? 'bg-sky-600' 
-                          : isLogoutItem
-                            ? 'text-gray-400 hover:bg-slate-700 hover:text-white'
-                            : 'hover:bg-slate-700'}
+                      ${isActive
+                        ? 'bg-sky-600'
+                        : isLogoutItem
+                          ? 'text-gray-400 hover:bg-slate-700 hover:text-white'
+                          : 'hover:bg-slate-700'}
                     `}
-                    onClick={() => handleNavigation(item.path, item.id, isDisabled)}
+                    onClick={() => handleNavigation(item.path, item.id)}
                   >
                   <a 
                     href="#"
@@ -184,7 +179,7 @@ export default function Sidebar({ className = '' }: SidebarProps) {
                     className={`
                       no-underline flex items-center transition-all duration-300
                       ${isOpen ? 'justify-start gap-[14px]' : 'justify-center'}
-                      ${isDisabled ? 'text-gray-400' : (isActive ? 'text-white' : 'text-gray-300 hover:text-white')}
+                      ${isActive ? 'text-white' : 'text-gray-300 hover:text-white'}
                     `}
                   >
                     {item.id === 'logout' ? (
@@ -211,7 +206,7 @@ export default function Sidebar({ className = '' }: SidebarProps) {
                         `}
                       />
                     )}
-                    <span 
+                    <span
                       className={`
                         text-sm transition-all duration-600
                         ${isOpen ? 'w-[150px] h-auto' : 'w-0 h-0'}
@@ -220,9 +215,6 @@ export default function Sidebar({ className = '' }: SidebarProps) {
                     >
                       {item.label}
                     </span>
-                    {isOpen && isDisabled && (
-                      <LockKeyhole size={16} className="ml-2 text-gray-400" />
-                    )}
                   </a>
                 </li>
                 </React.Fragment>

@@ -21,7 +21,7 @@ export interface MunicipioBase {
   estado: string;
   coordenadas: Coordenada;
   populacao: number;
-  tipo: 'polo' | 'periferia';
+  tipo: 'polo' | 'periferia' | 'sem_tag';
   pistas?: PistaVoo[]; // Pistas de voo disponíveis no município
   pistaSelecionada?: PistaVoo; // Pista escolhida pelo usuário para cálculos
 }
@@ -37,7 +37,7 @@ export interface MunicipioPolo extends MunicipioBase {
 }
 
 export interface MunicipioPeriferia extends MunicipioBase {
-  tipo: 'periferia';
+  tipo: 'periferia' | 'sem_tag';
   poloVinculado?: string; // codigo do polo
 }
 

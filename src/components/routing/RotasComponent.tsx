@@ -201,7 +201,7 @@ export default function RotasComponent({
         if (pistaSelecionada) {
           console.log(`🎯 [JOIN] Pista selecionada automaticamente para ${municipio.nome}: ${pistaSelecionada.codigo_pista} (${pistaSelecionada.nome_pista})`);
         }
-      } else if (municipio.tipo === 'periferia') {
+      } else if (municipio.tipo === 'periferia' || municipio.tipo === 'sem_tag') {
         periferias.push({
           codigo: municipio.codigo,
           nome: municipio.nome,
@@ -209,7 +209,7 @@ export default function RotasComponent({
           estado: municipio.estado || municipio.uf,
           coordenadas,
           populacao,
-          tipo: 'periferia' as const,
+          tipo: municipio.tipo === 'sem_tag' ? 'sem_tag' : 'periferia',
           poloVinculado: undefined, // Será calculado automaticamente
           pistas: pistasDoMunicipio,
           pistaSelecionada: pistasDoMunicipio.find(p =>
@@ -229,7 +229,8 @@ export default function RotasComponent({
     console.log('🔄 [RotasComponent] Municípios processados:', {
       totalMunicipios: municipios.length,
       polosEncontrados: polos.length,
-      periferiasEncontradas: periferias.length,
+      periferiasEncontradas: periferias.filter(p => p.tipo === 'periferia').length,
+      semTagEncontrados: periferias.filter(p => p.tipo === 'sem_tag').length,
       polosComPistas: polos.filter(p => p.pistas && p.pistas.length > 0).length,
       tiposOriginais: municipios.map(m => ({ nome: m.nome, tipo: m.tipo })).slice(0, 5)
     });
@@ -558,7 +559,14 @@ export default function RotasComponent({
                               : 'border-gray-200 hover:border-gray-300 bg-white'
                           }`}
                         >
-                          <div className="font-medium text-gray-800">{periferia.nome}</div>
+                          <div className="font-medium text-gray-800 flex items-center gap-2">
+                            {periferia.nome}
+                            {periferia.tipo === 'sem_tag' && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-200 text-gray-700">
+                                Fora do Polo
+                              </span>
+                            )}
+                          </div>
                           <div className="text-sm text-gray-600">
                             {periferia.estado}
                           </div>

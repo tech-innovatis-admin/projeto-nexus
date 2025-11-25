@@ -644,8 +644,8 @@ export function calcularEstatisticasRota(trechos: (TrechoVoo | TrechoTerrestre)[
       
       if (trecho.origem.tipo === 'polo') polosVisitados.add(trecho.origem.codigo);
       if (trecho.destino.tipo === 'polo') polosVisitados.add(trecho.destino.codigo);
-      if (trecho.origem.tipo === 'periferia') periferiasVisitadas.add(trecho.origem.codigo);
-      if (trecho.destino.tipo === 'periferia') periferiasVisitadas.add(trecho.destino.codigo);
+      if (trecho.origem.tipo === 'periferia' || trecho.origem.tipo === 'sem_tag') periferiasVisitadas.add(trecho.origem.codigo);
+      if (trecho.destino.tipo === 'periferia' || trecho.destino.tipo === 'sem_tag') periferiasVisitadas.add(trecho.destino.codigo);
     }
   }
   

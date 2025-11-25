@@ -84,6 +84,7 @@ export default function RotasPage() {
   const [forceMapUpdate, setForceMapUpdate] = useState(0);
   const [polosValores, setPolosValores] = useState<PoloValoresProps[]>([]);
   const [periferia, setPeriferia] = useState<PeriferiaProps[]>([]);
+  const [municipiosSemTag, setMunicipiosSemTag] = useState<any[]>([]);
   const mapRef = useRef<any>(null);
 
   // Função auxiliar para formatar tempo em horas e minutos
@@ -114,6 +115,62 @@ export default function RotasPage() {
       console.error('Erro ao gerar PDF da rota:', error);
     }
   };
+
+  // Carregar municípios sem tag
+  useEffect(() => {
+    let cancelled = false;
+    const loadMunicipiosSemTag = async () => {
+      try {
+        console.log('🏷️ [RotasPage] Carregando municípios sem tag...');
+        const resp = await fetch('/api/proxy-geojson/municipios_sem_tag.json', { cache: 'force-cache' });
+        if (!resp.ok) {
+          console.warn('⚠️ [RotasPage] Falha ao carregar municípios sem tag:', resp.status);
+          return;
+        }
+        const json = await resp.json();
+        if (cancelled) return;
+
+        // Processar dados - pode vir como FeatureCollection ou Array
+        let items: any[] = [];
+        if (json.type === 'FeatureCollection' && Array.isArray(json.features)) {
+          items = json.features.map((feature: any) => ({
+            UF: feature.properties?.UF || '',
+            codigo: String(feature.properties?.codigo || feature.properties?.codigo_ibge || '').trim(),
+            municipio: feature.properties?.municipio || '',
+            latitude_sem_tag: parseFloat(feature.properties?.latitude_sem_tag || '0'),
+            longitude_sem_tag: parseFloat(feature.properties?.longitude_sem_tag || '0'),
+            geom_sem_tag: feature.geometry || feature.properties?.geom_sem_tag,
+            propriedadesOriginais: feature.properties
+          }));
+        } else if (Array.isArray(json)) {
+          items = json.map((item: any) => ({
+            UF: item.UF || '',
+            codigo: String(item.codigo || item.codigo_ibge || '').trim(),
+            municipio: item.municipio || '',
+            latitude_sem_tag: parseFloat(String(item.latitude_sem_tag || '0')),
+            longitude_sem_tag: parseFloat(String(item.longitude_sem_tag || '0')),
+            geom_sem_tag: item.geom_sem_tag || item.geometry,
+            propriedadesOriginais: item
+          }));
+        }
+
+        // Filtrar apenas itens válidos
+        const itemsValidos = items.filter(item => 
+          item.codigo && item.codigo !== '0' && item.municipio && item.UF
+        );
+
+        if (!cancelled) {
+          setMunicipiosSemTag(itemsValidos);
+          console.log(`✅ [RotasPage] Municípios sem tag carregados: ${itemsValidos.length}`);
+        }
+      } catch (error) {
+        console.error('❌ [RotasPage] Erro ao carregar municípios sem tag:', error);
+      }
+    };
+
+    loadMunicipiosSemTag();
+    return () => { cancelled = true; };
+  }, []);
 
   // Processar dados do contexto
   useEffect(() => {
@@ -335,6 +392,63 @@ export default function RotasPage() {
       }
     });
 
+    // Adicionar municípios sem tag (processar após periferias para evitar duplicatas)
+    municipiosSemTag.forEach((semTagItem) => {
+      const codigoSemTag = String(semTagItem.codigo || '').trim();
+      
+      // Verificar se já não foi adicionado como polo ou periferia
+      if (!codigoSemTag || codigoSemTag === '0' || codigosUsados.has(codigoSemTag)) {
+        return; // Pular se já existe ou código inválido
+      }
+
+      // Extrair coordenadas - prioridade: latitude_sem_tag/longitude_sem_tag > geom_sem_tag > fallback
+      let latitude = 0, longitude = 0;
+      
+      // Prioridade 1: coordenadas diretas
+      if (semTagItem.latitude_sem_tag && semTagItem.longitude_sem_tag) {
+        latitude = parseFloat(String(semTagItem.latitude_sem_tag));
+        longitude = parseFloat(String(semTagItem.longitude_sem_tag));
+      }
+      
+      // Prioridade 2: extrair da geometria
+      if ((!latitude || !longitude) && semTagItem.geom_sem_tag?.coordinates) {
+        const geom = semTagItem.geom_sem_tag;
+        if (geom.type === 'Point') {
+          longitude = geom.coordinates[0];
+          latitude = geom.coordinates[1];
+        } else if (geom.type === 'Polygon' && geom.coordinates[0]) {
+          const coords = geom.coordinates[0];
+          longitude = coords.reduce((sum: number, coord: number[]) => sum + coord[0], 0) / coords.length;
+          latitude = coords.reduce((sum: number, coord: number[]) => sum + coord[1], 0) / coords.length;
+        } else if (geom.type === 'MultiPolygon' && geom.coordinates[0]?.[0]) {
+          const coords = geom.coordinates[0][0];
+          longitude = coords.reduce((sum: number, coord: number[]) => sum + coord[0], 0) / coords.length;
+          latitude = coords.reduce((sum: number, coord: number[]) => sum + coord[1], 0) / coords.length;
+        }
+      }
+      
+      // Fallback: coordenadas padrão
+      if (!latitude || !longitude || latitude === 0 || longitude === 0) {
+        console.warn(`🛣️ [RotasPage] Coordenadas inválidas para município sem tag ${semTagItem.municipio}, usando coordenadas padrão`);
+        latitude = -14.235;
+        longitude = -51.925;
+      }
+
+      const ufSemTag = String(semTagItem.UF || '').trim().toUpperCase();
+      const nomeEstadoCompleto = ufParaNomeCompleto[ufSemTag] || ufSemTag;
+
+      codigosUsados.add(codigoSemTag);
+      municipios.push({
+        codigo: codigoSemTag,
+        nome: String(semTagItem.municipio || '').trim(),
+        estado: nomeEstadoCompleto,
+        uf: ufSemTag,
+        latitude: latitude,
+        longitude: longitude,
+        tipo: 'sem_tag' as const
+      });
+    });
+
     // Log específico para conferir "Bom Jesus" PB
     const bomJesusPB = municipios.find(
       (m) => m.tipo === 'periferia' && m.nome.toUpperCase() === 'BOM JESUS' && m.uf === 'PB'
@@ -349,6 +463,7 @@ export default function RotasPage() {
       total: municipios.length,
       polos: municipios.filter(m => m.tipo === 'polo').length,
       periferias: municipios.filter(m => m.tipo === 'periferia').length,
+      semTag: municipios.filter(m => m.tipo === 'sem_tag').length,
       periferiasBrutasOriginais: periferia.length,
       periferiasUnicasProcessadas: periferiasUnicas.size,
       codigosUnicos: codigosUsados.size
@@ -356,7 +471,7 @@ export default function RotasPage() {
 
     // Ordenar municípios em ordem alfabética pelo nome
     return municipios.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-  }, [polosValores, periferia]);
+  }, [polosValores, periferia, municipiosSemTag]);
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#0f172a] to-[#1e293b] text-white">

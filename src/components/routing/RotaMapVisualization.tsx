@@ -20,21 +20,26 @@ export default function RotaMapVisualization({
     voo: '#3B82F6', // azul
     terrestre: '#10B981', // verde
     polo: '#EF4444', // vermelho
-    periferia: '#F59E0B' // amarelo
+    periferia: '#F59E0B', // amarelo
+    sem_tag: '#8B5CF6' // roxo para municípios sem tag
   }), []);
 
   // Identificadores das camadas e fontes
   const LAYER_IDS = useMemo(() => ({
     trechosVoo: 'rotas-trechos-voo',
     trechosTerrestres: 'rotas-trechos-terrestres',
+    iconesVoo: 'rotas-icones-voo',
+    iconesTerrestres: 'rotas-icones-terrestres',
     polos: 'rotas-polos',
     periferias: 'rotas-periferias',
+    semTag: 'rotas-sem-tag',
     labels: 'rotas-labels'
   }), []);
 
   const SOURCE_IDS = useMemo(() => ({
     trechos: 'rotas-trechos-source',
-    pontos: 'rotas-pontos-source'
+    pontos: 'rotas-pontos-source',
+    iconesTrechos: 'rotas-icones-trechos-source'
   }), []);
 
   useEffect(() => {
@@ -49,6 +54,9 @@ export default function RotaMapVisualization({
           // Remover layers (ordem inversa para evitar dependências)
           const layersToRemove = [
             LAYER_IDS.labels,
+            LAYER_IDS.iconesTerrestres,
+            LAYER_IDS.iconesVoo,
+            LAYER_IDS.semTag,
             LAYER_IDS.periferias,
             LAYER_IDS.polos,
             LAYER_IDS.trechosTerrestres,
@@ -78,11 +86,15 @@ export default function RotaMapVisualization({
             }
           });
 
-          // Remover imagens de marcadores antigos (polo-marker-* e periferia-marker-*)
+          // Remover imagens de marcadores antigos (polo-marker-*, periferia-marker-*, sem-tag-marker-*, icone-aviao, icone-carro)
           try {
             const imageKeys = Object.keys((map as any).style.imageManager?.images || {});
             imageKeys.forEach(imageId => {
-              if (imageId.startsWith('polo-marker-') || imageId.startsWith('periferia-marker-')) {
+              if (imageId.startsWith('polo-marker-') || 
+                  imageId.startsWith('periferia-marker-') || 
+                  imageId.startsWith('sem-tag-marker-') ||
+                  imageId === 'icone-aviao' ||
+                  imageId === 'icone-carro') {
                 try {
                   if (map.hasImage(imageId)) {
                     map.removeImage(imageId);
@@ -109,12 +121,73 @@ export default function RotaMapVisualization({
         // Preparar dados dos trechos
         const trechosVoo: GeoJSON.Feature[] = [];
         const trechosTerrestres: GeoJSON.Feature[] = [];
+        const iconesTrechos: GeoJSON.Feature[] = [];
         const pontos: GeoJSON.Feature[] = [];
         const pontosUnicos = new Map<string, any>();
         const ordemVisita: string[] = []; // Array para manter ordem de visita
 
+        // Função para calcular ponto médio de uma linha
+        const calcularPontoMedio = (coordinates: [number, number][]): [number, number] => {
+          if (coordinates.length === 0) return [0, 0];
+          if (coordinates.length === 1) return coordinates[0];
+          
+          // Se a linha tem múltiplos pontos, calcular o ponto médio do segmento central
+          const meio = Math.floor(coordinates.length / 2);
+          if (coordinates.length === 2) {
+            // Para linha reta, calcular ponto médio entre os dois pontos
+            const [lng1, lat1] = coordinates[0];
+            const [lng2, lat2] = coordinates[1];
+            return [(lng1 + lng2) / 2, (lat1 + lat2) / 2];
+          } else {
+            // Para linha com múltiplos pontos, usar o ponto do meio
+            return coordinates[meio];
+          }
+        };
+
+        // Função para calcular bearing (direção) de uma linha
+        const calcularBearing = (coordinates: [number, number][]): number => {
+          if (coordinates.length < 2) return 0;
+          
+          // Usar primeiro e último ponto para calcular direção geral
+          const [lng1, lat1] = coordinates[0];
+          const [lng2, lat2] = coordinates[coordinates.length - 1];
+          
+          const dLng = (lng2 - lng1) * Math.PI / 180;
+          const lat1Rad = lat1 * Math.PI / 180;
+          const lat2Rad = lat2 * Math.PI / 180;
+          
+          const y = Math.sin(dLng) * Math.cos(lat2Rad);
+          const x = Math.cos(lat1Rad) * Math.sin(lat2Rad) - 
+                    Math.sin(lat1Rad) * Math.cos(lat2Rad) * Math.cos(dLng);
+          
+          const bearing = Math.atan2(y, x) * 180 / Math.PI;
+          return (bearing + 360) % 360; // Normalizar para 0-360
+        };
+
         rota.trechos.forEach((trecho, index) => {
-          // Coletar pontos únicos e ordem de visita
+          // Função auxiliar para obter coordenadas (pista ou município)
+          const obterCoordenadas = (municipio: any): [number, number] => {
+            // Para trechos aéreos entre polos, priorizar coordenadas da pista
+            if (trecho.tipo === 'voo' && municipio.tipo === 'polo' && municipio.pistaSelecionada) {
+              const pista = municipio.pistaSelecionada;
+              // Verificar se a pista tem coordenadas válidas
+              if (pista.coordenadas && pista.coordenadas.lat && pista.coordenadas.lng) {
+                return [pista.coordenadas.lng, pista.coordenadas.lat];
+              }
+              // Fallback para coordenadas diretas da pista
+              if (pista.latitude_pista && pista.longitude_pista) {
+                return [pista.longitude_pista, pista.latitude_pista];
+              }
+            }
+            // Fallback: coordenadas do município
+            return [municipio.coordenadas.lng, municipio.coordenadas.lat];
+          };
+
+          // Obter coordenadas de origem e destino
+          const coordOrigem = obterCoordenadas(trecho.origem);
+          const coordDestino = obterCoordenadas(trecho.destino);
+
+          // Coletar pontos únicos e ordem de visita (usar coordenadas do município para os pins)
           if (!pontosUnicos.has(trecho.origem.codigo)) {
             pontosUnicos.set(trecho.origem.codigo, {
               municipio: trecho.origem,
@@ -134,16 +207,13 @@ export default function RotaMapVisualization({
             ordemVisita.push(trecho.destino.codigo);
           }
 
-          // Preparar geometria do trecho
-          let coordinates: [number, number][];
-          if (trecho.geometria && trecho.geometria.length > 0) {
-            coordinates = trecho.geometria; // OSRM já retorna em [lng, lat]
-          } else {
-            coordinates = [
-              [trecho.origem.coordenadas.lng, trecho.origem.coordenadas.lat],
-              [trecho.destino.coordenadas.lng, trecho.destino.coordenadas.lat]
-            ];
-          }
+          // Preparar geometria do trecho - linha reta entre origem e destino
+          // Para rotas aéreas: usar coordenadas de pista se disponível
+          // Para rotas terrestres: sempre usar coordenadas do município
+          const coordinates: [number, number][] = [
+            coordOrigem,
+            coordDestino
+          ];
 
           const feature: GeoJSON.Feature = {
             type: 'Feature',
@@ -162,10 +232,30 @@ export default function RotaMapVisualization({
             }
           };
 
+          // Calcular ponto médio e bearing para o ícone
+          const pontoMedio = calcularPontoMedio(coordinates);
+          const bearing = calcularBearing(coordinates);
+          const iconeFeature: GeoJSON.Feature = {
+            type: 'Feature',
+            geometry: {
+              type: 'Point',
+              coordinates: pontoMedio
+            },
+            properties: {
+              tipo: trecho.tipo,
+              origem: trecho.origem.nome,
+              destino: trecho.destino.nome,
+              index: index + 1,
+              bearing: bearing
+            }
+          };
+
           if (trecho.tipo === 'voo') {
             trechosVoo.push(feature);
+            iconesTrechos.push(iconeFeature);
           } else {
             trechosTerrestres.push(feature);
+            iconesTrechos.push(iconeFeature);
           }
         });
 
@@ -191,6 +281,7 @@ export default function RotaMapVisualization({
         console.log('🗺️ [RotaMapVisualization] Dados preparados:', {
           trechosVoo: trechosVoo.length,
           trechosTerrestres: trechosTerrestres.length,
+          iconesTrechos: iconesTrechos.length,
           pontos: pontos.length
         });
 
@@ -212,6 +303,15 @@ export default function RotaMapVisualization({
           }
         });
 
+        // Adicionar fonte dos ícones dos trechos
+        map.addSource(SOURCE_IDS.iconesTrechos, {
+          type: 'geojson',
+          data: {
+            type: 'FeatureCollection',
+            features: iconesTrechos
+          }
+        });
+
         // Função auxiliar para adicionar layer com verificação
         const addLayerSafely = (layerConfig: any) => {
           try {
@@ -226,7 +326,7 @@ export default function RotaMapVisualization({
           }
         };
 
-        // Camada dos trechos de voo
+        // Camada dos trechos de voo (linha contínua)
         addLayerSafely({
           id: LAYER_IDS.trechosVoo,
           type: 'line',
@@ -235,12 +335,11 @@ export default function RotaMapVisualization({
           paint: {
             'line-color': cores.voo,
             'line-width': 3,
-            'line-opacity': 0.8,
-            'line-dasharray': [2, 1]
+            'line-opacity': 0.8
           }
         });
 
-        // Camada dos trechos terrestres
+        // Camada dos trechos terrestres (linha pontilhada)
         addLayerSafely({
           id: LAYER_IDS.trechosTerrestres,
           type: 'line',
@@ -249,23 +348,50 @@ export default function RotaMapVisualization({
           paint: {
             'line-color': cores.terrestre,
             'line-width': 4,
-            'line-opacity': 0.8
+            'line-opacity': 0.8,
+            'line-dasharray': [4, 2]
           }
         });
 
         // Criar ícones SVG para marcadores com numeração
-        const createMarkerIcon = (color: string, tipo: 'polo' | 'periferia', numero: number) => {
+        const createMarkerIcon = (color: string, tipo: 'polo' | 'periferia' | 'sem_tag', numero: number) => {
           return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`
             <svg width="40" height="50" viewBox="0 0 40 50" xmlns="http://www.w3.org/2000/svg">
               <defs>
-                <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+                <filter id="shadow-${tipo}-${numero}" x="-50%" y="-50%" width="200%" height="200%">
                   <feDropShadow dx="1" dy="2" stdDeviation="2" flood-opacity="0.4"/>
                 </filter>
               </defs>
               <path d="M20 0C9 0 0 9 0 20c0 15 20 30 20 30s20-15 20-30C40 9 31 0 20 0z" 
-                    fill="${color}" stroke="#ffffff" stroke-width="2.5" filter="url(#shadow)"/>
+                    fill="${color}" stroke="#ffffff" stroke-width="2.5" filter="url(#shadow-${tipo}-${numero})"/>
               <circle cx="20" cy="20" r="13" fill="#ffffff" opacity="0.95"/>
               <text x="20" y="27" text-anchor="middle" font-size="16" font-weight="bold" fill="#1f2937">${numero}</text>
+            </svg>
+          `)}`;
+        };
+
+        // Criar ícone SVG de avião (Send do Lucide - apenas o ícone)
+        const createAviaoIcon = () => {
+          return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" 
+                    fill="none" 
+                    stroke="${cores.voo}" 
+                    stroke-width="2" 
+                    stroke-linecap="round" 
+                    stroke-linejoin="round"/>
+            </svg>
+          `)}`;
+        };
+
+        // Criar ícone SVG de carro (Car do Lucide - apenas o ícone)
+        const createCarroIcon = () => {
+          return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="${cores.terrestre}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/>
+              <circle cx="7" cy="17" r="2"/>
+              <path d="M9 17h6"/>
+              <circle cx="17" cy="17" r="2"/>
             </svg>
           `)}`;
         };
@@ -308,13 +434,21 @@ export default function RotaMapVisualization({
         // Carregar todas as imagens de marcadores necessárias
         const imagePromises: Promise<void>[] = [];
         numerosUnicos.forEach(numero => {
-          // Criar marcadores para polos e periferias com o mesmo número
+          // Criar marcadores para polos, periferias e sem tag com o mesmo número
           const poloIconUrl = createMarkerIcon(cores.polo, 'polo', numero);
           const periferiaIconUrl = createMarkerIcon(cores.periferia, 'periferia', numero);
+          const semTagIconUrl = createMarkerIcon(cores.sem_tag, 'sem_tag', numero);
           
           imagePromises.push(loadMarkerImage(`polo-marker-${numero}`, poloIconUrl));
           imagePromises.push(loadMarkerImage(`periferia-marker-${numero}`, periferiaIconUrl));
+          imagePromises.push(loadMarkerImage(`sem-tag-marker-${numero}`, semTagIconUrl));
         });
+
+        // Carregar ícones de avião e carro
+        const aviaoIconUrl = createAviaoIcon();
+        const carroIconUrl = createCarroIcon();
+        imagePromises.push(loadMarkerImage('icone-aviao', aviaoIconUrl));
+        imagePromises.push(loadMarkerImage('icone-carro', carroIconUrl));
 
         await Promise.all(imagePromises);
 
@@ -345,6 +479,53 @@ export default function RotaMapVisualization({
             'icon-anchor': 'bottom',
             'icon-allow-overlap': true,
             'icon-ignore-placement': true
+          }
+        });
+
+        // Camada dos municípios sem tag com ícones de pin numerados
+        addLayerSafely({
+          id: LAYER_IDS.semTag,
+          type: 'symbol',
+          source: SOURCE_IDS.pontos,
+          filter: ['==', 'tipo', 'sem_tag'],
+          layout: {
+            'icon-image': ['concat', 'sem-tag-marker-', ['get', 'ordem']],
+            'icon-size': 0.7,
+            'icon-anchor': 'bottom',
+            'icon-allow-overlap': true,
+            'icon-ignore-placement': true
+          }
+        });
+
+        // Camada dos ícones de avião nos trechos aéreos
+        addLayerSafely({
+          id: LAYER_IDS.iconesVoo,
+          type: 'symbol',
+          source: SOURCE_IDS.iconesTrechos,
+          filter: ['==', 'tipo', 'voo'],
+          layout: {
+            'icon-image': 'icone-aviao',
+            'icon-size': 0.9,
+            'icon-allow-overlap': true,
+            'icon-ignore-placement': true,
+            'icon-rotation-alignment': 'map',
+            'icon-rotate': ['get', 'bearing']
+          }
+        });
+
+        // Camada dos ícones de carro nos trechos terrestres
+        addLayerSafely({
+          id: LAYER_IDS.iconesTerrestres,
+          type: 'symbol',
+          source: SOURCE_IDS.iconesTrechos,
+          filter: ['==', 'tipo', 'terrestre'],
+          layout: {
+            'icon-image': 'icone-carro',
+            'icon-size': 0.9,
+            'icon-allow-overlap': true,
+            'icon-ignore-placement': true,
+            'icon-rotation-alignment': 'map',
+            'icon-rotate': ['get', 'bearing']
           }
         });
 
@@ -406,10 +587,14 @@ export default function RotaMapVisualization({
           });
 
           // Popup para pontos
-          [LAYER_IDS.polos, LAYER_IDS.periferias].forEach(layerId => {
+          [LAYER_IDS.polos, LAYER_IDS.periferias, LAYER_IDS.semTag].forEach(layerId => {
             map.on('click', layerId, (e: any) => {
               if (e.features && e.features[0]) {
                 const props = e.features[0].properties;
+                const tipo = props?.tipo || 'periferia';
+                const tipoLabel = tipo === 'polo' ? 'Polo' : tipo === 'sem_tag' ? 'Fora do Polo' : 'Periferia';
+                const emoji = tipo === 'polo' ? '🏢' : tipo === 'sem_tag' ? '📍' : '🏘️';
+                
                 const popup = new maplibregl.Popup({ offset: 4 })
                   .setLngLat(e.lngLat)
                   .setHTML(`
@@ -418,11 +603,11 @@ export default function RotaMapVisualization({
                         <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-600 text-white text-sm font-bold">
                           ${props?.ordem}
                         </span>
-                        <span class="text-lg">${props?.tipo === 'polo' ? '🏢' : '🏘️'}</span>
+                        <span class="text-lg">${emoji}</span>
                         <span class="text-base">${props?.nome}</span>
                       </div>
                       <div class="mb-1" style="color: black;"><strong class="text-sm">UF:</strong> <span class="text-base">${props?.uf}</span></div>
-                      <div class="mb-1" style="color: black;"><strong class="text-sm">Tipo:</strong> <span class="text-base">${props?.tipo === 'polo' ? 'Polo' : 'Periferia'}</span></div>
+                      <div class="mb-1" style="color: black;"><strong class="text-sm">Tipo:</strong> <span class="text-base">${tipoLabel}</span></div>
                       <div class="text-sm mt-2 pt-1 border-t border-gray-300" style="color: #666;">Parada ${props?.ordem} na rota</div>
                     </div>
                   `)
@@ -550,6 +735,9 @@ export default function RotaMapVisualization({
           try {
             const layersToRemove = [
               LAYER_IDS.labels,
+              LAYER_IDS.iconesTerrestres,
+              LAYER_IDS.iconesVoo,
+              LAYER_IDS.semTag,
               LAYER_IDS.periferias,
               LAYER_IDS.polos,
               LAYER_IDS.trechosTerrestres,
@@ -581,7 +769,11 @@ export default function RotaMapVisualization({
             try {
               const imageKeys = Object.keys((map as any).style.imageManager?.images || {});
               imageKeys.forEach(imageId => {
-                if (imageId.startsWith('polo-marker-') || imageId.startsWith('periferia-marker-')) {
+                if (imageId.startsWith('polo-marker-') || 
+                    imageId.startsWith('periferia-marker-') || 
+                    imageId.startsWith('sem-tag-marker-') ||
+                    imageId === 'icone-aviao' ||
+                    imageId === 'icone-carro') {
                   try {
                     if (map.hasImage(imageId)) {
                       map.removeImage(imageId);

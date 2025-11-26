@@ -71,6 +71,26 @@ Notas de segurança e produção:
 
 Mais detalhes, exemplos de troubleshooting, e comandos extras estão em `DOCKER_GUIDE.md`.
 
+### Build de Imagens ARM64 para EC2 Graviton
+
+Para criar imagens Docker compatíveis com instâncias EC2 ARM64 (Graviton):
+
+📖 **Consulte o guia completo**: [`BUILD_ARM64_GUIDE.md`](BUILD_ARM64_GUIDE.md)
+
+Comando rápido para build e push no ECR:
+
+```powershell
+# Login no ECR
+aws ecr get-login-password --region us-east-1 --profile Innovatis | docker login --username AWS --password-stdin 891612552945.dkr.ecr.us-east-1.amazonaws.com
+
+# Build e Push
+.\docker\scripts\build-arm64.ps1 `
+  -Version v1.0.2 `
+  -EcrRepoUri 891612552945.dkr.ecr.us-east-1.amazonaws.com/nexus-app `
+  -AwsRegion us-east-1 `
+  -Push
+```
+
 ## Principais Funcionalidades
 
 ### 🎯 **Sistema de Autenticação**

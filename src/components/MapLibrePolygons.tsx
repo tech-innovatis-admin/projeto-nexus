@@ -8,6 +8,7 @@ import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import { registerMapInstance } from '@/utils/mapRegistry';
 import { setupMapLibreHover, setupMapLibreHoverSemTag, removeMapLibreHover, readCssVar } from '@/utils/mapLibreHoverHandlers';
+import { useMapData } from '@/contexts/MapDataContext';
 
 // Tipos para o sistema de exportação do raio
 export interface MunicipioRaio {
@@ -189,6 +190,9 @@ export default function MapLibrePolygons({
   const [showPeriferia, setShowPeriferia] = useState(false);
   // Nova camada: municípios sem tag (nem periferia, nem polo)
   const [showSemTag, setShowSemTag] = useState(false);
+  // Camada de pistas de aeródromo
+  const [showPistas, setShowPistas] = useState(false);
+  const { mapData } = useMapData();
   // ADICIONAR ESTADO PARA RAIO
   const [radiusMode, setRadiusMode] = useState(false);
   const [circleGeoJSON, setCircleGeoJSON] = useState<any>(null);
@@ -471,6 +475,11 @@ export default function MapLibrePolygons({
       });
       // NOVO SOURCE
       map.addSource('radius-circle-src', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+      // Source para pistas de aeródromo
+      map.addSource('pistas-voo-source', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] }
+      });
 
     // layers - nova ordem: semtag-fill (mais baixa) → periferia-fill → polos-fill → polos-line → polo-highlight-line
       // 0. Sem Tag fill (camada mais baixa)
@@ -640,6 +649,66 @@ export default function MapLibrePolygons({
         paint: { 'line-color': '#2563EB', 'line-width': 2 },
       });
 
+      // Camada de pistas de aeródromo (ícones de avião)
+      const imageId = 'lucide-plane-icon';
+      const layerId = 'pistas-voo-layer';
+      const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="darkblue" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.7">
+  <path d="M2 22h20" />
+  <path d="M9.5 12.5 3 10l1-2 8 2 5-5 3 1-5 5 2 8-2 1-2.5-6.5-3.5 3.5v3l-2 1v-4l3.5-3.5Z" />
+</svg>`;
+      const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+      const img = new Image();
+      img.onload = () => {
+        try {
+          if (!map.hasImage(imageId)) {
+            map.addImage(imageId, img as any, { pixelRatio: 2 });
+          }
+          // Adicionar layer após a imagem estar carregada (só se não existir)
+          if (!map.getLayer(layerId)) {
+            map.addLayer({
+              id: layerId,
+              type: 'symbol',
+              source: 'pistas-voo-source',
+              layout: {
+                'icon-image': imageId,
+                'icon-size': 0.9,
+                'icon-anchor': 'bottom',
+                'icon-allow-overlap': true,
+                'icon-ignore-placement': true
+              }
+            });
+
+            // Interações: cursor e popup (só adicionar uma vez)
+            map.on('mouseenter', layerId, () => {
+              map.getCanvas().style.cursor = 'pointer';
+            });
+            map.on('mouseleave', layerId, () => {
+              map.getCanvas().style.cursor = '';
+            });
+            map.on('click', layerId, (e: any) => {
+              if (!e.features || !e.features[0]) return;
+              const f = e.features[0];
+              const props = f.properties || {};
+              const lngLat = e.lngLat;
+              new maplibregl.Popup({ offset: 6 })
+                .setLngLat(lngLat)
+                .setHTML(`
+                  <div class="text-sm" style="color: black; min-width: 200px;">
+                    <div><strong>Código:</strong> ${props.codigo_pista || ''}</div>
+                    <div><strong>Nome:</strong> ${props.nome_pista || ''}</div>
+                    <div><strong>Tipo:</strong> ${props.tipo_pista || ''}</div>
+                  </div>
+                `)
+                .addTo(map);
+            });
+          }
+        } catch (err) {
+          console.warn('Erro ao adicionar imagem de avião:', err);
+        }
+      };
+      img.src = url;
+
       // Aplicar visibilidade inicial (polos sempre visível)
       try {
         map.setLayoutProperty('semtag-fill', 'visibility', showSemTag ? 'visible' : 'none');
@@ -652,6 +721,10 @@ export default function MapLibrePolygons({
         // GARANTE VISIBILIDADE DO RAIO (inicial = none)
         map.setLayoutProperty('radius-fill', 'visibility', 'none');
         map.setLayoutProperty('radius-line', 'visibility', 'none');
+        // Pistas inicialmente ocultas
+        try {
+          map.setLayoutProperty('pistas-voo-layer', 'visibility', 'none');
+        } catch {}
       } catch (e) {
         // noop
       }
@@ -1069,6 +1142,21 @@ export default function MapLibrePolygons({
       removeMapLibreHover(map, 'peri-fill');
       removeMapLibreHover(map, 'semtag-fill');
       
+      // Remover camada de pistas
+      try {
+        if (map.getLayer('pistas-voo-layer')) {
+          map.removeLayer('pistas-voo-layer');
+        }
+        if (map.getSource('pistas-voo-source')) {
+          map.removeSource('pistas-voo-source');
+        }
+        if (map.hasImage('lucide-plane-icon')) {
+          map.removeImage('lucide-plane-icon');
+        }
+      } catch (err) {
+        console.warn('Erro ao remover camada de pistas:', err);
+      }
+      
       map.remove();
       mapRef.current = null;
       
@@ -1277,6 +1365,61 @@ export default function MapLibrePolygons({
     }
   }, [radiusMode]);
 
+  // Carregar e atualizar dados de pistas de aeródromo
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    const pistas = Array.isArray(mapData?.pistas) ? mapData!.pistas : [];
+
+    // Converter para GeoJSON
+    const features: GeoJSON.Feature[] = [];
+    for (const pista of pistas as any[]) {
+      const lat = parseFloat(String(pista.latitude_pista ?? '').trim());
+      const lng = parseFloat(String(pista.longitude_pista ?? '').trim());
+      if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) continue;
+
+      features.push({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [lng, lat] },
+        properties: {
+          codigo_pista: String(pista.codigo_pista ?? '').trim(),
+          nome_pista: String(pista.nome_pista ?? '').trim(),
+          tipo_pista: String(pista.tipo_pista ?? '').trim()
+        }
+      } as any);
+    }
+
+    const sourceId = 'pistas-voo-source';
+    const data: GeoJSON.FeatureCollection = {
+      type: 'FeatureCollection',
+      features
+    };
+
+    try {
+      const src = map.getSource(sourceId) as maplibregl.GeoJSONSource | undefined;
+      if (src) {
+        src.setData(data as any);
+      }
+    } catch (err) {
+      console.warn('Erro ao atualizar dados de pistas:', err);
+    }
+  }, [mapData?.pistas]);
+
+  // Controlar visibilidade da camada de pistas
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    try {
+      if (map.getLayer('pistas-voo-layer')) {
+        map.setLayoutProperty('pistas-voo-layer', 'visibility', showPistas ? 'visible' : 'none');
+      }
+    } catch (err) {
+      console.warn('Erro ao controlar visibilidade de pistas:', err);
+    }
+  }, [showPistas]);
+
   return (
     <div className="w-full h-full relative">
       <div ref={containerRef} className="w-full h-full" />
@@ -1347,6 +1490,15 @@ export default function MapLibrePolygons({
                 className="w-4 h-4" 
               />
               <span>Fora dos Polos</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input 
+                type="checkbox" 
+                checked={showPistas} 
+                onChange={(e) => setShowPistas(e.target.checked)} 
+                className="w-4 h-4" 
+              />
+              <span>Pistas de Aeródromo</span>
             </label>
           </div>
         </div>

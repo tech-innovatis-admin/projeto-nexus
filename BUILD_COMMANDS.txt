@@ -1,0 +1,124 @@
+=============================================================================
+  NEXUS - COMANDOS DE BUILD ARM64
+=============================================================================
+
+📖 DOCUMENTAÇÃO COMPLETA: BUILD_ARM64_GUIDE.md
+⚡ REFERÊNCIA RÁPIDA: QUICK_BUILD_ARM64.md
+✅ CHECKLIST: BUILD_CHECKLIST.md
+
+=============================================================================
+  1. NAVEGAÇÃO
+=============================================================================
+
+cd "C:\Users\victo\OneDrive\Desktop\Arquivos Victor\NEXUS\projeto-nexus"
+
+=============================================================================
+  2. BUILD LOCAL (TESTE)
+=============================================================================
+
+.\docker\scripts\build-arm64.ps1 -Version v1.0.2
+
+=============================================================================
+  3. LOGIN NO ECR
+=============================================================================
+
+aws ecr get-login-password --region us-east-1 --profile Innovatis | docker login --username AWS --password-stdin 891612552945.dkr.ecr.us-east-1.amazonaws.com
+
+=============================================================================
+  4. BUILD E PUSH PARA PRODUÇÃO
+=============================================================================
+
+.\docker\scripts\build-arm64.ps1 `
+  -Version v1.0.2 `
+  -EcrRepoUri 891612552945.dkr.ecr.us-east-1.amazonaws.com/nexus-app `
+  -AwsRegion us-east-1 `
+  -Push
+
+=============================================================================
+  5. VERIFICAR IMAGEM NO ECR
+=============================================================================
+
+aws ecr list-images --repository-name nexus-app --profile Innovatis --region us-east-1
+
+=============================================================================
+  6. DEPLOY NA EC2
+=============================================================================
+
+.\deploy-to-ec2-ssm.ps1 -ImageUri "891612552945.dkr.ecr.us-east-1.amazonaws.com/nexus-app:v1.0.2-arm64"
+
+=============================================================================
+  7. VERIFICAR APLICAÇÃO
+=============================================================================
+
+# Obter IP da EC2
+aws ec2 describe-instances --instance-ids i-0f97359729f6589f6 --profile Innovatis --region us-east-1 --query "Reservations[0].Instances[0].PublicIpAddress" --output text
+
+# Acessar no navegador:
+# http://[EC2_IP]:3000
+# http://[EC2_IP]:3000/api/health
+
+=============================================================================
+  TROUBLESHOOTING
+=============================================================================
+
+# Limpar cache
+docker builder prune -a -f
+docker system prune -a -f
+
+# Reconfigurar AWS
+aws configure --profile Innovatis
+
+# Verificar AWS
+aws sts get-caller-identity --profile Innovatis
+
+# Criar builder
+docker buildx create --name nexus-builder --use
+docker buildx inspect --bootstrap
+
+# Ver logs do container na EC2
+ssh -i saep-backend-key.pem ubuntu@98.91.74.236
+docker logs nexus-app
+
+=============================================================================
+  INFORMAÇÕES DO ECR
+=============================================================================
+
+Account ID:  891612552945
+Repository:  nexus-app
+Region:      us-east-1
+URI:         891612552945.dkr.ecr.us-east-1.amazonaws.com/nexus-app
+
+=============================================================================
+  VERSIONAMENTO
+=============================================================================
+
+v1.0.x  →  Patches e correções
+v1.x.0  →  Novas funcionalidades
+vx.0.0  →  Mudanças breaking
+
+Última versão: v1.0.2
+Próxima versão: v1.0.3
+
+=============================================================================
+  FLUXO COMPLETO (COPIAR E COLAR)
+=============================================================================
+
+# 1. Navegar
+cd "C:\Users\victo\OneDrive\Desktop\Arquivos Victor\NEXUS\projeto-nexus"
+
+# 2. Login
+aws ecr get-login-password --region us-east-1 --profile Innovatis | docker login --username AWS --password-stdin 891612552945.dkr.ecr.us-east-1.amazonaws.com
+
+# 3. Build e Push (ALTERE A VERSÃO!)
+.\docker\scripts\build-arm64.ps1 -Version v1.0.3 -EcrRepoUri 891612552945.dkr.ecr.us-east-1.amazonaws.com/nexus-app -AwsRegion us-east-1 -Push
+
+# 4. Verificar
+aws ecr list-images --repository-name nexus-app --profile Innovatis --region us-east-1
+
+# 5. Deploy (ALTERE A VERSÃO!)
+.\deploy-to-ec2-ssm.ps1 -ImageUri "891612552945.dkr.ecr.us-east-1.amazonaws.com/nexus-app:v1.0.3-arm64"
+
+=============================================================================
+  FIM
+=============================================================================
+

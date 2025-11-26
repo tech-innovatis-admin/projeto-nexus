@@ -40,6 +40,7 @@ export default function RotaMapa({
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibreMap | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [showPistas, setShowPistas] = useState(true); // Pistas visíveis por padrão
   const { mapData } = useMapData();
 
   // Inicializar o mapa
@@ -244,6 +245,19 @@ export default function RotaMapa({
     };
   }, [mapLoaded, mapData?.pistas]);
 
+  // Controlar visibilidade da camada de pistas
+  useEffect(() => {
+    if (!mapLoaded || !map.current) return;
+    
+    try {
+      if (map.current.getLayer('pistas-voo-layer')) {
+        map.current.setLayoutProperty('pistas-voo-layer', 'visibility', showPistas ? 'visible' : 'none');
+      }
+    } catch (err) {
+      console.warn('Erro ao controlar visibilidade de pistas:', err);
+    }
+  }, [showPistas, mapLoaded]);
+
   return (
     <div className={`relative w-full h-full ${className}`}>
       <div 
@@ -251,6 +265,23 @@ export default function RotaMapa({
         className="absolute inset-0 w-full h-full"
         style={{ minHeight: '400px' }}
       />
+      
+      {/* Painel de controles para pistas */}
+      {mapLoaded && (
+        <div className="absolute bottom-3 left-3 z-50">
+          <div className="bg-[#0b1220]/80 text-white rounded-md shadow-md p-2 text-sm">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input 
+                type="checkbox" 
+                checked={showPistas} 
+                onChange={(e) => setShowPistas(e.target.checked)} 
+                className="w-4 h-4" 
+              />
+              <span>Pistas de Aeródromo</span>
+            </label>
+          </div>
+        </div>
+      )}
       
       {!mapLoaded && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-100">

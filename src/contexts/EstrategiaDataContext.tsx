@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useMemo, useCall
 interface EstrategiaData {
   poloValores: any;
   poloPeriferia: any;
+  municipiosRelacionamento: any;
 }
 
 interface EstrategiaDataContextType {
@@ -47,7 +48,8 @@ export function EstrategiaDataProvider({ children }: { children: React.ReactNode
       const applyResult = (organizedData: EstrategiaData) => {
         try {
           console.log('[EstrategiaData] poloValores features:', organizedData.poloValores?.features?.length ?? 0,
-            '| poloPeriferia features:', organizedData.poloPeriferia?.features?.length ?? 0);
+            '| poloPeriferia features:', organizedData.poloPeriferia?.features?.length ?? 0,
+            '| municipiosRelacionamento records:', Array.isArray(organizedData.municipiosRelacionamento) ? organizedData.municipiosRelacionamento.length : 0);
         } catch {}
 
         setEstrategiaData(organizedData);
@@ -66,6 +68,7 @@ export function EstrategiaDataProvider({ children }: { children: React.ReactNode
           const organizedData: EstrategiaData = {
             poloValores: data.poloValores,
             poloPeriferia: data.poloPeriferia,
+            municipiosRelacionamento: data.municipiosRelacionamento,
           };
           setLoadingProgress(100);
           applyResult(organizedData);
@@ -75,6 +78,7 @@ export function EstrategiaDataProvider({ children }: { children: React.ReactNode
         const organizedData: EstrategiaData = {
           poloValores: data.poloValores,
           poloPeriferia: data.poloPeriferia,
+          municipiosRelacionamento: data.municipiosRelacionamento,
         };
         applyResult(organizedData);
         // Não tocar no loading quando SWR em background

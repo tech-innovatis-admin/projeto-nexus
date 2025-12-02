@@ -120,7 +120,8 @@ export async function fetchAllGeoJSONFiles() {
     'parceiros1.json',
     'pistas_s3_lat_log.json',
     'sedes_municipais_lat_long.json',
-    'municipios_sem_tag.json'
+    'municipios_sem_tag.json',
+    'municipios_relacionamento.json'
   ];
 
   console.log(`📥 Loading ${fileNames.length} GeoJSON files...`);
@@ -161,7 +162,8 @@ export async function fetchEnvConfig() {
 export async function fetchEstrategiaData() {
   const fileNames = [
     'base_polo_valores.geojson',
-    'base_polo_periferia.geojson'
+    'base_polo_periferia.geojson',
+    'municipios_relacionamento.json'
   ];
 
   console.log(`📥 Loading estrategia data (${fileNames.length} files)...`);

@@ -253,12 +253,30 @@ export function readCssVar(varName: string, fallback: string): string {
  */
 export function poloTooltipHtml(properties: MuniProps): string {
   const { uf, /* ibge, */ nome } = extractPoloFields(properties);
+  const hasRel = String(
+    (properties.relacionamento_polo ?? properties.propriedadesOriginais?.relacionamento_polo ?? '')
+  ).toLowerCase() === 'sim';
+
+  const relRow = hasRel
+    ? `
+      <div class="t-row t-rel">
+        <span class="t-badge t-badge-rel">
+          Relacionamento
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" style="margin-left:6px; vertical-align:middle">
+            <path d="M20 6L9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M22 4L11 15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </span>
+      </div>
+    `
+    : '';
 
   return `
     <div class="t-muni">
       <div class="t-title">${escapeHtml(nome)}</div>
       <div class="t-row">UF: <b>${escapeHtml(uf)}</b></div>
       <div class="t-row t-tipo"><span class="t-badge t-badge-polo">Polo</span></div>
+      ${relRow}
     </div>
   `.trim();
 }
@@ -273,12 +291,30 @@ export function poloTooltipHtml(properties: MuniProps): string {
  */
 export function periferiaTooltipHtml(properties: MuniProps): string {
   const { uf, /* ibge, */ nome } = extractPeriferiaFields(properties);
+  const hasRel = String(
+    (properties.relacionamento_periferia ?? properties.propriedadesOriginais?.relacionamento_periferia ?? '')
+  ).toLowerCase() === 'sim';
+
+  const relRow = hasRel
+    ? `
+      <div class="t-row t-rel">
+        <span class="t-badge t-badge-rel">
+          Relacionamento
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" style="margin-left:6px; vertical-align:middle">
+            <path d="M20 6L9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M22 4L11 15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </span>
+      </div>
+    `
+    : '';
 
   return `
     <div class="t-muni">
       <div class="t-title">${escapeHtml(nome)}</div>
       <div class="t-row">UF: <b>${escapeHtml(uf)}</b></div>
       <div class="t-row t-tipo"><span class="t-badge t-badge-periferia">Periferia</span></div>
+      ${relRow}
     </div>
   `.trim();
 }
@@ -288,12 +324,30 @@ export function periferiaTooltipHtml(properties: MuniProps): string {
  */
 export function semTagTooltipHtml(properties: MuniProps): string {
   const { uf, /* ibge, */ nome } = extractSemTagFields(properties);
+  const hasRel = String(
+    (properties.relacionamento_sem_tag ?? properties.propriedadesOriginais?.relacionamento_sem_tag ?? '')
+  ).toLowerCase() === 'sim';
+
+  const relRow = hasRel
+    ? `
+      <div class="t-row t-rel">
+        <span class="t-badge t-badge-rel">
+          Relacionamento
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" style="margin-left:6px; vertical-align:middle">
+            <path d="M20 6L9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+            <path d="M22 4L11 15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+          </svg>
+        </span>
+      </div>
+    `
+    : '';
 
   return `
     <div class="t-muni">
       <div class="t-title">${escapeHtml(nome)}</div>
       <div class="t-row">UF: <b>${escapeHtml(uf)}</b></div>
-      <div class="t-row t-tipo"><span class="t-badge t-badge-semtag">Sem Tag</span></div>
+      <div class="t-row t-tipo"><span class="t-badge t-badge-semtag">Fora do polo</span></div>
+      ${relRow}
     </div>
   `.trim();
 }

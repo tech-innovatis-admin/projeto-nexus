@@ -48,12 +48,17 @@ export async function GET() {
 
     const result = {
       poloValores: files.find(f => f.name === 'base_polo_valores.geojson')?.data || mockPoloValores,
-      poloPeriferia: files.find(f => f.name === 'base_polo_periferia.geojson')?.data || mockPoloPeriferia
+      poloPeriferia: files.find(f => f.name === 'base_polo_periferia.geojson')?.data || mockPoloPeriferia,
+      municipiosRelacionamento: files.find(f => f.name === 'municipios_relacionamento.json')?.data || []
     };
 
     return NextResponse.json(result);
   } catch (error) {
     console.error('Erro ao buscar dados de estratégia do S3:', error);
-    return NextResponse.json({ poloValores: mockPoloValores, poloPeriferia: mockPoloPeriferia });
+    return NextResponse.json({ 
+      poloValores: mockPoloValores, 
+      poloPeriferia: mockPoloPeriferia,
+      municipiosRelacionamento: []
+    });
   }
 }

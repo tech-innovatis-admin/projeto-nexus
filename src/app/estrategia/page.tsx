@@ -14,6 +14,8 @@ import { createPortal } from 'react-dom';
 import * as XLSX from 'xlsx';
 import { saveAs } from 'file-saver';
 import { RadiusResultPayload, MunicipioRaio } from '@/components/MapLibrePolygons';
+import EstrategiaFiltersMenu from '@/components/EstrategiaFiltersMenu';
+import RelacionamentoModal, { MunicipioDisponivel } from '@/components/RelacionamentoModal';
 // Removido: import { fetchGeoJSONWithCache } from '@/utils/cacheGeojson';
 import { UF_ABERTURA, isUFAbertura, REGIOES_BRASIL, TODAS_UFS, UF_NAMES, isRegiaoAbertura, PRODUCTS, PROD_FIELDS, ProdFieldKey } from '@/utils/mapConfig';
 
@@ -152,23 +154,43 @@ function sumSelectedProducts(
   return total;
 }
 
-// 🆕 Helpers para verificar relacionamento
-const hasRelacionamentoPolo = (p: PoloValoresProps): boolean =>
-  String(
+// 🆕 Helpers para verificar relacionamento - agora usando Set de códigos do banco de dados
+// Se o Set não for fornecido, usa a lógica antiga (verificar campo nas properties)
+const hasRelacionamentoPolo = (p: PoloValoresProps, codigosAtivos?: Set<string>): boolean => {
+  // Prioridade: usar Set de códigos do banco se disponível
+  if (codigosAtivos && codigosAtivos.size > 0) {
+    return codigosAtivos.has(p.codigo_origem);
+  }
+  // Fallback: lógica antiga baseada em campo da feature
+  return String(
     p.relacionamento_polo ??
     p.propriedadesOriginais?.relacionamento_polo ??
     ''
   ).toLowerCase() === 'sim';
+};
 
-const hasRelacionamentoPeriferia = (p: PeriferiaProps): boolean =>
-  String(
+const hasRelacionamentoPeriferia = (p: PeriferiaProps, codigosAtivos?: Set<string>): boolean => {
+  // Prioridade: usar Set de códigos do banco se disponível
+  if (codigosAtivos && codigosAtivos.size > 0) {
+    const codigo = p.codigo_destino || p.codigo_origem;
+    return codigosAtivos.has(codigo);
+  }
+  // Fallback: lógica antiga baseada em campo da feature
+  return String(
     p.relacionamento_periferia ??
     p.propriedadesOriginais?.relacionamento_periferia ??
     ''
   ).toLowerCase() === 'sim';
+};
 
-const hasRelacionamentoSemTag = (s: SemTagMunicipio): boolean =>
-  String(s.relacionamento_sem_tag ?? '').toLowerCase() === 'sim';
+const hasRelacionamentoSemTag = (s: SemTagMunicipio, codigosAtivos?: Set<string>): boolean => {
+  // Prioridade: usar Set de códigos do banco se disponível
+  if (codigosAtivos && codigosAtivos.size > 0) {
+    return codigosAtivos.has(s.codigo);
+  }
+  // Fallback: lógica antiga baseada em campo da feature
+  return String(s.relacionamento_sem_tag ?? '').toLowerCase() === 'sim';
+};
 
 // Tipagens para as duas bases reais
 interface PoloValoresProps {
@@ -252,6 +274,8 @@ const AnimatedCurrency = memo(function AnimatedCurrency({ targetValue, selectedP
 
   return <motion.span>{displayValue}</motion.span>;
 });
+
+// FiltersMenu movido para '@/components/EstrategiaFiltersMenu'
 
 // Componente para contagem animada de números inteiros
 const AnimatedNumber = memo(function AnimatedNumber({ targetValue, selectedPolo }: { targetValue: number; selectedPolo: string }) {
@@ -862,6 +886,12 @@ export default function EstrategiaPage() {
   // 🆕 Estado para filtro de Relacionamento
   const [isRelacionamentoFilterActive, setIsRelacionamentoFilterActive] = useState<boolean>(false);
 
+  // 🆕 Estado para o modal de gerenciamento de relacionamentos
+  const [isRelacionamentoModalOpen, setIsRelacionamentoModalOpen] = useState<boolean>(false);
+  
+  // 🆕 Set de códigos de municípios com relacionamento ativo (carregado do banco)
+  const [municipiosComRelacionamento, setMunicipiosComRelacionamento] = useState<Set<string>>(new Set());
+
   // 🆕 Estados para controlar periferias com múltiplos polos
   const [showPoloSelectionWarning, setShowPoloSelectionWarning] = useState<boolean>(false);
   const [filteredPolosByPeriferia, setFilteredPolosByPeriferia] = useState<string[]>([]);
@@ -1192,6 +1222,36 @@ export default function EstrategiaPage() {
     return () => { cancelled = true; };
   }, []);
 
+  // 🆕 Carregar municípios com relacionamento ativo do banco de dados
+  const fetchMunicipiosComRelacionamento = useCallback(async () => {
+    try {
+      const resp = await fetch('/api/relacionamentos?apenas_ativos=true');
+      if (!resp.ok) return;
+      const data = await resp.json();
+      if (data.success && Array.isArray(data.data)) {
+        const codigosAtivos = new Set<string>(
+          data.data.map((r: any) => String(r.code_muni))
+        );
+        setMunicipiosComRelacionamento(codigosAtivos);
+        dbg('🔗 Relacionamentos carregados do banco:', codigosAtivos.size);
+      }
+    } catch (e) {
+      console.warn('Erro ao carregar relacionamentos do banco:', e);
+    }
+  }, []);
+
+  // Carregar relacionamentos ao montar e quando o modal fechar
+  useEffect(() => {
+    fetchMunicipiosComRelacionamento();
+  }, [fetchMunicipiosComRelacionamento]);
+
+  // Recarregar relacionamentos quando o modal fechar
+  useEffect(() => {
+    if (!isRelacionamentoModalOpen) {
+      fetchMunicipiosComRelacionamento();
+    }
+  }, [isRelacionamentoModalOpen, fetchMunicipiosComRelacionamento]);
+
   // Função para filtrar municípios dentro do raio de João Pessoa
   // 🔥 CRÍTICO: Usar useRef para estabilizar a função e evitar loops
   const filterByJoaoPessoaRadiusRef = useRef<(municipios: (PoloValoresProps | PeriferiaProps)[]) => (PoloValoresProps | PeriferiaProps)[]>(null as any);
@@ -1327,9 +1387,9 @@ export default function EstrategiaPage() {
       ? polosValores.filter(p => selectedUFs.includes(String(p.UF || p.UF_origem)))
       : polosValores;
     
-    // 🆕 Aplicar filtro de Relacionamento
+    // 🆕 Aplicar filtro de Relacionamento (usando Set do banco de dados)
     if (isRelacionamentoFilterActive) {
-      base = base.filter(hasRelacionamentoPolo);
+      base = base.filter(p => hasRelacionamentoPolo(p, municipiosComRelacionamento));
     }
     
     // Aplicar filtro de João Pessoa se ativo
@@ -1349,7 +1409,7 @@ export default function EstrategiaPage() {
       }));
     // Ordena alfabeticamente pelo label
     return opts.sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
-  }, [polosValores, selectedUFs, filterByJoaoPessoaRadius, isRelacionamentoFilterActive]);
+  }, [polosValores, selectedUFs, filterByJoaoPessoaRadius, isRelacionamentoFilterActive, municipiosComRelacionamento]);
 
   // 🆕 UFs disponíveis quando o filtro de João Pessoa está ativo
   const availableUFsWithRadiusFilter = useMemo(() => {
@@ -1361,8 +1421,10 @@ export default function EstrategiaPage() {
     // Se o raio está ativo, retornar apenas os UFs que têm polos dentro do raio
     const ufsWithinRadius = new Set<string>();
 
-    // 🆕 Aplicar filtro de Relacionamento quando disponível
-    let base = isRelacionamentoFilterActive ? polosValores.filter(hasRelacionamentoPolo) : polosValores;
+    // 🆕 Aplicar filtro de Relacionamento quando disponível (usando Set do banco)
+    let base = isRelacionamentoFilterActive 
+      ? polosValores.filter(p => hasRelacionamentoPolo(p, municipiosComRelacionamento)) 
+      : polosValores;
 
     for (const polo of base) {
       let lat: number | undefined = polo.latitude_munic_polo;
@@ -1389,7 +1451,7 @@ export default function EstrategiaPage() {
     }
 
     return ufsWithinRadius;
-  }, [polosValores, isJoaoPessoaFilterActive, isRelacionamentoFilterActive]);
+  }, [polosValores, isJoaoPessoaFilterActive, isRelacionamentoFilterActive, municipiosComRelacionamento]);
 
   // 🆕 Mapa de periferias para seus polos (pre-computado para performance) - SIMPLIFICADO
   const periferiaToPolosMap = useMemo(() => {
@@ -1399,9 +1461,9 @@ export default function EstrategiaPage() {
       ? periferia.filter(p => selectedUFs.includes(String(p.UF)))
       : periferia;
 
-    // 🆕 Aplicar filtro de Relacionamento
+    // 🆕 Aplicar filtro de Relacionamento (usando Set do banco)
     if (isRelacionamentoFilterActive) {
-      base = base.filter(hasRelacionamentoPeriferia);
+      base = base.filter(p => hasRelacionamentoPeriferia(p, municipiosComRelacionamento));
     }
 
     // Aplicar filtro de João Pessoa se ativo
@@ -1429,7 +1491,7 @@ export default function EstrategiaPage() {
     }
 
     return map;
-  }, [periferia, polosValores, selectedUFs, filterByJoaoPessoaRadius, isRelacionamentoFilterActive]);
+  }, [periferia, polosValores, selectedUFs, filterByJoaoPessoaRadius, isRelacionamentoFilterActive, municipiosComRelacionamento]);
 
   // 🆕 Lista única de municípios periféricos (sem duplicatas)
   // 🔥 OTIMIZAÇÃO: Pré-processamento para normalizar nomes municipais e evitar toLowerCase() repetitivo
@@ -1440,9 +1502,9 @@ export default function EstrategiaPage() {
       ? periferia.filter(p => selectedUFs.includes(String(p.UF)))
       : periferia;
 
-    // 🆕 Aplicar filtro de Relacionamento
+    // 🆕 Aplicar filtro de Relacionamento (usando Set do banco)
     if (isRelacionamentoFilterActive) {
-      base = base.filter(hasRelacionamentoPeriferia);
+      base = base.filter(p => hasRelacionamentoPeriferia(p, municipiosComRelacionamento));
     }
 
     // Aplicar filtro de João Pessoa se ativo
@@ -1632,9 +1694,9 @@ export default function EstrategiaPage() {
       ? semTagMunicipios.filter(s => selectedUFs.includes(String(s.UF || '')))
       : semTagMunicipios;
     
-    // 🆕 Aplicar filtro de Relacionamento em sem tag
+    // 🆕 Aplicar filtro de Relacionamento em sem tag (usando Set do banco)
     if (isRelacionamentoFilterActive) {
-      baseSemTag = baseSemTag.filter(hasRelacionamentoSemTag);
+      baseSemTag = baseSemTag.filter(s => hasRelacionamentoSemTag(s, municipiosComRelacionamento));
     }
 
     // 🔥 OTIMIZAÇÃO: Adicionar nomeLower aos semTag para evitar toLowerCase repetitivo
@@ -1666,7 +1728,7 @@ export default function EstrategiaPage() {
     perif.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
     semTag.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
     return [...perif, ...semTag];
-  }, [periferiasFiltradas, semTagMunicipios, selectedUFs, periferiaInputValue, selectedPolo, poloOptions, isRelacionamentoFilterActive]);
+  }, [periferiasFiltradas, semTagMunicipios, selectedUFs, periferiaInputValue, selectedPolo, poloOptions, isRelacionamentoFilterActive, municipiosComRelacionamento]);
 
   // Opções filtradas por UFs selecionadas e filtro de João Pessoa (para o select de POLO)
   const filteredPoloOptions = useMemo(() => {
@@ -1674,9 +1736,9 @@ export default function EstrategiaPage() {
       ? polosValores.filter(p => selectedUFs.includes(String(p.UF || p.UF_origem)))
       : polosValores;
     
-    // 🆕 Aplicar filtro de Relacionamento
+    // 🆕 Aplicar filtro de Relacionamento (usando Set do banco)
     if (isRelacionamentoFilterActive) {
-      base = base.filter(hasRelacionamentoPolo);
+      base = base.filter(p => hasRelacionamentoPolo(p, municipiosComRelacionamento));
     }
     
     // Aplicar filtro de João Pessoa se ativo
@@ -1692,7 +1754,7 @@ export default function EstrategiaPage() {
       })
       .map(p => ({ value: p.codigo_origem, label: p.municipio_origem }));
     return opts.sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'));
-  }, [selectedUFs, polosValores, filterByJoaoPessoaRadius, isRelacionamentoFilterActive]);
+  }, [selectedUFs, polosValores, filterByJoaoPessoaRadius, isRelacionamentoFilterActive, municipiosComRelacionamento]);
 
   // Resetar polo selecionado caso UFs mudem e o polo atual não exista mais
   useEffect(() => {
@@ -1708,16 +1770,16 @@ export default function EstrategiaPage() {
       ? periferia.filter(p => selectedUFs.includes(String(p.UF)))
       : periferia;
     
-    // 🆕 Aplicar filtro de Relacionamento
+    // 🆕 Aplicar filtro de Relacionamento (usando Set do banco)
     if (isRelacionamentoFilterActive) {
-      base = base.filter(hasRelacionamentoPeriferia);
+      base = base.filter(p => hasRelacionamentoPeriferia(p, municipiosComRelacionamento));
     }
     
     // Aplicar filtro de João Pessoa se ativo
     base = filterByJoaoPessoaRadius(base) as PeriferiaProps[];
     
     return base.filter(p => p.codigo_origem === selectedPolo);
-  }, [periferia, selectedPolo, selectedUFs, filterByJoaoPessoaRadius, isRelacionamentoFilterActive]);
+  }, [periferia, selectedPolo, selectedUFs, filterByJoaoPessoaRadius, isRelacionamentoFilterActive, municipiosComRelacionamento]);
 
   // Resetar município periférico selecionado caso o polo mude
   useEffect(() => {
@@ -1926,9 +1988,9 @@ export default function EstrategiaPage() {
     const inPoloMode = appliedPolo !== 'ALL';
     let base = polosValores;
     
-    // 🆕 Aplicar filtro de Relacionamento
+    // 🆕 Aplicar filtro de Relacionamento (usando Set do banco)
     if (isRelacionamentoFilterActive) {
-      base = base.filter(hasRelacionamentoPolo);
+      base = base.filter(p => hasRelacionamentoPolo(p, municipiosComRelacionamento));
     }
     
     if (appliedUFs.length) base = base.filter(p => appliedUFs.includes(String(p.UF || p.UF_origem)));
@@ -1948,6 +2010,10 @@ export default function EstrategiaPage() {
           codigo_origem: p.codigo_origem,
           municipio_origem: p.municipio_origem,
           UF: String(p.UF || p.UF_origem || '').toUpperCase(),
+          // Indicador de relacionamento (quando disponível)
+          relacionamento_polo: String(
+            (p as any).relacionamento_polo ?? p.propriedadesOriginais?.relacionamento_polo ?? ''
+          ),
           soma_valor_total_destino: periferiaAggByCodigo.get(p.codigo_origem) || 0,
           valor_total_origem: Number(p.valor_total_origem) || 0,
           // Inclui productValues já calculados para uso no raio/export
@@ -1959,7 +2025,7 @@ export default function EstrategiaPage() {
     timeEnd(tLabel, { base: base.length, features: features.length, inUFMode, inPoloMode });
     dbg('🗺️ polosFCForMap pronto', { features: features.length });
     return fc;
-  }, [polosValores, appliedUF, appliedPolo, appliedUFs, periferiaAggByCodigo, filterByJoaoPessoaRadius, isRelacionamentoFilterActive]);
+  }, [polosValores, appliedUF, appliedPolo, appliedUFs, periferiaAggByCodigo, filterByJoaoPessoaRadius, isRelacionamentoFilterActive, municipiosComRelacionamento]);
 
   const periferiasFCForMap = useMemo(() => {
     const tLabel = 'compute-periferiasFCForMap';
@@ -1969,9 +2035,9 @@ export default function EstrategiaPage() {
     const inPoloMode = appliedPolo !== 'ALL';
   let base = periferia;
   
-  // 🆕 Aplicar filtro de Relacionamento
+  // 🆕 Aplicar filtro de Relacionamento (usando Set do banco)
   if (isRelacionamentoFilterActive) {
-    base = base.filter(hasRelacionamentoPeriferia);
+    base = base.filter(p => hasRelacionamentoPeriferia(p, municipiosComRelacionamento));
   }
   
   if (appliedUFs.length) base = base.filter(p => appliedUFs.includes(String(p.UF)));
@@ -1993,6 +2059,10 @@ export default function EstrategiaPage() {
           municipio_destino: p.municipio_destino,
           UF: String(p.UF || p.UF_destino || '').toUpperCase(),
           valor_total_destino: sumSelectedProducts(p.productValues, Number(p.valor_total_destino) || 0, appliedProducts, PRODUCTS.length),
+          // Indicador de relacionamento (quando disponível)
+          relacionamento_periferia: String(
+            (p as any).relacionamento_periferia ?? p.propriedadesOriginais?.relacionamento_periferia ?? ''
+          ),
           // Campos individuais de produtos no topo para compatibilidade com componentes do mapa
           valor_pd_num_destino: Number(p.propriedadesOriginais?.valor_pd_num_destino ?? (p as any).valor_pd_num_destino ?? 0),
           valor_pmsb_num_destino: Number(p.propriedadesOriginais?.valor_pmsb_num_destino ?? (p as any).valor_pmsb_num_destino ?? 0),
@@ -2029,7 +2099,7 @@ export default function EstrategiaPage() {
     timeEnd(tLabel, { base: base.length, features: features.length, inUFMode, inPoloMode });
     dbg('🗺️ periferiasFCForMap pronto', { features: features.length });
     return fc;
-  }, [periferia, appliedUF, appliedPolo, appliedUFs, appliedProducts, filterByJoaoPessoaRadius, isRelacionamentoFilterActive]);
+  }, [periferia, appliedUF, appliedPolo, appliedUFs, appliedProducts, filterByJoaoPessoaRadius, isRelacionamentoFilterActive, municipiosComRelacionamento]);
 
   // Cálculos derivados para cards com base no polo aplicado
   const derived = useMemo(() => {
@@ -2042,9 +2112,9 @@ export default function EstrategiaPage() {
     // Filtrar registros conforme interseção: UFs selecionadas, UF/Polo
     let valoresFiltrados = polosValores;
     
-    // 🆕 Aplicar filtro de Relacionamento
+    // 🆕 Aplicar filtro de Relacionamento (usando Set do banco)
     if (isRelacionamentoFilterActive) {
-      valoresFiltrados = valoresFiltrados.filter(hasRelacionamentoPolo);
+      valoresFiltrados = valoresFiltrados.filter(p => hasRelacionamentoPolo(p, municipiosComRelacionamento));
     }
     
     if (appliedUFs.length) valoresFiltrados = valoresFiltrados.filter(v => appliedUFs.includes(String(v.UF || v.UF_origem)));
@@ -2060,9 +2130,9 @@ export default function EstrategiaPage() {
     // Card 2 e 3: base de periferias filtrada
     let periferiaFiltrada = periferia;
     
-    // 🆕 Aplicar filtro de Relacionamento
+    // 🆕 Aplicar filtro de Relacionamento (usando Set do banco)
     if (isRelacionamentoFilterActive) {
-      periferiaFiltrada = periferiaFiltrada.filter(hasRelacionamentoPeriferia);
+      periferiaFiltrada = periferiaFiltrada.filter(p => hasRelacionamentoPeriferia(p, municipiosComRelacionamento));
     }
     
     if (appliedUFs.length) periferiaFiltrada = periferiaFiltrada.filter(p => appliedUFs.includes(String(p.UF)));
@@ -2180,7 +2250,7 @@ export default function EstrategiaPage() {
     };
     timeEnd(tLabel, { municipios: municipiosList.length, top3: top3.length });
     return result;
-  }, [appliedPolo, appliedUF, appliedUFs, appliedProducts, appliedMinValor, appliedMaxValor, polosValores, periferia, poloOptions, periferiaAggByCodigo, filterByJoaoPessoaRadius, isRelacionamentoFilterActive]);
+  }, [appliedPolo, appliedUF, appliedUFs, appliedProducts, appliedMinValor, appliedMaxValor, polosValores, periferia, poloOptions, periferiaAggByCodigo, filterByJoaoPessoaRadius, isRelacionamentoFilterActive, municipiosComRelacionamento]);
 
   // Reset da lista de municípios quando o polo mudar
   useEffect(() => {
@@ -2677,6 +2747,48 @@ export default function EstrategiaPage() {
     }
   }, [appliedUF, appliedPolo, appliedUFs, appliedMinValor, appliedMaxValor, appliedProducts, polosValores, periferia]);
 
+  // 🆕 Preparar lista de municípios disponíveis para o modal de relacionamento
+  // Combina polos, periferias e sem tag em uma lista única
+  const municipiosDisponiveisParaModal = useMemo((): MunicipioDisponivel[] => {
+    const seen = new Set<string>();
+    const result: MunicipioDisponivel[] = [];
+
+    // Adicionar polos
+    for (const polo of polosValores) {
+      if (!polo.codigo_origem || seen.has(polo.codigo_origem)) continue;
+      seen.add(polo.codigo_origem);
+      result.push({
+        codigo: polo.codigo_origem,
+        nome: polo.municipio_origem,
+        UF: String(polo.UF || polo.UF_origem || '')
+      });
+    }
+
+    // Adicionar periferias
+    for (const peri of periferia) {
+      const codigo = peri.codigo_destino || '';
+      if (!codigo || seen.has(codigo)) continue;
+      seen.add(codigo);
+      result.push({
+        codigo,
+        nome: peri.municipio_destino,
+        UF: String(peri.UF || peri.UF_destino || '')
+      });
+    }
+
+    // Adicionar sem tag
+    for (const st of semTagMunicipios) {
+      if (!st.codigo || seen.has(st.codigo)) continue;
+      seen.add(st.codigo);
+      result.push({
+        codigo: st.codigo,
+        nome: st.municipio,
+        UF: String(st.UF || '')
+      });
+    }
+
+    return result.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+  }, [polosValores, periferia, semTagMunicipios]);
 
 
   return (
@@ -2701,106 +2813,20 @@ export default function EstrategiaPage() {
                 className="flex flex-col md:flex-row md:justify-between md:items-center gap-2 md:gap-0"
               >
                 <h1 className="text-3xl font-bold text-white">
-                  Análise Estratégica deee<span className="text-sky-400">Produtos</span>
+                  Análise Estratégica de <span className="text-sky-400">Produtos</span>
                 </h1>
                 
-                {/* Botão Toggle para Filtro de Relacionamento e João Pessoa */}
+                {/* Botão Toggle unificado: Radar Estratégico + Relacionamento */}
                 <div className="flex items-center gap-3 flex-wrap">
-                  <div className="flex items-center gap-2 relative">
-                    <span 
-                      className="text-sm text-slate-300 font-medium cursor-pointer"
-                      onMouseEnter={() => setShowRadarTooltip(true)}
-                      onMouseLeave={() => setShowRadarTooltip(false)}
-                      onClick={() => setShowRadarTooltip(!showRadarTooltip)}
-                    >
-                      Radar Estratégico
-                    </span>
-                    
-                    {/* Tooltip profissional */}
-                    {showRadarTooltip && (
-                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-2 bg-slate-800 text-white text-xs rounded-md shadow-lg border border-slate-600 z-50 whitespace-nowrap">
-                        <div className="flex items-center gap-2">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                          Raio de 1.300 km a partir de João Pessoa
-                        </div>
-                        {/* Seta do tooltip */}
-                        <div className="absolute -top-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-slate-800 border-l border-t border-slate-600 rotate-45"></div>
-                      </div>
-                    )}
-                    
-                    <button
-                      onClick={() => {
-                        const newState = !isJoaoPessoaFilterActive;
-                        setIsJoaoPessoaFilterActive(newState);
-                        dbg('🎯 [RADAR] Toggle clicado', { newState });
-                      }}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-slate-800 ${
-                        isJoaoPessoaFilterActive ? 'bg-sky-600 shadow-lg shadow-sky-500/50' : 'bg-slate-600'
-                      }`}
-                      role="switch"
-                      aria-checked={isJoaoPessoaFilterActive}
-                      aria-label="Ativar filtro de raio de João Pessoa"
-                      title={isJoaoPessoaFilterActive ? 'Desativar Radar Estratégico' : 'Ativar Radar Estratégico'}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-all duration-300 ${
-                          isJoaoPessoaFilterActive ? 'translate-x-6 scale-110' : 'translate-x-1'
-                        }`}
-                      />
-                    </button>
-                  </div>
-                  {isJoaoPessoaFilterActive && (
-                    <div className="flex items-center gap-1 text-xs text-sky-400 bg-sky-900/30 px-2 py-1 rounded-md border border-sky-700/50">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      <span>Radar Ativo</span>
-                    </div>
-                  )}
-                  
-                  {/* 🆕 Botão Toggle para Filtro de Relacionamento */}
-                  <div className="flex items-center gap-2">
-                    <span 
-                      className="text-sm text-slate-300 font-medium cursor-pointer"
-                      title="Mostrar apenas municípios com relacionamento confirmado"
-                    >
-                      Relacionamento
-                    </span>
-                    
-                    <button
-                      onClick={() => {
-                        const newState = !isRelacionamentoFilterActive;
-                        setIsRelacionamentoFilterActive(newState);
-                        dbg('🔗 [RELACIONAMENTO] Toggle clicado', { newState });
-                      }}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:ring-offset-slate-800 ${
-                        isRelacionamentoFilterActive ? 'bg-emerald-600 shadow-lg shadow-emerald-500/50' : 'bg-slate-600'
-                      }`}
-                      role="switch"
-                      aria-checked={isRelacionamentoFilterActive}
-                      aria-label="Ativar filtro de relacionamento"
-                      title={isRelacionamentoFilterActive ? 'Desativar filtro de relacionamento' : 'Ativar filtro de relacionamento'}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-all duration-300 ${
-                          isRelacionamentoFilterActive ? 'translate-x-6 scale-110' : 'translate-x-1'
-                        }`}
-                      />
-                    </button>
-                  </div>
-                  
-                  {isRelacionamentoFilterActive && (
-                    <div className="flex items-center gap-1 text-xs text-emerald-400 bg-emerald-900/30 px-2 py-1 rounded-md border border-emerald-700/50">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <span>Ativo</span>
-                    </div>
-                  )}
+                  <EstrategiaFiltersMenu
+                    isRadarActive={isJoaoPessoaFilterActive}
+                    setIsRadarActive={setIsJoaoPessoaFilterActive}
+                    isRelActive={isRelacionamentoFilterActive}
+                    setIsRelActive={setIsRelacionamentoFilterActive}
+                    onOpenRelacionamentoModal={() => setIsRelacionamentoModalOpen(true)}
+                  />
+
+                  {/* Status badges removed — state indicated inside the popover only */}
                 </div>
 
               </motion.div>
@@ -3737,6 +3763,13 @@ export default function EstrategiaPage() {
       
       {/* Botão scroll to top */}
       <ScrollToTopButton />
+
+      {/* 🆕 Modal de Gerenciamento de Relacionamentos */}
+      <RelacionamentoModal
+        isOpen={isRelacionamentoModalOpen}
+        onClose={() => setIsRelacionamentoModalOpen(false)}
+        municipiosDisponiveis={municipiosDisponiveisParaModal}
+      />
 
     </div>
   );

@@ -56,3 +56,17 @@ model users {
   updated_at        DateTime            @default(now()) @db.Timestamptz(6)
   municipio_acessos municipio_acessos[]
 }
+
+/// Tabela para gerenciar relacionamentos com municípios
+model municipios_com_relacionamento {
+  row_index              Int       @id @default(autoincrement())
+  name_state             String    @db.VarChar(2)
+  code_muni              String    @db.VarChar(10)
+  name_muni              String    @db.VarChar(255)
+  relacionamento_ativo   Boolean   @default(true)
+  relacionamento_criado  DateTime? @db.Timestamptz(6)
+  relacionamento_editado DateTime? @db.Timestamptz(6)
+
+  @@unique([code_muni], map: "municipios_com_relacionamento_code_muni_key")
+  @@map("municipios_com_relacionamento")
+}

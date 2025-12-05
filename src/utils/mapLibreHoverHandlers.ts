@@ -253,12 +253,25 @@ export function readCssVar(varName: string, fallback: string): string {
  */
 export function poloTooltipHtml(properties: MuniProps): string {
   const { uf, /* ibge, */ nome } = extractPoloFields(properties);
+  const relRaw = (properties as any).relacionamento_polo ?? (properties as any).relacionamento ?? (properties as any)?.propriedadesOriginais?.relacionamento_polo ?? '';
+  const rel = String(relRaw || '').trim().toLowerCase();
+  const isRel = rel === 'sim' || rel === 'true' || rel === '1' || rel === 'yes';
+  const relHtml = `
+      <div class="t-row t-rel">
+        <span class="t-label">Relacionamento</span>
+        <span class="t-icon" aria-label="${isRel ? 'Relacionamento confirmado' : 'Sem relacionamento'}" title="${isRel ? 'Relacionamento confirmado' : 'Sem relacionamento'}">
+          ${isRel
+            ? '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>'
+            : '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="9" y1="12" x2="15" y2="12"/></svg>'}
+        </span>
+      </div>`;
 
   return `
     <div class="t-muni">
       <div class="t-title">${escapeHtml(nome)}</div>
       <div class="t-row">UF: <b>${escapeHtml(uf)}</b></div>
       <div class="t-row t-tipo"><span class="t-badge t-badge-polo">Polo</span></div>
+      ${relHtml}
     </div>
   `.trim();
 }
@@ -273,12 +286,25 @@ export function poloTooltipHtml(properties: MuniProps): string {
  */
 export function periferiaTooltipHtml(properties: MuniProps): string {
   const { uf, /* ibge, */ nome } = extractPeriferiaFields(properties);
+  const relRaw = (properties as any).relacionamento_periferia ?? (properties as any).relacionamento ?? (properties as any)?.propriedadesOriginais?.relacionamento_periferia ?? '';
+  const rel = String(relRaw || '').trim().toLowerCase();
+  const isRel = rel === 'sim' || rel === 'true' || rel === '1' || rel === 'yes';
+  const relHtml = `
+      <div class="t-row t-rel">
+        <span class="t-label">Relacionamento</span>
+        <span class="t-icon" aria-label="${isRel ? 'Relacionamento confirmado' : 'Sem relacionamento'}" title="${isRel ? 'Relacionamento confirmado' : 'Sem relacionamento'}">
+          ${isRel
+            ? '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>'
+            : '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="9" y1="12" x2="15" y2="12"/></svg>'}
+        </span>
+      </div>`;
 
   return `
     <div class="t-muni">
       <div class="t-title">${escapeHtml(nome)}</div>
       <div class="t-row">UF: <b>${escapeHtml(uf)}</b></div>
       <div class="t-row t-tipo"><span class="t-badge t-badge-periferia">Periferia</span></div>
+      ${relHtml}
     </div>
   `.trim();
 }
@@ -288,12 +314,25 @@ export function periferiaTooltipHtml(properties: MuniProps): string {
  */
 export function semTagTooltipHtml(properties: MuniProps): string {
   const { uf, /* ibge, */ nome } = extractSemTagFields(properties);
+  const relRaw = (properties as any).relacionamento_sem_tag ?? (properties as any).relacionamento ?? (properties as any)?.propriedadesOriginais?.relacionamento_sem_tag ?? '';
+  const rel = String(relRaw || '').trim().toLowerCase();
+  const isRel = rel === 'sim' || rel === 'true' || rel === '1' || rel === 'yes';
+  const relHtml = `
+      <div class="t-row t-rel">
+        <span class="t-label">Relacionamento</span>
+        <span class="t-icon" aria-label="${isRel ? 'Relacionamento confirmado' : 'Sem relacionamento'}" title="${isRel ? 'Relacionamento confirmado' : 'Sem relacionamento'}">
+          ${isRel
+            ? '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>'
+            : '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="9" y1="12" x2="15" y2="12"/></svg>'}
+        </span>
+      </div>`;
 
   return `
     <div class="t-muni">
       <div class="t-title">${escapeHtml(nome)}</div>
       <div class="t-row">UF: <b>${escapeHtml(uf)}</b></div>
       <div class="t-row t-tipo"><span class="t-badge t-badge-semtag">Fora do polo</span></div>
+      ${relHtml}
     </div>
   `.trim();
 }

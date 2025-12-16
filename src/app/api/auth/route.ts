@@ -76,8 +76,10 @@ export async function POST(request: Request) {
     let viewerAcessosCount = 0; // usado também para sinalizar isRestricted no payload de resposta
     if ((dbUser.role || '').toLowerCase() === 'viewer') {
       try {
+        // Converter BigInt para Number se necessário (Prisma Client espera Int)
+        const userId = typeof dbUser.id === 'bigint' ? Number(dbUser.id) : dbUser.id;
         const acessos = await prisma.municipio_acessos.findMany({
-          where: { user_id: dbUser.id },
+          where: { user_id: userId },
           select: { valid_until: true },
         });
         viewerAcessosCount = Array.isArray(acessos) ? acessos.length : 0;
@@ -113,10 +115,22 @@ export async function POST(request: Request) {
       }
     }
 
+    // Normalizar BigInt para string antes de criar JWT
+    // JSON.stringify (usado internamente por jsonwebtoken) não serializa BigInt
+    const normalizeBigInt = (value: unknown): string | number | null | undefined => {
+      if (typeof value === 'bigint') {
+        return value.toString();
+      }
+      if (typeof value === 'number' && (value > Number.MAX_SAFE_INTEGER || value < Number.MIN_SAFE_INTEGER)) {
+        return value.toString();
+      }
+      return value as string | number | null | undefined;
+    };
+
     // Criar token JWT
     const token = sign(
       {
-        id: dbUser.id,
+        id: normalizeBigInt(dbUser.id),
         username: dbUser.username,
         email: dbUser.email,
         role: dbUser.role,
@@ -135,10 +149,18 @@ export async function POST(request: Request) {
       maxAge: 3600 // 1 hora
     });
 
+    // Normalizar BigInt na resposta também
+    const normalizeForJson = (value: unknown): any => {
+      if (typeof value === 'bigint') {
+        return value.toString();
+      }
+      return value;
+    };
+
     return new Response(JSON.stringify({ 
       success: true, 
       user: {
-        id: dbUser.id,
+        id: normalizeForJson(dbUser.id),
         username: dbUser.username,
         email: dbUser.email,
         role: dbUser.role,

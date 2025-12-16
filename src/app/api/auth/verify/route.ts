@@ -41,9 +41,17 @@ export async function GET(request: Request) {
 
     // Busca dados atualizados do usuário no banco
     try {
+      // Converter ID do token (string) para Number/BigInt conforme necessário
+      // O token pode ter o ID como string (se foi BigInt) ou number
+      const userId = typeof decoded.id === 'string' 
+        ? (decoded.id.includes('e') || decoded.id.includes('E') || decoded.id.length > 15 
+            ? BigInt(decoded.id) 
+            : Number(decoded.id))
+        : decoded.id;
+
       const rows = await prisma.$queryRaw<
-        { id: number; username: string | null; email: string | null; role: string | null; name: string | null; cargo: string | null; photo: string | null; }[]
-      >`SELECT id, username, email, role, name, cargo, photo FROM "users" WHERE id = ${decoded.id} LIMIT 1`;
+        { id: number | bigint; username: string | null; email: string | null; role: string | null; name: string | null; cargo: string | null; photo: string | null; }[]
+      >`SELECT id, username, email, role, name, cargo, photo FROM "users" WHERE id = ${userId} LIMIT 1`;
       const userData = rows[0];
 
       if (!userData) {
@@ -56,19 +64,38 @@ export async function GET(request: Request) {
         });
       }
 
+      // Normalizar BigInt na resposta JSON
+      const normalizeForJson = (value: unknown): any => {
+        if (typeof value === 'bigint') {
+          return value.toString();
+        }
+        return value;
+      };
+
+      const normalizedUser = {
+        id: normalizeForJson(userData.id),
+        username: userData.username,
+        email: userData.email,
+        role: userData.role,
+        name: userData.name,
+        cargo: userData.cargo,
+        photo: userData.photo
+      };
+
       return new Response(JSON.stringify({ 
         success: true, 
-        user: userData
+        user: normalizedUser
       }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       });
     } catch (dbError) {
       console.error('Erro ao buscar dados do usuário:', dbError);
+      // Fallback: retornar dados do token (já normalizados)
       return new Response(JSON.stringify({ 
         success: true, 
         user: {
-          id: decoded.id,
+          id: decoded.id, // Já está como string se era BigInt
           username: decoded.username,
           email: decoded.email,
           role: decoded.role

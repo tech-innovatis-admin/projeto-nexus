@@ -161,6 +161,10 @@ export default function MapLibrePolygons({
   radarFilterActive,
   radarCenterLngLat,
   radarRadiusKm,
+  // 🆕 Set de códigos de municípios com relacionamento ativo
+  municipiosComRelacionamento,
+  // 🆕 Set de códigos de municípios em negociação
+  municipiosEmNegociacao,
 }: {
   polos: FC;
   periferias: FC;
@@ -180,6 +184,10 @@ export default function MapLibrePolygons({
   // Espera [lng, lat]
   radarCenterLngLat?: [number, number];
   radarRadiusKm?: number;
+  // 🆕 Set de códigos de municípios com relacionamento ativo
+  municipiosComRelacionamento?: Set<string>;
+  // 🆕 Set de códigos de municípios em negociação
+  municipiosEmNegociacao?: Set<string>;
 }) {
   const mapRef = useRef<MapLibreMap | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -208,6 +216,19 @@ export default function MapLibrePolygons({
   // Refs com os dados mais recentes das features (evita closures com dados antigos)
   const polosLatestRef = useRef<FC>({ type: 'FeatureCollection', features: [] });
   const periLatestRef = useRef<FC>({ type: 'FeatureCollection', features: [] });
+  
+  // 🆕 Refs para os Sets de relacionamento e negociação (para uso nos handlers de hover)
+  const municipiosComRelacionamentoRef = useRef<Set<string>>(new Set());
+  const municipiosEmNegociacaoRef = useRef<Set<string>>(new Set());
+  
+  // Atualizar refs quando os Sets mudarem
+  useEffect(() => {
+    municipiosComRelacionamentoRef.current = municipiosComRelacionamento || new Set();
+  }, [municipiosComRelacionamento]);
+  
+  useEffect(() => {
+    municipiosEmNegociacaoRef.current = municipiosEmNegociacao || new Set();
+  }, [municipiosEmNegociacao]);
   
   // Sincronizar checkbox da periferia com contexto de filtro
   useEffect(() => {
@@ -436,6 +457,108 @@ export default function MapLibrePolygons({
     return { poloFillByUF: p, periFillByUF: r };
   }, []);
 
+  // 🆕 Lista de códigos com relacionamento ativo (para uso em expressões MapLibre)
+  const codigosComRelacionamento = useMemo(() => {
+    if (!municipiosComRelacionamento || municipiosComRelacionamento.size === 0) return [];
+    return Array.from(municipiosComRelacionamento);
+  }, [municipiosComRelacionamento]);
+
+  // 🆕 Lista de códigos em negociação (para uso em expressões MapLibre)
+  const codigosEmNegociacao = useMemo(() => {
+    if (!municipiosEmNegociacao || municipiosEmNegociacao.size === 0) return [];
+    return Array.from(municipiosEmNegociacao);
+  }, [municipiosEmNegociacao]);
+
+  // 🆕 Expressões de cor que destacam municípios com status especial
+  // Prioridade: 1) Hover, 2) Negociação (roxo), 3) Relacionamento ativo (amarelo), 4) Cor por UF
+  const poloFillWithRelacionamento = useMemo(() => {
+    const hasRelacionamento = codigosComRelacionamento.length > 0;
+    const hasNegociacao = codigosEmNegociacao.length > 0;
+    
+    if (!hasRelacionamento && !hasNegociacao) {
+      return [
+        'case',
+        ['boolean', ['feature-state', 'hover'], false],
+        '#bfdbfe',
+        poloFillByUF
+      ];
+    }
+    
+    // Construir expressão com prioridades
+    return [
+      'case',
+      ['boolean', ['feature-state', 'hover'], false],
+      '#bfdbfe', // Hover (prioridade máxima)
+      ...(hasNegociacao ? [
+        ['in', ['get', 'codigo_origem'], ['literal', codigosEmNegociacao]],
+        '#A855F7', // Roxo para negociação
+      ] : []),
+      ...(hasRelacionamento ? [
+        ['in', ['get', 'codigo_origem'], ['literal', codigosComRelacionamento]],
+        '#FCD34D', // Amarelo para relacionamento ativo
+      ] : []),
+      poloFillByUF // Cor por UF (fallback)
+    ];
+  }, [poloFillByUF, codigosComRelacionamento, codigosEmNegociacao]);
+
+  const periFillWithRelacionamento = useMemo(() => {
+    const hasRelacionamento = codigosComRelacionamento.length > 0;
+    const hasNegociacao = codigosEmNegociacao.length > 0;
+    
+    if (!hasRelacionamento && !hasNegociacao) {
+      return [
+        'case',
+        ['boolean', ['feature-state', 'hover'], false],
+        '#bfdbfe',
+        periFillByUF
+      ];
+    }
+    
+    return [
+      'case',
+      ['boolean', ['feature-state', 'hover'], false],
+      '#bfdbfe', // Hover (prioridade máxima)
+      ...(hasNegociacao ? [
+        ['in', ['get', 'codigo_destino'], ['literal', codigosEmNegociacao]],
+        '#A855F7', // Roxo para negociação
+      ] : []),
+      ...(hasRelacionamento ? [
+        ['in', ['get', 'codigo_destino'], ['literal', codigosComRelacionamento]],
+        '#FCD34D', // Amarelo para relacionamento ativo
+      ] : []),
+      periFillByUF // Cor por UF (fallback)
+    ];
+  }, [periFillByUF, codigosComRelacionamento, codigosEmNegociacao]);
+
+  const semTagFillWithRelacionamento = useMemo(() => {
+    const hasRelacionamento = codigosComRelacionamento.length > 0;
+    const hasNegociacao = codigosEmNegociacao.length > 0;
+    
+    if (!hasRelacionamento && !hasNegociacao) {
+      return [
+        'case',
+        ['boolean', ['feature-state', 'hover'], false],
+        '#bfdbfe',
+        '#E5E7EB'
+      ];
+    }
+    
+    return [
+      'case',
+      ['boolean', ['feature-state', 'hover'], false],
+      '#bfdbfe', // Hover (prioridade máxima)
+      ...(hasNegociacao ? [
+        ['in', ['get', 'codigo'], ['literal', codigosEmNegociacao]],
+        '#A855F7', // Roxo para negociação
+      ] : []),
+      ...(hasRelacionamento ? [
+        ['in', ['get', 'codigo'], ['literal', codigosComRelacionamento]],
+        '#FCD34D', // Amarelo para relacionamento ativo
+      ] : []),
+      '#E5E7EB' // Cinza padrão (fallback)
+    ];
+  }, [codigosComRelacionamento, codigosEmNegociacao]);
+
   useEffect(() => {
     if (mapRef.current || !containerRef.current) return;
     const map = new maplibregl.Map({
@@ -478,16 +601,17 @@ export default function MapLibrePolygons({
         type: 'fill',
         source: 'semtag-src',
         paint: {
-          'fill-color': [
-            'case',
-            ['boolean', ['feature-state', 'hover'], false],
-            readCssVar('--map-hover-fill', '#bfdbfe'),
-            '#E5E7EB' // cinza claro para fundo neutro
-          ],
+          'fill-color': semTagFillWithRelacionamento as any,
           'fill-opacity': [
             'case',
             ['boolean', ['feature-state', 'hover'], false],
             0.35,
+            // 🆕 Aumentar opacidade para municípios em negociação
+            ['in', ['get', 'codigo'], ['literal', codigosEmNegociacao]],
+            0.45,
+            // 🆕 Aumentar opacidade para municípios com relacionamento ativo
+            ['in', ['get', 'codigo'], ['literal', codigosComRelacionamento]],
+            0.4,
             0.18,
           ],
         },
@@ -509,16 +633,17 @@ export default function MapLibrePolygons({
         type: 'fill',
         source: 'periferia-src',
         paint: {
-          'fill-color': [
-            'case',
-            ['boolean', ['feature-state', 'hover'], false],
-            readCssVar('--map-hover-fill', '#bfdbfe'), // Cor de hover
-            periFillByUF as any, // Cor normal por UF
-          ],
+          'fill-color': periFillWithRelacionamento as any,
           'fill-opacity': [
             'case',
             ['boolean', ['feature-state', 'hover'], false],
             0.35, // Opacidade de hover
+            // 🆕 Aumentar opacidade para municípios em negociação
+            ['in', ['get', 'codigo_destino'], ['literal', codigosEmNegociacao]],
+            0.55,
+            // 🆕 Aumentar opacidade para municípios com relacionamento ativo
+            ['in', ['get', 'codigo_destino'], ['literal', codigosComRelacionamento]],
+            0.5,
             colors.periferia.fillOpacity, // Opacidade normal
           ],
         },
@@ -541,16 +666,17 @@ export default function MapLibrePolygons({
         type: 'fill',
         source: 'polos-src',
         paint: {
-          'fill-color': [
-            'case',
-            ['boolean', ['feature-state', 'hover'], false],
-            readCssVar('--map-hover-fill', '#bfdbfe'), // Cor de hover
-            poloFillByUF as any, // Cor normal por UF
-          ],
+          'fill-color': poloFillWithRelacionamento as any,
           'fill-opacity': [
             'case',
             ['boolean', ['feature-state', 'hover'], false],
             0.35, // Opacidade de hover
+            // 🆕 Aumentar opacidade para municípios em negociação
+            ['in', ['get', 'codigo_origem'], ['literal', codigosEmNegociacao]],
+            0.65,
+            // 🆕 Aumentar opacidade para municípios com relacionamento ativo
+            ['in', ['get', 'codigo_origem'], ['literal', codigosComRelacionamento]],
+            0.6,
             colors.polo.fillOpacity, // Opacidade normal
           ],
         },
@@ -953,9 +1079,27 @@ export default function MapLibrePolygons({
       // ============================================================
       // CONFIGURAR HOVER HANDLERS (Tooltips estilo Leaflet)
       // ============================================================
-  setupMapLibreHoverSemTag(map, 'semtag-fill');
-      setupMapLibreHover(map, 'polos-fill', true);     // true = é camada de polos
-      setupMapLibreHover(map, 'peri-fill', false);     // false = é camada de periferias
+      // Passa getters para que os handlers sempre obtenham os valores mais recentes das refs
+      setupMapLibreHoverSemTag(
+        map, 
+        'semtag-fill',
+        () => municipiosComRelacionamentoRef.current,
+        () => municipiosEmNegociacaoRef.current
+      );
+      setupMapLibreHover(
+        map, 
+        'polos-fill', 
+        true,  // true = é camada de polos
+        () => municipiosComRelacionamentoRef.current,
+        () => municipiosEmNegociacaoRef.current
+      );
+      setupMapLibreHover(
+        map, 
+        'peri-fill', 
+        false, // false = é camada de periferias
+        () => municipiosComRelacionamentoRef.current,
+        () => municipiosEmNegociacaoRef.current
+      );
       console.log('🎯 [MapLibrePolygons] Hover handlers configurados para polos e periferias');
 
       // Eventos de clique nos polígonos
@@ -1227,6 +1371,21 @@ export default function MapLibrePolygons({
       if (map.getLayer('peri-line')) map.setPaintProperty('peri-line', 'line-width', periLineWidthExpr as any);
     }
 
+    // 🆕 GARANTIR que cores de relacionamento sejam sempre aplicadas (prevalecem sobre outras cores)
+    try {
+      if (map.getLayer('polos-fill') && codigosComRelacionamento.length > 0) {
+        map.setPaintProperty('polos-fill', 'fill-color', poloFillWithRelacionamento as any);
+      }
+      if (map.getLayer('peri-fill') && codigosComRelacionamento.length > 0) {
+        map.setPaintProperty('peri-fill', 'fill-color', periFillWithRelacionamento as any);
+      }
+      if (map.getLayer('semtag-fill') && codigosComRelacionamento.length > 0) {
+        map.setPaintProperty('semtag-fill', 'fill-color', semTagFillWithRelacionamento as any);
+      }
+    } catch (e) {
+      console.warn('Erro ao aplicar cores de relacionamento no useEffect principal:', e);
+    }
+
     // Fit bounds: Polo específico => enquadrar polo e suas periferias; UF mode => enquadrar UF; caso contrário, Brasil
     if (appliedPolo !== 'ALL') {
       // Modo polo específico - centralizar no polo selecionado e suas periferias
@@ -1265,7 +1424,79 @@ export default function MapLibrePolygons({
       // Modo geral - mostrar Brasil inteiro
       map.fitBounds([[-74, -34], [-34, 5]], { padding: 24, duration: 700 }); // Brasil aprox
     }
-  }, [polos, periferias, appliedPolo, appliedUF, municipioPerifericoSelecionado, municipioSemTagSelecionado, semTagAllFC, radarFilterActive, radarCenterLngLat, radarRadiusKm]);
+  }, [polos, periferias, appliedUF, appliedPolo, municipioPerifericoSelecionado, municipioSemTagSelecionado, radarFilterActive, radarCenterLngLat, radarRadiusKm, semTagAllFC, codigosComRelacionamento, codigosEmNegociacao]);
+
+  // 🆕 Atualizar cores quando relacionamentos ou negociações mudarem
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+
+    // Sempre aplicar as expressões de cor que priorizam negociação e relacionamento ativo
+    try {
+      // Polos: aplicar cores (negociação = roxo, relacionamento = amarelo)
+      if (map.getLayer('polos-fill')) {
+        map.setPaintProperty('polos-fill', 'fill-color', poloFillWithRelacionamento as any);
+        // Opacidade: negociação e relacionamento ativo têm opacidade maior
+        const opacityExpr = [
+          'case',
+          ['boolean', ['feature-state', 'hover'], false],
+          0.35, // Hover
+          ...(codigosEmNegociacao.length > 0 ? [
+            ['in', ['get', 'codigo_origem'], ['literal', codigosEmNegociacao]],
+            0.65, // Negociação - opacidade maior
+          ] : []),
+          ...(codigosComRelacionamento.length > 0 ? [
+            ['in', ['get', 'codigo_origem'], ['literal', codigosComRelacionamento]],
+            0.6, // Relacionamento ativo - opacidade maior
+          ] : []),
+          colors.polo.fillOpacity // Padrão
+        ];
+        map.setPaintProperty('polos-fill', 'fill-opacity', opacityExpr as any);
+      }
+
+      // Periferias: aplicar cores
+      if (map.getLayer('peri-fill')) {
+        map.setPaintProperty('peri-fill', 'fill-color', periFillWithRelacionamento as any);
+        const opacityExpr = [
+          'case',
+          ['boolean', ['feature-state', 'hover'], false],
+          0.35, // Hover
+          ...(codigosEmNegociacao.length > 0 ? [
+            ['in', ['get', 'codigo_destino'], ['literal', codigosEmNegociacao]],
+            0.55, // Negociação - opacidade maior
+          ] : []),
+          ...(codigosComRelacionamento.length > 0 ? [
+            ['in', ['get', 'codigo_destino'], ['literal', codigosComRelacionamento]],
+            0.5, // Relacionamento ativo - opacidade maior
+          ] : []),
+          colors.periferia.fillOpacity // Padrão
+        ];
+        map.setPaintProperty('peri-fill', 'fill-opacity', opacityExpr as any);
+      }
+
+      // Sem Tag: aplicar cores
+      if (map.getLayer('semtag-fill')) {
+        map.setPaintProperty('semtag-fill', 'fill-color', semTagFillWithRelacionamento as any);
+        const opacityExpr = [
+          'case',
+          ['boolean', ['feature-state', 'hover'], false],
+          0.35, // Hover
+          ...(codigosEmNegociacao.length > 0 ? [
+            ['in', ['get', 'codigo'], ['literal', codigosEmNegociacao]],
+            0.45, // Negociação - opacidade maior
+          ] : []),
+          ...(codigosComRelacionamento.length > 0 ? [
+            ['in', ['get', 'codigo'], ['literal', codigosComRelacionamento]],
+            0.4, // Relacionamento ativo - opacidade maior
+          ] : []),
+          0.18 // Padrão
+        ];
+        map.setPaintProperty('semtag-fill', 'fill-opacity', opacityExpr as any);
+      }
+    } catch (e) {
+      console.warn('Erro ao atualizar cores de relacionamento/negociação:', e);
+    }
+  }, [codigosComRelacionamento, codigosEmNegociacao, poloFillWithRelacionamento, periFillWithRelacionamento, semTagFillWithRelacionamento]);
 
   // SINCRONIZAR refs COM STATE DE RAIO E CURSOR
   useEffect(() => {

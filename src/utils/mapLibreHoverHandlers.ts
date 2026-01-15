@@ -249,20 +249,46 @@ export function readCssVar(varName: string, fallback: string): string {
  * Usa as mesmas classes CSS do Leaflet para manter estética consistente
  *
  * @param properties - Propriedades do feature GeoJSON
+ * @param municipiosComRelacionamento - Set de códigos IBGE com relacionamento ativo
+ * @param municipiosEmNegociacao - Set de códigos IBGE em negociação
  * @returns String com HTML do tooltip
  */
-export function poloTooltipHtml(properties: MuniProps): string {
-  const { uf, /* ibge, */ nome } = extractPoloFields(properties);
-  const relRaw = (properties as any).relacionamento_polo ?? (properties as any).relacionamento ?? (properties as any)?.propriedadesOriginais?.relacionamento_polo ?? '';
-  const rel = String(relRaw || '').trim().toLowerCase();
-  const isRel = rel === 'sim' || rel === 'true' || rel === '1' || rel === 'yes';
+export function poloTooltipHtml(
+  properties: MuniProps,
+  municipiosComRelacionamento?: Set<string>,
+  municipiosEmNegociacao?: Set<string>
+): string {
+  const { uf, ibge, nome } = extractPoloFields(properties);
+  
+  // Determinar status: negociação > relacionamento > sem status
+  const isNegociacao = municipiosEmNegociacao ? municipiosEmNegociacao.has(ibge) : false;
+  const isRelacionamento = municipiosComRelacionamento ? municipiosComRelacionamento.has(ibge) : false;
+  
+  // Ícone e label baseados no status
+  let statusIcon: string;
+  let statusLabel: string;
+  let statusColor: string;
+  
+  if (isNegociacao) {
+    statusIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A855F7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+    statusLabel = 'Em negociação';
+    statusColor = '#A855F7';
+  } else if (isRelacionamento) {
+    statusIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+    statusLabel = 'Relacionamento ativo';
+    statusColor = '#10b981';
+  } else {
+    statusIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="9" y1="12" x2="15" y2="12"/></svg>';
+    statusLabel = 'Sem relacionamento';
+    statusColor = '#94a3b8';
+  }
+  
   const relHtml = `
       <div class="t-row t-rel">
-        <span class="t-label">Relacionamento</span>
-        <span class="t-icon" aria-label="${isRel ? 'Relacionamento confirmado' : 'Sem relacionamento'}" title="${isRel ? 'Relacionamento confirmado' : 'Sem relacionamento'}">
-          ${isRel
-            ? '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>'
-            : '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="9" y1="12" x2="15" y2="12"/></svg>'}
+        <span class="t-label">Status</span>
+        <span class="t-icon" aria-label="${statusLabel}" title="${statusLabel}" style="display: flex; align-items: center; gap: 4px;">
+          ${statusIcon}
+          <span style="color: ${statusColor}; font-size: 11px;">${isNegociacao ? 'Negociação' : isRelacionamento ? 'Relacionamento' : ''}</span>
         </span>
       </div>`;
 
@@ -282,20 +308,46 @@ export function poloTooltipHtml(properties: MuniProps): string {
  * Usa as mesmas classes CSS do Leaflet para manter estética consistente
  *
  * @param properties - Propriedades do feature GeoJSON
+ * @param municipiosComRelacionamento - Set de códigos IBGE com relacionamento ativo
+ * @param municipiosEmNegociacao - Set de códigos IBGE em negociação
  * @returns String com HTML do tooltip
  */
-export function periferiaTooltipHtml(properties: MuniProps): string {
-  const { uf, /* ibge, */ nome } = extractPeriferiaFields(properties);
-  const relRaw = (properties as any).relacionamento_periferia ?? (properties as any).relacionamento ?? (properties as any)?.propriedadesOriginais?.relacionamento_periferia ?? '';
-  const rel = String(relRaw || '').trim().toLowerCase();
-  const isRel = rel === 'sim' || rel === 'true' || rel === '1' || rel === 'yes';
+export function periferiaTooltipHtml(
+  properties: MuniProps,
+  municipiosComRelacionamento?: Set<string>,
+  municipiosEmNegociacao?: Set<string>
+): string {
+  const { uf, ibge, nome } = extractPeriferiaFields(properties);
+  
+  // Determinar status: negociação > relacionamento > sem status
+  const isNegociacao = municipiosEmNegociacao ? municipiosEmNegociacao.has(ibge) : false;
+  const isRelacionamento = municipiosComRelacionamento ? municipiosComRelacionamento.has(ibge) : false;
+  
+  // Ícone e label baseados no status
+  let statusIcon: string;
+  let statusLabel: string;
+  let statusColor: string;
+  
+  if (isNegociacao) {
+    statusIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A855F7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+    statusLabel = 'Em negociação';
+    statusColor = '#A855F7';
+  } else if (isRelacionamento) {
+    statusIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+    statusLabel = 'Relacionamento ativo';
+    statusColor = '#10b981';
+  } else {
+    statusIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="9" y1="12" x2="15" y2="12"/></svg>';
+    statusLabel = 'Sem relacionamento';
+    statusColor = '#94a3b8';
+  }
+  
   const relHtml = `
       <div class="t-row t-rel">
-        <span class="t-label">Relacionamento</span>
-        <span class="t-icon" aria-label="${isRel ? 'Relacionamento confirmado' : 'Sem relacionamento'}" title="${isRel ? 'Relacionamento confirmado' : 'Sem relacionamento'}">
-          ${isRel
-            ? '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>'
-            : '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="9" y1="12" x2="15" y2="12"/></svg>'}
+        <span class="t-label">Status</span>
+        <span class="t-icon" aria-label="${statusLabel}" title="${statusLabel}" style="display: flex; align-items: center; gap: 4px;">
+          ${statusIcon}
+          <span style="color: ${statusColor}; font-size: 11px;">${isNegociacao ? 'Negociação' : isRelacionamento ? 'Ativo' : ''}</span>
         </span>
       </div>`;
 
@@ -311,19 +363,47 @@ export function periferiaTooltipHtml(properties: MuniProps): string {
 
 /**
  * Gera HTML do tooltip para município SEM TAG
+ * @param properties - Propriedades do feature GeoJSON
+ * @param municipiosComRelacionamento - Set de códigos IBGE com relacionamento ativo
+ * @param municipiosEmNegociacao - Set de códigos IBGE em negociação
+ * @returns String com HTML do tooltip
  */
-export function semTagTooltipHtml(properties: MuniProps): string {
-  const { uf, /* ibge, */ nome } = extractSemTagFields(properties);
-  const relRaw = (properties as any).relacionamento_sem_tag ?? (properties as any).relacionamento ?? (properties as any)?.propriedadesOriginais?.relacionamento_sem_tag ?? '';
-  const rel = String(relRaw || '').trim().toLowerCase();
-  const isRel = rel === 'sim' || rel === 'true' || rel === '1' || rel === 'yes';
+export function semTagTooltipHtml(
+  properties: MuniProps,
+  municipiosComRelacionamento?: Set<string>,
+  municipiosEmNegociacao?: Set<string>
+): string {
+  const { uf, ibge, nome } = extractSemTagFields(properties);
+  
+  // Determinar status: negociação > relacionamento > sem status
+  const isNegociacao = municipiosEmNegociacao ? municipiosEmNegociacao.has(ibge) : false;
+  const isRelacionamento = municipiosComRelacionamento ? municipiosComRelacionamento.has(ibge) : false;
+  
+  // Ícone e label baseados no status
+  let statusIcon: string;
+  let statusLabel: string;
+  let statusColor: string;
+  
+  if (isNegociacao) {
+    statusIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A855F7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+    statusLabel = 'Em negociação';
+    statusColor = '#A855F7';
+  } else if (isRelacionamento) {
+    statusIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+    statusLabel = 'Relacionamento ativo';
+    statusColor = '#10b981';
+  } else {
+    statusIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="9" y1="12" x2="15" y2="12"/></svg>';
+    statusLabel = 'Sem relacionamento';
+    statusColor = '#94a3b8';
+  }
+  
   const relHtml = `
       <div class="t-row t-rel">
-        <span class="t-label">Relacionamento</span>
-        <span class="t-icon" aria-label="${isRel ? 'Relacionamento confirmado' : 'Sem relacionamento'}" title="${isRel ? 'Relacionamento confirmado' : 'Sem relacionamento'}">
-          ${isRel
-            ? '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>'
-            : '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="9" y1="12" x2="15" y2="12"/></svg>'}
+        <span class="t-label">Status</span>
+        <span class="t-icon" aria-label="${statusLabel}" title="${statusLabel}" style="display: flex; align-items: center; gap: 4px;">
+          ${statusIcon}
+          <span style="color: ${statusColor}; font-size: 11px;">${isNegociacao ? 'Negociação' : isRelacionamento ? 'Ativo' : ''}</span>
         </span>
       </div>`;
 
@@ -356,15 +436,18 @@ export function getHoverColors() {
  * @param map - Instância do MapLibre GL Map
  * @param layerId - ID da camada (ex: 'polos-fill', 'peri-fill')
  * @param isPolo - true se for camada de polos, false se for periferias
+ * @param getRelacionamentos - Função que retorna Set de códigos IBGE com relacionamento ativo
+ * @param getNegociacoes - Função que retorna Set de códigos IBGE em negociação
  * 
  * Uso:
- *   setupMapLibreHover(map, 'polos-fill', true);
- *   setupMapLibreHover(map, 'peri-fill', false);
+ *   setupMapLibreHover(map, 'polos-fill', true, () => relacionamentoRef.current, () => negociacaoRef.current);
  */
 export function setupMapLibreHover(
   map: maplibregl.Map,
   layerId: string,
-  isPolo: boolean
+  isPolo: boolean,
+  getRelacionamentos?: () => Set<string>,
+  getNegociacoes?: () => Set<string>
 ): void {
   let popup: maplibregl.Popup | null = null;
   let hoveredFeatureId: string | number | null = null;
@@ -378,11 +461,15 @@ export function setupMapLibreHover(
 
     const feature = e.features[0];
     const properties = feature.properties || {};
+    
+    // Obtém os Sets atualizados através dos getters
+    const municipiosComRelacionamento = getRelacionamentos ? getRelacionamentos() : undefined;
+    const municipiosEmNegociacao = getNegociacoes ? getNegociacoes() : undefined;
 
-    // Gera HTML do tooltip baseado no tipo (polo ou periferia)
+    // Gera HTML do tooltip baseado no tipo (polo ou periferia), passando os Sets
     const tooltipHtml = isPolo
-      ? poloTooltipHtml(properties)
-      : periferiaTooltipHtml(properties);
+      ? poloTooltipHtml(properties, municipiosComRelacionamento, municipiosEmNegociacao)
+      : periferiaTooltipHtml(properties, municipiosComRelacionamento, municipiosEmNegociacao);
 
     // Remove popup anterior se existir
     if (popup) {
@@ -476,10 +563,15 @@ export function setupMapLibreHover(
 
     const feature = e.features[0];
     const properties = feature.properties || {};
+    
+    // Obtém os Sets atualizados através dos getters
+    const municipiosComRelacionamento = getRelacionamentos ? getRelacionamentos() : undefined;
+    const municipiosEmNegociacao = getNegociacoes ? getNegociacoes() : undefined;
 
+    // Passa os Sets para o tooltip no click também
     const tooltipHtml = isPolo
-      ? poloTooltipHtml(properties)
-      : periferiaTooltipHtml(properties);
+      ? poloTooltipHtml(properties, municipiosComRelacionamento, municipiosEmNegociacao)
+      : periferiaTooltipHtml(properties, municipiosComRelacionamento, municipiosEmNegociacao);
 
     // Remove popup anterior
     if (popup) {
@@ -501,10 +593,16 @@ export function setupMapLibreHover(
 
 /**
  * Handlers de hover específicos para camada de Municípios Sem Tag
+ * @param map - Instância do MapLibre GL Map
+ * @param layerId - ID da camada
+ * @param getRelacionamentos - Função que retorna Set de códigos IBGE com relacionamento ativo
+ * @param getNegociacoes - Função que retorna Set de códigos IBGE em negociação
  */
 export function setupMapLibreHoverSemTag(
   map: maplibregl.Map,
   layerId: string,
+  getRelacionamentos?: () => Set<string>,
+  getNegociacoes?: () => Set<string>
 ): void {
   let popup: maplibregl.Popup | null = null;
   let hoveredFeatureId: string | number | null = null;
@@ -515,8 +613,13 @@ export function setupMapLibreHoverSemTag(
     if (!e.features || e.features.length === 0) return;
     const feature = e.features[0];
     const properties = feature.properties || {};
+    
+    // Obtém os Sets atualizados através dos getters
+    const municipiosComRelacionamento = getRelacionamentos ? getRelacionamentos() : undefined;
+    const municipiosEmNegociacao = getNegociacoes ? getNegociacoes() : undefined;
 
-    const tooltipHtml = semTagTooltipHtml(properties);
+    // Passa os Sets para o tooltip
+    const tooltipHtml = semTagTooltipHtml(properties, municipiosComRelacionamento, municipiosEmNegociacao);
 
     if (popup) popup.remove();
     popup = new maplibregl.Popup({
@@ -563,7 +666,13 @@ export function setupMapLibreHoverSemTag(
     if (!e.features || e.features.length === 0) return;
     const feature = e.features[0];
     const properties = feature.properties || {};
-    const tooltipHtml = semTagTooltipHtml(properties);
+    
+    // Obtém os Sets atualizados através dos getters
+    const municipiosComRelacionamento = getRelacionamentos ? getRelacionamentos() : undefined;
+    const municipiosEmNegociacao = getNegociacoes ? getNegociacoes() : undefined;
+    
+    // Passa os Sets para o tooltip no click também
+    const tooltipHtml = semTagTooltipHtml(properties, municipiosComRelacionamento, municipiosEmNegociacao);
     if (popup) popup.remove();
     popup = new maplibregl.Popup({
       closeButton: true,

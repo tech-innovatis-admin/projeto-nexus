@@ -892,6 +892,9 @@ export default function EstrategiaPage() {
   // 🆕 Set de códigos de municípios com relacionamento ativo (carregado do banco)
   const [municipiosComRelacionamento, setMunicipiosComRelacionamento] = useState<Set<string>>(new Set());
 
+  // 🆕 Set de códigos de municípios em negociação (carregado do CSV)
+  const [municipiosEmNegociacao, setMunicipiosEmNegociacao] = useState<Set<string>>(new Set());
+
   // 🆕 Estados para controlar periferias com múltiplos polos
   const [showPoloSelectionWarning, setShowPoloSelectionWarning] = useState<boolean>(false);
   const [filteredPolosByPeriferia, setFilteredPolosByPeriferia] = useState<string[]>([]);
@@ -1251,6 +1254,40 @@ export default function EstrategiaPage() {
       fetchMunicipiosComRelacionamento();
     }
   }, [isRelacionamentoModalOpen, fetchMunicipiosComRelacionamento]);
+
+  // 🆕 Carregar municípios em negociação do CSV
+  const fetchMunicipiosEmNegociacao = useCallback(async () => {
+    try {
+      const resp = await fetch('/api/csv?file=municipios_negociacao.csv');
+      if (!resp.ok) return;
+      const csvText = await resp.text();
+      
+      // Parse simples do CSV (Município,UF,codigo,relacionamento)
+      const lines = csvText.trim().split('\n');
+      if (lines.length < 2) return; // Sem dados além do header
+      
+      const codigosNegociacao = new Set<string>();
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(',');
+        // cols: [Município, UF, codigo, relacionamento]
+        if (cols.length >= 3) {
+          const codigo = cols[2]?.trim();
+          if (codigo) {
+            codigosNegociacao.add(codigo);
+          }
+        }
+      }
+      setMunicipiosEmNegociacao(codigosNegociacao);
+      dbg('💼 Municípios em negociação carregados do CSV:', codigosNegociacao.size);
+    } catch (e) {
+      console.warn('Erro ao carregar municípios em negociação:', e);
+    }
+  }, []);
+
+  // Carregar negociações ao montar
+  useEffect(() => {
+    fetchMunicipiosEmNegociacao();
+  }, [fetchMunicipiosEmNegociacao]);
 
   // Função para filtrar municípios dentro do raio de João Pessoa
   // 🔥 CRÍTICO: Usar useRef para estabilizar a função e evitar loops
@@ -3640,6 +3677,10 @@ export default function EstrategiaPage() {
                           // Converter [lat, lng] -> [lng, lat] para uso no Turf/MapLibre
                           radarCenterLngLat={[JOAO_PESSOA_COORDS[1], JOAO_PESSOA_COORDS[0]] as [number, number]}
                           radarRadiusKm={JOAO_PESSOA_RADIUS_KM}
+                          // 🆕 Passa Set de códigos com relacionamento ativo para destacar em amarelo
+                          municipiosComRelacionamento={municipiosComRelacionamento}
+                          // 🆕 Passa Set de códigos em negociação para destacar em roxo
+                          municipiosEmNegociacao={municipiosEmNegociacao}
                         />
 
                       </div>
@@ -3709,6 +3750,10 @@ export default function EstrategiaPage() {
                         // Converter [lat, lng] -> [lng, lat]
                         radarCenterLngLat={[JOAO_PESSOA_COORDS[1], JOAO_PESSOA_COORDS[0]] as [number, number]}
                         radarRadiusKm={JOAO_PESSOA_RADIUS_KM}
+                        // 🆕 Passa Set de códigos com relacionamento ativo para destacar em amarelo
+                        municipiosComRelacionamento={municipiosComRelacionamento}
+                        // 🆕 Passa Set de códigos em negociação para destacar em roxo
+                        municipiosEmNegociacao={municipiosEmNegociacao}
                       />
 
                       <AnimatePresence>

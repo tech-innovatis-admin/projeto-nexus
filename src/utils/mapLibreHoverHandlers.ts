@@ -347,7 +347,7 @@ export function periferiaTooltipHtml(
         <span class="t-label">Status</span>
         <span class="t-icon" aria-label="${statusLabel}" title="${statusLabel}" style="display: flex; align-items: center; gap: 4px;">
           ${statusIcon}
-          <span style="color: ${statusColor}; font-size: 11px;">${isNegociacao ? 'Negociação' : isRelacionamento ? 'Ativo' : ''}</span>
+          <span style="color: ${statusColor}; font-size: 11px;">${isNegociacao ? 'Negociação' : isRelacionamento ? 'Relacionamento' : ''}</span>
         </span>
       </div>`;
 

@@ -24,9 +24,7 @@ export async function middleware(request: NextRequest) {
 
     try {
       // Verifica se o token é válido fazendo uma chamada para a API
-      const baseUrl = process.env.NODE_ENV === 'production' 
-        ? `http://localhost:3000` 
-        : request.url.split('/').slice(0, 3).join('/');
+      const baseUrl = request.nextUrl.origin;
       const verifyResponse = await fetch(`${baseUrl}/api/auth/verify`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -80,9 +78,7 @@ export async function middleware(request: NextRequest) {
     const token = request.cookies.get('auth_token')?.value;
     if (token) {
       try {
-        const baseUrl = process.env.NODE_ENV === 'production' 
-          ? `http://localhost:3000` 
-          : request.url.split('/').slice(0, 3).join('/');
+        const baseUrl = request.nextUrl.origin;
         const verifyResponse = await fetch(`${baseUrl}/api/auth/verify`, {
           headers: {
             'Authorization': `Bearer ${token}`,

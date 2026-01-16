@@ -8,6 +8,12 @@ import jwt from 'jsonwebtoken';
  */
 export async function GET(request: NextRequest) {
   try {
+    // Validar JWT_SECRET obrigatório
+    if (!process.env.JWT_SECRET) {
+      console.error('❌ JWT_SECRET não está configurado');
+      return NextResponse.json({ error: 'Erro de configuração do servidor' }, { status: 500 });
+    }
+
     // 1) Obter token do cookie ou do header Authorization
     const cookieToken = request.cookies.get('auth_token')?.value;
     const authHeader = request.headers.get('authorization') || request.headers.get('Authorization');
@@ -23,7 +29,7 @@ export async function GET(request: NextRequest) {
     // 2) Verificar token
     let decoded: any;
     try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET || 'ProjetoNexus_InnOvatis_Plataforma_2025');
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
     } catch (e) {
       return NextResponse.json({ error: 'Token inválido ou expirado' }, { status: 401 });
     }

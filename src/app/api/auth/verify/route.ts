@@ -4,6 +4,18 @@ import { cookies } from 'next/headers';
 
 export async function GET(request: Request) {
   try {
+    // Validar JWT_SECRET obrigatório
+    if (!process.env.JWT_SECRET) {
+      console.error('❌ JWT_SECRET não está configurado');
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Erro de configuração do servidor' 
+      }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
     let token = request.headers.get('Authorization')?.replace('Bearer ', '');
     if (!token) {
       const cookieStore = await cookies();
@@ -23,7 +35,7 @@ export async function GET(request: Request) {
     // Verifica o token
     const decoded = verify(
       token,
-      process.env.JWT_SECRET || 'ProjetoNexus_InnOvatis_Plataforma_2025'
+      process.env.JWT_SECRET
     ) as any;
 
     // Garante que o token também contenha acesso a "nexus" (defesa adicional)

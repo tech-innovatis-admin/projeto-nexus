@@ -4,13 +4,16 @@ import { prisma } from '@/lib/prisma';
 import bcrypt from 'bcryptjs';
 // import { Prisma } from '@prisma/client';
 
-// Aviso em desenvolvimento se JWT_SECRET não estiver definido
-if (!process.env.JWT_SECRET) {
-  console.warn('⚠️ JWT_SECRET não definido. Usando valor padrão inseguro. Não recomendado para produção!');
-}
-
 export async function POST(request: Request) {
   try {
+    // Validar JWT_SECRET obrigatório
+    if (!process.env.JWT_SECRET) {
+      console.error('❌ JWT_SECRET não está configurado');
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Erro de configuração do servidor'
+      }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+    }
 
     const { username, password } = await request.json();
     const identifier: string = String(username ?? '').trim();
@@ -136,7 +139,7 @@ export async function POST(request: Request) {
         role: dbUser.role,
         platforms: platformList
       },
-      process.env.JWT_SECRET || 'ProjetoNexus_InnOvatis_Plataforma_2025',
+      process.env.JWT_SECRET,
       { expiresIn: '1h' }
     );
 

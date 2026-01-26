@@ -1056,15 +1056,6 @@ const {
 ```
 
 #### ⚙️ **Configurações Disponíveis**
-```typescript
-const configuracao = {
-  velocidadeMediaVooKmh: 300,        // Helicóptero médio
-  preferirVooEntrePolos: true,       // Voo automático entre polos
-  limitarDistanciaMaximaTerrestreKm: 400, // Limite para forçar voo
-  otimizarOrdemPolos: true,          // TSP entre polos
-  otimizarRotasPeriferias: true      // TSP local por polo
-};
-```
 
 #### 🎯 **Regras de Negócio do Sistema**
 1. **Entre Polos**: Preferencialmente aéreo (se otimizado)
@@ -1823,7 +1814,7 @@ DATABASE_URL="postgresql://user:password@localhost:5432/nexus_db"
 AWS_REGION=us-east-2
 AWS_ACCESS_KEY_ID=your_access_key_here
 AWS_SECRET_ACCESS_KEY=your_secret_key_here
-AWS_S3_BUCKET=projetonexusinnovatis
+AWS_S3_BUCKET=
 
 # Autenticação JWT
 JWT_SECRET=your_super_secret_jwt_key_here

@@ -10,78 +10,38 @@ import { useState } from "react"; // Hook para gerenciamento de estado
 import { useRouter } from "next/navigation"; // Hook para navegação
 import { motion } from "framer-motion"; // Biblioteca de animações
 import Image from "next/image"; // Importação do componente Image
-import { FaEye, FaEyeSlash } from 'react-icons/fa'; // Ícones para mostrar/ocultar senha
-import { useUser } from "@/contexts/UserContext"; // Hook para dados do usuário
 import MiniFooter from "@/components/MiniFooter"; // Componente de rodapé
 
 export default function LoginPage() {
   // Estados para controle do formulário
-  const [username, setUsername] = useState(""); // Estado para o nome de usuário
-  const [password, setPassword] = useState(""); // Estado para a senha
   const [error, setError] = useState(""); // Estado para mensagens de erro
   const [isLoading, setIsLoading] = useState(false); // Estado para controle de carregamento
-  const [showPassword, setShowPassword] = useState(false); // Estado para mostrar/ocultar senha
   const [isFadingOut, setIsFadingOut] = useState(false); // Estado para fade out
   const router = useRouter(); // Hook de navegação
-  const { setUser } = useUser(); // Hook para definir dados do usuário
 
   /**
    * Manipula o envio do formulário de login
-   * Valida as credenciais e redireciona para a página do mapa se corretas
+   * Redireciona diretamente para a página do mapa
    */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log(`🔐 [LoginPage] Tentativa de login: ${username}`);
+    console.log(`🔐 [LoginPage] Entrada sem autenticação`);
     setIsLoading(true);
-    setError("");
 
     try {
-      console.log('📡 [LoginPage] Enviando request para /api/auth...');
-      const response = await fetch('/api/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
-      });
+      // Inicia fade out
+      console.log('🎬 [LoginPage] Iniciando animação de fade out...');
+      setIsFadingOut(true);
 
-      console.log(`📡 [LoginPage] Response status: ${response.status}`);
-      const data = await response.json();
-      console.log('📡 [LoginPage] Response data:', data);
-
-      if (!response.ok) {
-        console.error(`❌ [LoginPage] Login falhou - Status: ${response.status}, Error:`, data.error);
-        throw new Error(data.error || 'Erro ao fazer login');
-      }
-
-      if (data.success) {
-        console.log('✅ [LoginPage] Login bem-sucedido!');
-
-        // Define os dados do usuário no contexto
-        if (data.user) {
-          console.log('👤 [LoginPage] Definindo dados do usuário:', data.user);
-          setUser(data.user);
-        }
-
-        // Espera um momento para o cookie ser definido
-        console.log('⏳ [LoginPage] Aguardando cookie ser definido...');
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        // Inicia fade out
-        console.log('🎬 [LoginPage] Iniciando animação de fade out...');
-        setIsFadingOut(true);
-
-        setTimeout(() => {
-          console.log('🗺️ [LoginPage] Redirecionando para /mapa');
-          router.push('/mapa');
-        }, 500); // Duração do fade out
-      } else {
-        console.error(`❌ [LoginPage] Login falhou - Response success: false`);
-        throw new Error(data.error || 'Erro ao fazer login');
-      }
+      setTimeout(() => {
+        console.log('🗺️ [LoginPage] Redirecionando para /mapa');
+        router.push('/mapa');
+      }, 500); // Duração do fade out
     } catch (error) {
-      console.error(`❌ [LoginPage] Erro no login:`, error instanceof Error ? error.message : error);
-      setError(error instanceof Error ? error.message : 'Erro ao fazer login');
+      console.error(`❌ [LoginPage] Erro:`, error instanceof Error ? error.message : error);
+      setError('Erro ao entrar. Tente novamente.');
     } finally {
-      console.log('🔄 [LoginPage] Finalizando tentativa de login');
+      console.log('🔄 [LoginPage] Finalizando entrada');
       setIsLoading(false);
     }
   };
@@ -131,65 +91,10 @@ export default function LoginPage() {
         {/* Formulário de login */}
         <form onSubmit={handleSubmit} className="space-y-4">
 
-          {/* Campo de usuário */}
-          <div className="relative mb-1">
-            <input
-              id="username"
-              type="text"
-              value={username}
-              onChange={(e) => {
-                setUsername(e.target.value);
-                if (error) setError(""); // Limpa erro ao digitar
-              }}
-              onBlur={() => {
-                if (username.trim()) {
-                  console.log(`👤 [LoginPage] Username inserido: ${username}`);
-                }
-              }}
-              required
-              className="w-full h-11 pl-4 pr-4 text-sm leading-none bg-slate-800/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition duration-150 ease-in-out"
-              placeholder="Usuário"
-              disabled={isLoading}
-            />
-          </div>
-
-          {/* Campo de senha */}
-          <div className="relative mb-1">
-            <input
-              id="password"
-              type={showPassword ? "text" : "password"}
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                if (error) setError(""); // Limpa erro ao digitar
-              }}
-              onBlur={() => {
-                if (password) {
-                  console.log(`🔑 [LoginPage] Password inserida (${password.length} caracteres)`);
-                }
-              }}
-              required
-              autoComplete="off"
-              data-lpignore="true"
-              spellCheck="false"
-              aria-autocomplete="none"
-              className="w-full h-11 pl-4 pr-10 text-sm leading-none bg-slate-800/50 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition duration-150 ease-in-out"
-              placeholder="Senha"
-              disabled={isLoading}
-            />
-            <button
-              type="button"
-              onClick={() => {
-                const newState = !showPassword;
-                console.log(`👁️ [LoginPage] Toggle password visibility: ${newState ? 'SHOW' : 'HIDE'}`);
-                setShowPassword(newState);
-              }}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-white focus:outline-none"
-              aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
-            >
-              {showPassword ? <FaEyeSlash size={16} /> : <FaEye size={16} />}
-            </button>
-          </div>
+          {/* Mensagem de boas-vindas */}
+          <p className="text-center text-sm text-slate-300 mb-6">
+            Clique em "Entrar" para acessar a plataforma
+          </p>
 
           {/* Mensagem de erro com animação */}
           {error && (
@@ -223,19 +128,6 @@ export default function LoginPage() {
             </motion.button>
           </div>
         </form>
-
-        {/* Mensagem de ajuda com link para contato */}
-        <p className="mt-6 text-center text-sm text-slate-400">
-          Ainda não tem acesso?<br />
-          <a 
-            href="mailto:victor.eduardo@innovatismc.com?subject=Solicitação%20de%20Acesso%20-%20Nexus&body=Olá,%0A%0AGostaria%20de%20solicitar%20acesso%20à%20plataforma%20Nexus.%0A%0AAtenciosamente,"
-            className="text-sky-300 hover:text-sky-300 transition-colors font-medium"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Fale com o administrador
-          </a>.
-        </p>
       </motion.div>
 
       {/* Componente MiniFooter */}
@@ -244,7 +136,4 @@ export default function LoginPage() {
       </div>
     </div>
   );
-
-  // Log quando a página está totalmente carregada
-  console.log(`✅ [LoginPage] Página renderizada - Loading: ${isLoading}, Username: ${username ? 'Preenchido' : 'Vazio'}, Password: ${password ? 'Preenchida' : 'Vazia'}, Error: ${error ? 'Presente' : 'Ausente'}`);
 } 

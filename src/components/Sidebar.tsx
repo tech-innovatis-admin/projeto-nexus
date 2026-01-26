@@ -86,14 +86,10 @@ export default function Sidebar({ className = '' }: SidebarProps) {
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
-      setUser(null); // Limpa os dados do usuário do contexto
-      document.cookie = "auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
-      document.cookie = "auth_token=; path=/; max-age=0";
-      await new Promise(r => setTimeout(r, 100));
+      setUser(null);
       window.location.replace('/login');
     } catch (e) {
-      setUser(null); // Limpa os dados do usuário do contexto mesmo em caso de erro
-      document.cookie = "auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT";
+      setUser(null);
       window.location.href = '/login';
     }
   };

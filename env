@@ -1,0 +1,24 @@
+# Variáveis de Ambiente do S3
+AWS_REGION=us-east-1
+AWS_S3_BUCKET=projeto-nexus-aws
+NEXT_PUBLIC_AWS_REGION=us-east-1
+NEXT_PUBLIC_AWS_S3_BUCKET=projeto-nexus-aws
+JWT_SECRET=ProjetoNexus_InnOvatis_Plataforma_2025
+
+# Banco de Dados PostgreSQL (Prisma)
+DATABASE_URL="postgresql://postgres:InnovaLabs86@nexus-db-prod.cmjoumo2iiux.us-east-1.rds.amazonaws.com:5432/nexus"
+
+# Google Maps API Key para cálculo de rotas terrestres
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=AIzaSyC9VacoMqSZl6hY7GOeP7i2AdxivGPhTqg
+GOOGLE_MAPS_API_KEY=AIzaSyC9VacoMqSZl6hY7GOeP7i2AdxivGPhTqg
+
+MAPS_DISABLED=false
+MAPS_DAILY_CAP_ROUTES=1000
+MAPS_DAILY_CAP_GEOCODE=1000
+
+# Aplicação
+NODE_ENV=development
+NEXT_TELEMETRY_DISABLED=1
+
+# Opcional: chave separada para Google Routes Optimization (usa GOOGLE_MAPS_API_KEY se não definida)
+# GOOGLE_ROUTES_API_KEY=sua_chave_aqui

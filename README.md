@@ -44,7 +44,7 @@ Arquivos e alterações principais adicionados:
 Como começar (resumo rápido):
 
 1. Garanta que o Docker Desktop (Windows) ou Docker Engine (Linux/Mac) esteja instalado e rodando.
-2. Copie ou configure o arquivo de ambiente `.env` com as variáveis essenciais (DATABASE_URL, JWT_SECRET, GOOGLE_MAPS_API_KEY, AWS_* etc.).
+2. Copie ou configure o arquivo de ambiente `.env` com as variáveis essenciais (DATABASE_URL, JWT_SECRET, GOOGLE_MAPS_API_KEY, AWS_REGION, AWS_S3_BUCKET etc.).
 3. No Windows (PowerShell) execute:
 
 ```powershell
@@ -66,7 +66,7 @@ Após a inicialização acesse: http://localhost:3000 e verifique o health check
 Notas de segurança e produção:
 
 - Altere senhas e segredos padrão do `docker-compose.yml` antes de usar em produção.
-- Configure variáveis sensíveis (`JWT_SECRET`, chaves AWS, Google Maps) via `.env` ou secret manager.
+- Configure variáveis sensíveis (`JWT_SECRET`, Google Maps) via `.env` ou secret manager. As chaves AWS são opcionais se estiver usando IAM Roles.
 - Para produção considere expor a aplicação através de um proxy Nginx com TLS (configuração incluída como profile opcional no `docker-compose.yml`).
 
 Mais detalhes, exemplos de troubleshooting, e comandos extras estão em `DOCKER_GUIDE.md`.

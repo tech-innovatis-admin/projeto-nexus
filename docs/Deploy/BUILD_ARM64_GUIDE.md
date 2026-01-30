@@ -126,8 +126,6 @@ Certifique-se de que o arquivo `.env` existe na raiz do projeto com as variávei
 DATABASE_URL="postgresql://..."
 JWT_SECRET="sua_chave_secreta"
 GOOGLE_MAPS_API_KEY="sua_chave_google"
-AWS_ACCESS_KEY_ID="sua_chave_aws"
-AWS_SECRET_ACCESS_KEY="sua_chave_secreta_aws"
 AWS_REGION="us-east-1"
 AWS_S3_BUCKET="seu_bucket"
 ```

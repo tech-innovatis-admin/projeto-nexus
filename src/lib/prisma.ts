@@ -1,5 +1,5 @@
 // Importa PrismaClient do output customizado gerado: src/generated/prisma
-import { PrismaClient } from '@/generated/prisma';
+import { PrismaClient } from '../generated/prisma';
 
 const globalForPrisma = global as any;
 

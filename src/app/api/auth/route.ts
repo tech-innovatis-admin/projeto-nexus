@@ -147,10 +147,11 @@ export async function POST(request: Request) {
     const cookieStore = await cookies();
     cookieStore.set('auth_token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      secure: true, // Sempre secure em produção (HTTPS)
+      sameSite: 'lax',
       maxAge: 3600 // 1 hora
     });
+    console.log('✅ Cookie auth_token definido como Lax/Secure');
 
     // Normalizar BigInt na resposta também
     const normalizeForJson = (value: unknown): any => {
@@ -160,8 +161,8 @@ export async function POST(request: Request) {
       return value;
     };
 
-    return new Response(JSON.stringify({ 
-      success: true, 
+    return new Response(JSON.stringify({
+      success: true,
       user: {
         id: normalizeForJson(dbUser.id),
         username: dbUser.username,
@@ -180,9 +181,9 @@ export async function POST(request: Request) {
 
   } catch (error) {
     console.error('Erro na autenticação:', error);
-    return new Response(JSON.stringify({ 
-      success: false, 
-      error: 'Erro interno do servidor' 
+    return new Response(JSON.stringify({
+      success: false,
+      error: 'Erro interno do servidor'
     }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }

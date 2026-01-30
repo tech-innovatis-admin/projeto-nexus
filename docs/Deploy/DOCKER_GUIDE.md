@@ -127,9 +127,7 @@ JWT_SECRET="nexus_jwt_secret_2025_ALTERE_EM_PRODUCAO"
 # Google Maps API
 GOOGLE_MAPS_API_KEY="sua_chave_google_maps_aqui"
 
-# AWS Configuration (opcional)
-AWS_ACCESS_KEY_ID="sua_aws_access_key"
-AWS_SECRET_ACCESS_KEY="sua_aws_secret_key"
+# AWS Configuration (Opcional - Recomendável usar IAM Role)
 AWS_REGION="us-east-1"
 AWS_S3_BUCKET="seu_bucket_s3"
 
@@ -146,7 +144,7 @@ NEXT_TELEMETRY_DISABLED="1"
 **⚠️ ALTERE ANTES DE USAR EM PRODUÇÃO:**
 - `JWT_SECRET`: Use um valor criptograficamente seguro
 - Senhas do banco: Altere `nexus_password_2025` no docker-compose.yml
-- API Keys: Configure suas chaves reais do Google Maps e AWS
+- API Keys: Configure suas chaves reais do Google Maps (AWS keys são opcionais se usando IAM Role)
 
 ---
 

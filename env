@@ -6,7 +6,7 @@ NEXT_PUBLIC_AWS_S3_BUCKET=projeto-nexus-aws
 JWT_SECRET=ProjetoNexus_InnOvatis_Plataforma_2025
 
 # Banco de Dados PostgreSQL (Prisma)
-DATABASE_URL="postgresql://postgres:InnovaLabs86@nexus-db-prod.cmjoumo2iiux.us-east-1.rds.amazonaws.com:5432/nexus"
+DATABASE_URL=postgresql://postgres:InnovaLabs86@nexus-db-prod.cmjoumo2iiux.us-east-1.rds.amazonaws.com:5432/nexus
 
 # Google Maps API Key para cálculo de rotas terrestres
 NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=AIzaSyC9VacoMqSZl6hY7GOeP7i2AdxivGPhTqg

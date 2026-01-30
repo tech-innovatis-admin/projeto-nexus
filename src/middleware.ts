@@ -1,106 +1,113 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { jwtVerify } from 'jose';
 
+// Chave secreta convertida para o formato esperado pelo jose (Uint8Array)
+// Usamos o segredo do ambiente ou o fallback padrão
+const secret = new TextEncoder().encode(
+  process.env.JWT_SECRET || 'nexus_jwt_secret_2025_production'
+);
+
+/**
+ * MIDDLEWARE DA PLATAFORMA NEXUS
+ * ----------------------------
+ * Gerencia redirecionamentos, proxy de GeoJSON e proteção de rotas.
+ */
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  
-  // Redireciona solicitações para /data/ para nossa API de proxy
+
+  // 1. Redireciona solicitações para /data/ para nossa API de proxy (S3)
   if (pathname.startsWith('/data/')) {
     const fileName = pathname.replace('/data/', '');
     const url = new URL(`/api/proxy-geojson/${fileName}`, request.url);
-    console.log(`Redirecionando ${pathname} para ${url.pathname}`);
     return NextResponse.rewrite(url);
   }
 
-  // Verifica se é uma rota protegida (/mapa, /estrategia ou /rotas)
-  if (pathname.startsWith('/mapa') || pathname.startsWith('/estrategia') || pathname.startsWith('/rotas') || pathname.startsWith('/perfil')) {
+  // 2. Definição de rotas protegidas
+  const protectedPaths = ['/mapa', '/estrategia', '/rotas', '/perfil'];
+  const isProtectedPath = protectedPaths.some(path => pathname.startsWith(path));
+
+  if (isProtectedPath) {
     const token = request.cookies.get('auth_token')?.value;
-    
-    // Se não houver token, redireciona para o login
+
     if (!token) {
+      console.warn(`[Middleware] Redirecionando para login: Token ausente em ${pathname}`);
       const loginUrl = new URL('/login', request.url);
       return NextResponse.redirect(loginUrl);
     }
 
     try {
-      // Verifica se o token é válido fazendo uma chamada para a API
-      const baseUrl = request.nextUrl.origin;
-      const verifyResponse = await fetch(`${baseUrl}/api/auth/verify`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Cookie': `auth_token=${token}`
-        }
-      });
-      const verifyData = await verifyResponse.json();
+      /**
+       * 🔐 VERIFICAÇÃO DIRETA (Node/Edge Runtime)
+       * Substituído fetch interno por verificação local via 'jose'.
+       * Motivo: Container em produção muitas vezes não consegue resolver sua própria URL pública (Hairpin NAT).
+       */
+      const { payload } = await jwtVerify(token, secret);
 
-      if (!verifyResponse.ok || !verifyData.success) {
-        // Se o token for inválido, redireciona para o login e limpa o cookie
-        const response = NextResponse.redirect(new URL('/login', request.url));
-        response.cookies.delete('auth_token');
-        return response;
-      }
+      if (!payload) throw new Error('Payload vazio');
 
-      // Regras adicionais: bloquear viewers restritos em /estrategia e /rotas
+      // 3. Verificação de permissão para Viewers Restritos (apenas em Estratégia e Rotas)
       const restrictedPaths = ['/estrategia', '/rotas'];
       const isRestrictedPage = restrictedPaths.some((path) => pathname.startsWith(path));
-      const role: string = String(verifyData?.user?.role || '').toLowerCase();
+      const role = String(payload.role || '').toLowerCase();
 
       if (role === 'viewer' && isRestrictedPage) {
+        // Se for um viewer acessando página restrita, validamos a lista de permissões
+        // Nota: Esta chamada interna para 127.0.0.1 é opcionalmente mantida se localhost estiver resolvendo.
         try {
-          // Consulta rápida ao backend para saber se o viewer é restrito (possui registros em municipio_acessos)
-          const acessosResp = await fetch(new URL('/api/municipios/acessos', request.url), {
+          // Fallback: Se a verificação de acessos falhar, bloqueamos por segurança ou permitimos?
+          // Aqui optamos por consultar a API que já validamos antes.
+          const verifyAcessosUrl = new URL('/api/municipios/acessos', request.url);
+          const acessosResp = await fetch(verifyAcessosUrl, {
             headers: { 'Authorization': `Bearer ${token}` }
           });
 
           if (acessosResp.ok) {
             const acessosData = await acessosResp.json();
-            // Critério: viewer é "restrito" se possuir qualquer registro na tabela municipio_acessos
-            const totalAcessos = typeof acessosData?.totalAcessos === 'number' ? acessosData.totalAcessos : 0;
-            if (totalAcessos > 0) {
+            if (acessosData?.totalAcessos > 0) {
               return NextResponse.redirect(new URL('/acesso-negado', request.url));
             }
           }
-          // Se a API falhar, mantemos o fluxo normal (não bloqueia) para evitar falso-positivo
-        } catch {
-          // Silencia e segue o fluxo normal
+        } catch (e) {
+          console.error('[Middleware] Erro ao verificar acessos:', e);
         }
       }
+
     } catch (error) {
-      // Em caso de erro na verificação, redireciona para o login e limpa o cookie
+      console.error(`[Middleware] Token inválido para ${pathname}:`, error instanceof Error ? error.message : 'Erro');
       const response = NextResponse.redirect(new URL('/login', request.url));
-      response.cookies.delete('auth_token');
+      // Limpa o cookie em caso de erro
+      response.cookies.set('auth_token', '', { path: '/', maxAge: 0, sameSite: 'lax' });
       return response;
     }
   }
 
-  // Verifica se está tentando acessar o login com um token válido
+  // 4. Se o usuário já estiver logado (token válido) e tentar acessar /login, manda para o mapa
   if (pathname === '/login') {
     const token = request.cookies.get('auth_token')?.value;
     if (token) {
       try {
-        const baseUrl = request.nextUrl.origin;
-        const verifyResponse = await fetch(`${baseUrl}/api/auth/verify`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Cookie': `auth_token=${token}`
-          }
-        });
-
-        if (verifyResponse.ok) {
-          // Se já estiver autenticado, redireciona para o /mapa
-          const mapaUrl = new URL('/mapa', request.url);
-          return NextResponse.redirect(mapaUrl);
-        }
-      } catch (error) {
-        // Em caso de erro, permite continuar para a página de login
+        await jwtVerify(token, secret);
+        return NextResponse.redirect(new URL('/mapa', request.url));
+      } catch {
+        // Token inválido, ignora e deixa renderizar o login para novo acesso
       }
     }
   }
-  
+
   return NextResponse.next();
 }
 
-// Especifica os caminhos que o middleware deve ser executado
+/**
+ * Configuração de monitoramento do Middleware
+ */
 export const config = {
-  matcher: ['/mapa/:path*', '/estrategia/:path*', '/rotas/:path*', '/login', '/data/:path*', '/perfil/:path*']
-}; 
+  matcher: [
+    '/mapa/:path*',
+    '/estrategia/:path*',
+    '/rotas/:path*',
+    '/login',
+    '/data/:path*',
+    '/perfil/:path*'
+  ]
+};

@@ -50,8 +50,6 @@ docker run -d \
   -e DATABASE_URL="\`${DATABASE_URL}\`" \
   -e JWT_SECRET="\`${JWT_SECRET}\`" \
   -e GOOGLE_MAPS_API_KEY="\`${GOOGLE_MAPS_API_KEY}\`" \
-  -e AWS_ACCESS_KEY_ID="\`${AWS_ACCESS_KEY_ID}\`" \
-  -e AWS_SECRET_ACCESS_KEY="\`${AWS_SECRET_ACCESS_KEY}\`" \
   -e AWS_REGION="\`${AWS_REGION}\`" \
   -e AWS_S3_BUCKET="\`${AWS_S3_BUCKET}\`" \
   -e MAPS_DISABLED="false" \

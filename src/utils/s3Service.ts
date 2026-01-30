@@ -4,15 +4,9 @@ import { parse } from 'dotenv';
 
 
 // Configuração do cliente S3
-console.log('🔧 S3 Client - Access Key:', process.env.AWS_ACCESS_KEY_ID ? 'OK' : '❌ MISSING');
-console.log('🔧 S3 Client - Secret Key:', process.env.AWS_SECRET_ACCESS_KEY ? 'OK' : '❌ MISSING');
 
 const s3Client = new S3Client({
-  region: process.env.AWS_REGION || 'us-east-2',
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || ''
-  }
+  region: process.env.AWS_REGION || 'us-east-1',
 });
 
 export async function downloadS3File(fileName: string): Promise<string> {
@@ -157,7 +151,7 @@ export async function fetchEnvConfig() {
     console.error(`❌ Error loading config:`, error instanceof Error ? error.message : error);
     return null;
   }
-} 
+}
 // Função para buscar os arquivos usados pela página /estrategia
 export async function fetchEstrategiaData() {
   const fileNames = [

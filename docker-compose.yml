@@ -70,10 +70,10 @@ services:
       - "3000:3000"
     environment:
       # Database Configuration
-      DATABASE_URL: "postgresql://nexus_user:nexus_password_2025@postgres:5432/nexus_db?schema=public"
+      DATABASE_URL: "${DATABASE_URL:-postgresql://nexus_user:nexus_password_2025@postgres:5432/nexus_db?schema=public}"
       
       # Redis Configuration
-      REDIS_URL: "redis://redis:6379"
+      REDIS_URL: "${REDIS_URL:-redis://redis:6379}"
       
       # Application Configuration
       NODE_ENV: production
@@ -82,12 +82,10 @@ services:
       HOSTNAME: "0.0.0.0"
       
       # JWT Configuration
-      JWT_SECRET: "nexus_jwt_secret_2025_production"
+      JWT_SECRET: "${JWT_SECRET}"
       
       # API Keys (configure conforme necessário)
       GOOGLE_MAPS_API_KEY: "${GOOGLE_MAPS_API_KEY:-}"
-      AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID:-}"
-      AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY:-}"
       AWS_REGION: "${AWS_REGION:-us-east-1}"
       AWS_S3_BUCKET: "${AWS_S3_BUCKET:-}"
       

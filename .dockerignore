@@ -1,154 +1,95 @@
-# =============================================================================
 # .dockerignore - NEXUS Platform
-# =============================================================================
-# Exclui arquivos desnecessários do contexto de build do Docker
-# Reduz tempo de build e tamanho da imagem
-# =============================================================================
+# Optimized for Next.js + Prisma + Docker
 
 # ---------------------------------------------------------------------------
-# NODE.JS
+# DEPENDENCIES
 # ---------------------------------------------------------------------------
-node_modules
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+**/node_modules
 .npm
 .yarn
-.yarn-integrity
 
 # ---------------------------------------------------------------------------
-# NEXT.JS
+# NEXT.JS & BUILD ARTIFACTS
 # ---------------------------------------------------------------------------
-.next
-.next/*
-out
-build
-dist
-*.tsbuildinfo
-next-env.d.ts
+.next/
+out/
+build/
+dist/
+stats.json
+.vercel
+.turbo/
+src/generated/
 
 # ---------------------------------------------------------------------------
-# DEVELOPMENT
+# LOGS & DEBUG
 # ---------------------------------------------------------------------------
-.git
-.gitignore
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# ---------------------------------------------------------------------------
-# IDE / EDITOR
-# ---------------------------------------------------------------------------
-.vscode
-.idea
-*.swp
-*.swo
-*~
-
-# ---------------------------------------------------------------------------
-# OS GENERATED
-# ---------------------------------------------------------------------------
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# ---------------------------------------------------------------------------
-# LOGS
-# ---------------------------------------------------------------------------
-logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-lerna-debug.log*
+.pnpm-debug.log*
 
 # ---------------------------------------------------------------------------
-# TEMPORARY FILES
+# ENVIRONMENT & SECRETS
 # ---------------------------------------------------------------------------
-*.tmp
-*.temp
-.cache
-.parcel-cache
+.env*
+env
+!env.example
+*.pem
+*.key
+.aws/
+.secrets/
 
 # ---------------------------------------------------------------------------
-# TESTING
+# IDE & OS
 # ---------------------------------------------------------------------------
-coverage
-.nyc_output
-.jest
+.vscode/
+.idea/
+.history/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
 
 # ---------------------------------------------------------------------------
-# DOCUMENTATION (mantenha apenas o README principal)
+# DATABASE
 # ---------------------------------------------------------------------------
-docs/*
-*.md
-!README.md
-
-# Arquivos de documentação específicos do projeto
-CHECKLIST_*.md
-CONFIGURACAO_*.md
-CORRECAO_*.md
-CORRECOES_*.md
-GOOGLE_MAPS_*.md
-GUIA_*.md
-IMPLEMENTACAO_*.md
-MIGRACAO_*.md
-OTIMIZACAO_*.md
+*.db
+*.sqlite
+prisma/seeds/*
+!prisma/schema.prisma
+!prisma/migrations/
 
 # ---------------------------------------------------------------------------
-# ARQUIVOS DE TESTE
+# TESTING & TOOLS
 # ---------------------------------------------------------------------------
+coverage/
+.nyc_output/
+.jest/
+test-*/
+teste-*/
 test-*.js
 teste-*.js
 
 # ---------------------------------------------------------------------------
-# DOCKER
+# DOCUMENTATION
+# ---------------------------------------------------------------------------
+docs/
+*.md
+!README.md
+
+# ---------------------------------------------------------------------------
+# DOCKER SPECIFIC
 # ---------------------------------------------------------------------------
 Dockerfile*
 docker-compose*
 .dockerignore
-
-# Permitir scripts essenciais
 !docker/scripts/start.sh
 
 # ---------------------------------------------------------------------------
-# ARQUIVOS ESPECÍFICOS DO PROJETO NEXUS
+# MISC
 # ---------------------------------------------------------------------------
-# Arquivos de configuração local
-env(2).s3
-
-# Build artifacts
-.vercel
-
-# Database
-*.db
-*.sqlite
-
-# Uploads locais (se existirem)
+.git/
+.gitignore
 uploads/
 temp/
-
-# ---------------------------------------------------------------------------
-# PRISMA (manter apenas schema e migrations)
-# ---------------------------------------------------------------------------
-prisma/seeds/*
-!prisma/schema.prisma
-!prisma/migrations
-
-# ---------------------------------------------------------------------------
-# AWS / CLOUD
-# ---------------------------------------------------------------------------
-.aws
-
-# ---------------------------------------------------------------------------
-# SECRETS
-# ---------------------------------------------------------------------------
-*.pem
-*.key
-secrets/
-.secrets

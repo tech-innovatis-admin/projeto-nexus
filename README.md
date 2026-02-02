@@ -10,12 +10,13 @@
 5. [Estrutura de Pastas](#estrutura-de-pastas)
 6. [Tecnologias Utilizadas](#tecnologias-utilizadas)
 7. [Configuração do Ambiente](#configuração-do-ambiente)
-8. [Scripts NPM](#scripts-npm)
-9. [Visualização em Dispositivos Móveis](#visualização-em-dispositivos-móveis)
-10. [Fluxo da Aplicação](#fluxo-da-aplicação)
-11. [Contribuindo](#contribuindo)
-12. [Licença](#licença)
-13. [Dockerização](#dockerização)
+8. [Configuração AWS (S3)](#configuração-aws-s3)
+9. [Scripts NPM](#scripts-npm)
+10. [Visualização em Dispositivos Móveis](#visualização-em-dispositivos-móveis)
+11. [Fluxo da Aplicação](#fluxo-da-aplicação)
+12. [Contribuindo](#contribuindo)
+13. [Licença](#licença)
+14. [Dockerização](#dockerização)
 
 ---
 
@@ -1811,6 +1812,56 @@ public/
 1. **Criar bucket S3** com os arquivos necessários
 2. **Configurar política IAM** com permissões de leitura
 3. **Gerar access keys** para o usuário IAM
+
+### ☁️ **Configuração AWS (S3)**
+
+O projeto utiliza o **AWS SDK v3** com a cadeia padrão de credenciais. Isso permite segurança em produção (IAM Roles) e facilidade em desenvolvimento (SSO/Profiles).
+
+#### **1. Pré-requisitos**
+- Ter o [AWS CLI v2](https://aws.amazon.com/cli/) instalado.
+- Ter acesso a uma conta AWS com permissão ao bucket.
+
+#### **2. Desenvolvimento Local (Windows/Mac/Linux)**
+> **IMPORTANTE**: Não use chaves fixas (`AWS_ACCESS_KEY_ID`) no arquivo `.env`. Em vez disso, use o AWS SSO ou Profiles.
+
+**Passo 1: Configurar Perfil**
+```powershell
+aws configure sso
+# Siga os passos (SSO start URL, Region, Profile Name ex: "dev-profile")
+```
+
+**Passo 2: Login**
+```powershell
+aws sso login --profile dev-profile
+```
+
+**Passo 3: Executar o Backend**
+No Windows (PowerShell):
+```powershell
+$env:AWS_PROFILE="dev-profile"
+$env:AWS_REGION="us-east-1"
+npm run dev
+```
+
+No Mac/Linux:
+```bash
+export AWS_PROFILE=dev-profile
+export AWS_REGION=us-east-1
+npm run dev
+```
+
+#### **3. Executando com Docker**
+Para que o container acesse suas credenciais locais, monte a pasta `~/.aws`:
+
+```powershell
+docker run -d -p 3000:3000 `
+  -v "$HOME\.aws:/root/.aws" `
+  -e AWS_PROFILE="dev-profile" `
+  -e AWS_REGION="us-east-1" `
+  nexus-app
+```
+
+> **Nota**: Em produção (EC2), nenhuma configuração manual é necessária se a instância tiver uma IAM Role associada.
 
 ### 🔧 **Variáveis de Ambiente**
 Criar arquivo `.env.local` na raiz do projeto:

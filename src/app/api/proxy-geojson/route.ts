@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { downloadS3File } from "@/utils/s3Service";
+import { getFileBuffer } from "@/utils/s3Service";
 import { join } from "path";
 
 // Esta rota captura solicitações para /api/proxy-geojson/[...path]
@@ -8,36 +8,41 @@ export async function GET(request: NextRequest) {
   try {
     // Extrai o caminho solicitado da URL
     const path = request.nextUrl.pathname.replace('/api/proxy-geojson', '');
-    
+
     // Remove a barra inicial se existir
     const fileName = path.startsWith('/') ? path.substring(1) : path;
-    
+
     // Lista de arquivos permitidos
     const allowedFiles = [
       "base_municipios.geojson",
       "parceiros1.json",
       "pistas_s3_lat_log.json",
+      "sedes_municipais_lat_long.json",
+      "municipios_sem_tag.json",
+      "base_polo_valores.geojson",
+      "base_polo_periferia.geojson",
       "municipios_relacionamento.json"
     ];
-    
+
     // Extrai apenas o nome do arquivo, sem qualquer caminho
     const fileBaseName = fileName.split('/').pop() || '';
-    
+
     // Verifica se o arquivo é permitido
     if (!allowedFiles.includes(fileBaseName)) {
       return NextResponse.json({ error: "Arquivo não permitido" }, { status: 403 });
     }
-    
+
     console.log(`Buscando arquivo ${fileBaseName} do S3`);
-    
+
+
     // Busca o arquivo do S3
-    const buffer = await downloadS3File(fileBaseName);
-    
+    const buffer = await getFileBuffer(fileBaseName);
+
     // Determina o tipo MIME com base na extensão
     const contentType = fileName.endsWith('.geojson') ? 'application/geo+json' : 'application/json';
-    
+
     // Retorna o conteúdo do arquivo
-    return new NextResponse(buffer, {
+    return new NextResponse(buffer as unknown as BodyInit, {
       headers: {
         'Content-Type': contentType,
         'Content-Length': buffer.length.toString(),
@@ -47,7 +52,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("Erro ao buscar arquivo do S3:", error);
     return NextResponse.json(
-      { error: "Erro ao carregar arquivo" }, 
+      { error: "Erro ao carregar arquivo" },
       { status: 500 }
     );
   }

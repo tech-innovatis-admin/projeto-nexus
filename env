@@ -1,6 +1,8 @@
 # Variáveis de Ambiente do S3
 AWS_REGION=us-east-1
 AWS_S3_BUCKET=projeto-nexus-aws
+AWS_PROFILE=victor.eduardo
+AWS_SDK_LOAD_CONFIG=1
 NEXT_PUBLIC_AWS_REGION=us-east-1
 NEXT_PUBLIC_AWS_S3_BUCKET=projeto-nexus-aws
 JWT_SECRET=ProjetoNexus_InnOvatis_Plataforma_2025

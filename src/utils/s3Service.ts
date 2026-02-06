@@ -12,7 +12,7 @@ import { parse } from 'dotenv';
 
 // --- Configuration ---
 const REGION = process.env.AWS_REGION || 'us-east-1';
-const BUCKET_NAME = process.env.AWS_S3_BUCKET || 'projetonexusinnovatis';
+const BUCKET_NAME = process.env.AWS_S3_BUCKET || 'projeto-nexus-aws';
 
 // Initialize S3 Client using Default Chain (Env, Profile, Role)
 const s3Client = new S3Client({

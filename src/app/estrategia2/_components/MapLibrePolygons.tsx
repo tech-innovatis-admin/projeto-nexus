@@ -5,8 +5,9 @@ import maplibregl, { LngLatBoundsLike, Map as MapLibreMap, LngLatBounds } from '
 import 'maplibre-gl/dist/maplibre-gl.css';
 import * as turf from '@turf/turf';
 import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver';
 import { registerMapInstance } from '@/utils/mapRegistry';
-import { setupMapLibreHover, setupMapLibreHoverSemTag, removeMapLibreHover, readCssVar } from '@/utils/mapLibreHoverHandlers';
+import { setupMapLibreHover, setupMapLibreHoverSemTag, removeMapLibreHover, readCssVar } from '../utils/mapLibreHoverHandlers';
 
 // Tipos para o sistema de exportação do raio
 export interface MunicipioRaio {
@@ -162,8 +163,6 @@ export default function MapLibrePolygons({
   radarRadiusKm,
   // 🆕 Set de códigos de municípios com relacionamento ativo
   municipiosComRelacionamento,
-  // 🆕 Set de códigos de municípios em negociação
-  municipiosEmNegociacao,
 }: {
   polos: FC;
   periferias: FC;
@@ -185,17 +184,16 @@ export default function MapLibrePolygons({
   radarRadiusKm?: number;
   // 🆕 Set de códigos de municípios com relacionamento ativo
   municipiosComRelacionamento?: Set<string>;
-  // 🆕 Set de códigos de municípios em negociação
-  municipiosEmNegociacao?: Set<string>;
 }) {
   const mapRef = useRef<MapLibreMap | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
-  // Camadas visíveis: polos deve sempre iniciar ativado (e ficará bloqueado)
-  const [showPolos, setShowPolos] = useState(true);
-  const [showPeriferia, setShowPeriferia] = useState(false);
-  // Nova camada: municípios sem tag (nem periferia, nem polo)
-  const [showSemTag, setShowSemTag] = useState(false);
+  // Camadas visíveis: polos estratégicos e logísticos
+  const [showPolosEstrategicos, setShowPolosEstrategicos] = useState(true);
+  const [showPolosLogisticos, setShowPolosLogisticos] = useState(true); // Desativado por padrão
+  const [showPeriferia, setShowPeriferia] = useState(true);
+  // Nova camada: municípios sem tag (sempre visível por padrão)
+  const [showSemTag, setShowSemTag] = useState(true);
   // ADICIONAR ESTADO PARA RAIO
   const [radiusMode, setRadiusMode] = useState(false);
   const [circleGeoJSON, setCircleGeoJSON] = useState<any>(null);
@@ -216,18 +214,13 @@ export default function MapLibrePolygons({
   const polosLatestRef = useRef<FC>({ type: 'FeatureCollection', features: [] });
   const periLatestRef = useRef<FC>({ type: 'FeatureCollection', features: [] });
   
-  // 🆕 Refs para os Sets de relacionamento e negociação (para uso nos handlers de hover)
+  // 🆕 Ref para os códigos de municípios com relacionamento ativo (para uso nos handlers de hover)
   const municipiosComRelacionamentoRef = useRef<Set<string>>(new Set());
-  const municipiosEmNegociacaoRef = useRef<Set<string>>(new Set());
   
   // Atualizar refs quando os Sets mudarem
   useEffect(() => {
     municipiosComRelacionamentoRef.current = municipiosComRelacionamento || new Set();
   }, [municipiosComRelacionamento]);
-  
-  useEffect(() => {
-    municipiosEmNegociacaoRef.current = municipiosEmNegociacao || new Set();
-  }, [municipiosEmNegociacao]);
   
   // Sincronizar checkbox da periferia com contexto de filtro
   useEffect(() => {
@@ -245,24 +238,24 @@ export default function MapLibrePolygons({
   // Cores para polígonos normais e destacados (selecionados)
   const colors = {
     polo: {
-      fillOpacity: 0.6,
-      line: '#2563EB', // Azul substituindo cores anteriores
+      fillOpacity: 0.5, // Opacidade base para polos
+      line: '#9CA3AF',
       lineWidth: 1,
     },
     poloHighlighted: {
-      fillOpacity: 0.8,
-      line: '#2563EB', // Azul para destaque
+      fillOpacity: 0.5, // Mesma opacidade (sem destaque por seleção)
+      line: '#9CA3AF',
       lineWidth: 1.5,
     },
     periferia: {
-      fillOpacity: 0.5,
-      line: '#2563EB', // Azul com baixa opacidade
-      lineWidth: 0.5, // Sem borda para periferia
+      fillOpacity: 0.5, // Opacidade base para periferia
+      line: '#9CA3AF',
+      lineWidth: 0.5,
     },
     periferiaHighlighted: {
-      fillOpacity: 0.5,
-      line: '#2563EB', // Azul com baixa opacidade
-      lineWidth: 0.5, // Sem borda para periferia destacada
+      fillOpacity: 0.5, // Mesma opacidade (sem destaque por seleção)
+      line: '#9CA3AF',
+      lineWidth: 0.5,
     }
   };
 
@@ -376,6 +369,9 @@ export default function MapLibrePolygons({
 
   // Função para criar conteúdo do popup
   const createPopupContent = (properties: any, isPoloLayer: boolean) => {
+    const codigo = isPoloLayer ? properties.codigo_origem : properties.codigo_destino;
+    const temRelacionamento = municipiosComRelacionamento?.has(codigo);
+    
     if (isPoloLayer) {
       // Popup para polo
       const nome_polo = safe(properties.municipio_origem, 'Polo');
@@ -383,12 +379,21 @@ export default function MapLibrePolygons({
       const somaDestino = Number(properties.soma_valor_total_destino) || 0;
       const valorOrigem = Number(properties.valor_total_origem) || 0;
       const total_polo = somaDestino + valorOrigem;
+      
+      // Determinar tipo do polo conforme nova nomenclatura
+      let tipoPolo = 'Polo Logístico';
+      let corBadge = CORES_ESTRATEGIA.poloLogistico;
+      if (temRelacionamento) {
+        tipoPolo = 'Polo Estratégico';
+        corBadge = CORES_ESTRATEGIA.poloEstrategico;
+      }
 
       return `
         <div class="nexus-popup-content">
           <div class="nexus-popup-title">${nome_polo}</div>
+          <div class="nexus-popup-line" style="color: ${corBadge}; font-weight: 600;">${tipoPolo}</div>
           <div class="nexus-popup-line">UF: ${uf_polo}</div>
-          <div class="nexus-popup-line">Valor Total Polo: ${formatCurrencyBRL(total_polo)}</div>
+          <div class="nexus-popup-line">Valor Total: ${formatCurrencyBRL(total_polo)}</div>
         </div>
       `;
     } else {
@@ -399,62 +404,34 @@ export default function MapLibrePolygons({
       const valor_destino = Number(properties.valor_total_destino) || 0;
       const codigoOrigem = safe(properties.codigo_origem);
       const poloReferencia = codigoToMunicipio.get(codigoOrigem) || codigoOrigem;
+      
+      // Determinar status do município periférico (sempre "Periferia" em cinza)
+      let tipoMunicipio = 'Periferia';
+      let corBadge = CORES_ESTRATEGIA.outrosMunicipios;
 
       return `
         <div class="nexus-popup-content">
           <div class="nexus-popup-title">${nome_destino}</div>
+          <div class="nexus-popup-line" style="color: ${corBadge}; font-weight: 600;">${tipoMunicipio}</div>
           <div class="nexus-popup-line">UF: ${uf_destino}</div>
           <div class="nexus-popup-line">Código: ${codigoDestino}</div>
           <div class="nexus-popup-line">Valor: ${formatCurrencyBRL(valor_destino)}</div>
-          <div class="nexus-popup-line">Polo Código: ${safe(poloReferencia)}</div>
+          <div class="nexus-popup-line">Polo Referência: ${safe(poloReferencia)}</div>
         </div>
       `;
     }
   };
 
-  // Paleta oficial por UF (polo = escuro, periferia = claro com +15% luminosidade)
-  const UF_COLORS: Record<string, { polo: string; peri: string }> = {
-    AC: { polo: '#0A3D91', peri: '#A3C7FF' },
-    AL: { polo: '#2F5AA6', peri: '#C1D5FF' },
-    AM: { polo: '#3B47A5', peri: '#D0D1FF' },
-    AP: { polo: '#1E60A7', peri: '#C0E2FF' },
-    BA: { polo: '#234E9D', peri: '#B4C6FF' },
-    CE: { polo: '#2A6F9B', peri: '#BFE4F5' },
-    ES: { polo: '#1F7A8C', peri: '#B6E0E6' },
-    GO: { polo: '#0E91A1', peri: '#BBEAF2' },
-    MA: { polo: '#1A8F84', peri: '#B9E6DB' },
-    MG: { polo: '#1D7F62', peri: '#B5DFC6' },
-    MS: { polo: '#1E7D4F', peri: '#BEE7CB' },
-    MT: { polo: '#226B5C', peri: '#B6D6C8' },
-    PA: { polo: '#2BAE66', peri: '#CEF5DB' },
-    PB: { polo: '#2B9EA9', peri: '#CBE8EF' },
-    PE: { polo: '#3D5A80', peri: '#D3D4F6' },
-    PI: { polo: '#305A79', peri: '#C7CAE1' },
-    PR: { polo: '#2A7FB8', peri: '#C6DAF7' },
-    RJ: { polo: '#2D8FD5', peri: '#D1E4FD' },
-    RN: { polo: '#3F6FE2', peri: '#E0D6FF' },
-    RO: { polo: '#4338CA', peri: '#DFD5FE' },
-    RR: { polo: '#2563EB', peri: '#D7E4FE' },
-    RS: { polo: '#06B6D4', peri: '#E7FDFE' },
-    SC: { polo: '#0D9488', peri: '#B1F9E7' },
-    SE: { polo: '#059669', peri: '#BFF6D3' },
-    SP: { polo: '#0284C7', peri: '#D2E9FD' },
-    TO: { polo: '#6D28D9', peri: '#E5D9FE' },
+  // === NOVA PALETA SIMPLIFICADA (sem diferenciação por UF) ===
+  // Polo Estratégico (polos com relacionamento) = Verde
+  // Polo Logístico (polos sem relacionamento) = Azul
+  // Periferias e Sem Tag = Cinza (sempre, independente de relacionamento)
+  const CORES_ESTRATEGIA = {
+    poloEstrategico: '#00E043',    // Verde - municípios com relacionamento
+    poloLogistico: '#EDCA32',      // Azul - polos sem relacionamento (possuem pista de voo)
+    outrosMunicipios: '#EDCA32',   // Cinza - periferia e sem tag
+    hover: '#bfdbfe',              // Azul claro - estado hover
   };
-
-  // Expressões de cor por UF (memoizado)
-  const { poloFillByUF, periFillByUF } = useMemo(() => {
-    const p: any[] = ['match', ['get', 'UF']];
-    const r: any[] = ['match', ['get', 'UF']];
-    Object.keys(UF_COLORS).forEach(uf => {
-      p.push(uf, UF_COLORS[uf].polo);
-      r.push(uf, UF_COLORS[uf].peri);
-    });
-    const fallbackColor = '#CCCCCC';
-    p.push(fallbackColor);
-    r.push(fallbackColor);
-    return { poloFillByUF: p, periFillByUF: r };
-  }, []);
 
   // 🆕 Lista de códigos com relacionamento ativo (para uso em expressões MapLibre)
   const codigosComRelacionamento = useMemo(() => {
@@ -462,101 +439,35 @@ export default function MapLibrePolygons({
     return Array.from(municipiosComRelacionamento);
   }, [municipiosComRelacionamento]);
 
-  // 🆕 Lista de códigos em negociação (para uso em expressões MapLibre)
-  const codigosEmNegociacao = useMemo(() => {
-    if (!municipiosEmNegociacao || municipiosEmNegociacao.size === 0) return [];
-    return Array.from(municipiosEmNegociacao);
-  }, [municipiosEmNegociacao]);
-
   // 🆕 Expressões de cor que destacam municípios com status especial
-  // Prioridade: 1) Hover, 2) Negociação (roxo), 3) Relacionamento ativo (amarelo), 4) Cor por UF
-  const poloFillWithRelacionamento = useMemo(() => {
-    const hasRelacionamento = codigosComRelacionamento.length > 0;
-    const hasNegociacao = codigosEmNegociacao.length > 0;
-    
-    if (!hasRelacionamento && !hasNegociacao) {
-      return [
-        'case',
-        ['boolean', ['feature-state', 'hover'], false],
-        '#bfdbfe',
-        poloFillByUF
-      ];
-    }
-    
-    // Construir expressão com prioridades
-    return [
-      'case',
-      ['boolean', ['feature-state', 'hover'], false],
-      '#bfdbfe', // Hover (prioridade máxima)
-      ...(hasNegociacao ? [
-        ['in', ['get', 'codigo_origem'], ['literal', codigosEmNegociacao]],
-        '#A855F7', // Roxo para negociação
-      ] : []),
-      ...(hasRelacionamento ? [
-        ['in', ['get', 'codigo_origem'], ['literal', codigosComRelacionamento]],
-        '#FCD34D', // Amarelo para relacionamento ativo
-      ] : []),
-      poloFillByUF // Cor por UF (fallback)
-    ];
-  }, [poloFillByUF, codigosComRelacionamento, codigosEmNegociacao]);
-
-  const periFillWithRelacionamento = useMemo(() => {
-    const hasRelacionamento = codigosComRelacionamento.length > 0;
-    const hasNegociacao = codigosEmNegociacao.length > 0;
-    
-    if (!hasRelacionamento && !hasNegociacao) {
-      return [
-        'case',
-        ['boolean', ['feature-state', 'hover'], false],
-        '#bfdbfe',
-        periFillByUF
-      ];
-    }
-    
-    return [
-      'case',
-      ['boolean', ['feature-state', 'hover'], false],
-      '#bfdbfe', // Hover (prioridade máxima)
-      ...(hasNegociacao ? [
-        ['in', ['get', 'codigo_destino'], ['literal', codigosEmNegociacao]],
-        '#A855F7', // Roxo para negociação
-      ] : []),
-      ...(hasRelacionamento ? [
-        ['in', ['get', 'codigo_destino'], ['literal', codigosComRelacionamento]],
-        '#FCD34D', // Amarelo para relacionamento ativo
-      ] : []),
-      periFillByUF // Cor por UF (fallback)
-    ];
-  }, [periFillByUF, codigosComRelacionamento, codigosEmNegociacao]);
-
   const semTagFillWithRelacionamento = useMemo(() => {
-    const hasRelacionamento = codigosComRelacionamento.length > 0;
-    const hasNegociacao = codigosEmNegociacao.length > 0;
-    
-    if (!hasRelacionamento && !hasNegociacao) {
+    // Sem Tag: Polo Estratégico (verde) se tem relacionamento, senão amarelo
+    if (codigosComRelacionamento.length > 0) {
       return [
         'case',
-        ['boolean', ['feature-state', 'hover'], false],
-        '#bfdbfe',
-        '#E5E7EB'
-      ];
-    }
-    
-    return [
-      'case',
-      ['boolean', ['feature-state', 'hover'], false],
-      '#bfdbfe', // Hover (prioridade máxima)
-      ...(hasNegociacao ? [
-        ['in', ['get', 'codigo'], ['literal', codigosEmNegociacao]],
-        '#A855F7', // Roxo para negociação
-      ] : []),
-      ...(hasRelacionamento ? [
         ['in', ['get', 'codigo'], ['literal', codigosComRelacionamento]],
-        '#FCD34D', // Amarelo para relacionamento ativo
-      ] : []),
-      '#E5E7EB' // Cinza padrão (fallback)
-    ];
-  }, [codigosComRelacionamento, codigosEmNegociacao]);
+        CORES_ESTRATEGIA.poloEstrategico, // Verde para Polo Estratégico (relacionamento ativo)
+        CORES_ESTRATEGIA.outrosMunicipios // Amarelo padrão (fallback)
+      ];
+    } else {
+      return CORES_ESTRATEGIA.outrosMunicipios;
+    }
+  }, [codigosComRelacionamento]);
+
+  // 🆕 Expressão de cor para Periferia que destaca municípios com relacionamento
+  const periFillWithRelacionamento = useMemo(() => {
+    // Periferia: Verde se tem relacionamento, senão amarelo
+    if (codigosComRelacionamento.length > 0) {
+      return [
+        'case',
+        ['in', ['get', 'codigo_destino'], ['literal', codigosComRelacionamento]],
+        CORES_ESTRATEGIA.poloEstrategico, // Verde para Polo Estratégico (relacionamento ativo)
+        CORES_ESTRATEGIA.outrosMunicipios // Amarelo padrão (fallback)
+      ];
+    } else {
+      return CORES_ESTRATEGIA.outrosMunicipios;
+    }
+  }, [codigosComRelacionamento]);
 
   useEffect(() => {
     if (mapRef.current || !containerRef.current) return;
@@ -579,7 +490,13 @@ export default function MapLibrePolygons({
         data: { type: 'FeatureCollection', features: [] },
         promoteId: 'codigo',
       });
-      map.addSource('polos-src', {
+      map.addSource('polos-estrategicos-src', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] },
+        // Garante que feature-state use o campo de código como ID
+        promoteId: 'codigo_origem',
+      });
+      map.addSource('polos-logisticos-src', {
         type: 'geojson',
         data: { type: 'FeatureCollection', features: [] },
         // Garante que feature-state use o campo de código como ID
@@ -604,14 +521,8 @@ export default function MapLibrePolygons({
           'fill-opacity': [
             'case',
             ['boolean', ['feature-state', 'hover'], false],
-            0.35,
-            // 🆕 Aumentar opacidade para municípios em negociação
-            ['in', ['get', 'codigo'], ['literal', codigosEmNegociacao]],
-            0.45,
-            // 🆕 Aumentar opacidade para municípios com relacionamento ativo
-            ['in', ['get', 'codigo'], ['literal', codigosComRelacionamento]],
-            0.4,
-            0.18,
+            0.35, // Opacidade de hover
+            0.5, // Opacidade base
           ],
         },
       });
@@ -622,11 +533,11 @@ export default function MapLibrePolygons({
         paint: {
           'line-color': '#9CA3AF',
           'line-width': 0.5,
-          'line-opacity': 0.6
+          'line-opacity': 0.5
         },
       });
 
-      // 1. Periferia fill
+      // 1. Periferia fill - usa expressão que destaca municípios com relacionamento
       map.addLayer({
         id: 'peri-fill',
         type: 'fill',
@@ -637,13 +548,7 @@ export default function MapLibrePolygons({
             'case',
             ['boolean', ['feature-state', 'hover'], false],
             0.35, // Opacidade de hover
-            // 🆕 Aumentar opacidade para municípios em negociação
-            ['in', ['get', 'codigo_destino'], ['literal', codigosEmNegociacao]],
-            0.55,
-            // 🆕 Aumentar opacidade para municípios com relacionamento ativo
-            ['in', ['get', 'codigo_destino'], ['literal', codigosComRelacionamento]],
-            0.5,
-            colors.periferia.fillOpacity, // Opacidade normal
+            0.5, // Opacidade base
           ],
         },
       });
@@ -659,36 +564,57 @@ export default function MapLibrePolygons({
         },
       });
 
-      // 3. Polos fill (acima da periferia)
+      // 3. Polos Estratégicos fill
       map.addLayer({
-        id: 'polos-fill',
+        id: 'polos-estrategicos-fill',
         type: 'fill',
-        source: 'polos-src',
+        source: 'polos-estrategicos-src',
         paint: {
-          'fill-color': poloFillWithRelacionamento as any,
+          'fill-color': CORES_ESTRATEGIA.poloEstrategico,
           'fill-opacity': [
             'case',
             ['boolean', ['feature-state', 'hover'], false],
-            0.35, // Opacidade de hover
-            // 🆕 Aumentar opacidade para municípios em negociação
-            ['in', ['get', 'codigo_origem'], ['literal', codigosEmNegociacao]],
-            0.65,
-            // 🆕 Aumentar opacidade para municípios com relacionamento ativo
-            ['in', ['get', 'codigo_origem'], ['literal', codigosComRelacionamento]],
-            0.6,
-            colors.polo.fillOpacity, // Opacidade normal
+            0.65, // Opacidade de hover
+            0.5, // Opacidade base
           ],
         },
       });
       
-      // 4. Polos line (acima do fill dos polos)
+      // 4. Polos Estratégicos line
       map.addLayer({
-        id: 'polos-line',
+        id: 'polos-estrategicos-line',
         type: 'line',
-        source: 'polos-src',
+        source: 'polos-estrategicos-src',
         paint: {
-      'line-color': colors.polo.line,
-      'line-width': colors.polo.lineWidth,
+          'line-color': colors.polo.line,
+          'line-width': colors.polo.lineWidth,
+        },
+      });
+
+      // 5. Polos Logísticos fill
+      map.addLayer({
+        id: 'polos-logisticos-fill',
+        type: 'fill',
+        source: 'polos-logisticos-src',
+        paint: {
+          'fill-color': CORES_ESTRATEGIA.poloLogistico,
+          'fill-opacity': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            0.75, // Opacidade de hover
+            0.5, // Opacidade base
+          ],
+        },
+      });
+      
+      // 6. Polos Logísticos line
+      map.addLayer({
+        id: 'polos-logisticos-line',
+        type: 'line',
+        source: 'polos-logisticos-src',
+        paint: {
+          'line-color': colors.polo.line,
+          'line-width': colors.polo.lineWidth,
         },
       });
 
@@ -699,8 +625,8 @@ export default function MapLibrePolygons({
         type: 'line',
         source: 'polo-highlight-src',
         paint: {
-          'line-color': '#2563EB', // Azul consistente
-          'line-width': 2.5,
+          'line-color': '#9CA3AF', // Azul consistente
+          'line-width': 0.5,
           'line-opacity': 0.5
         },
       });
@@ -713,7 +639,7 @@ export default function MapLibrePolygons({
         source: 'municipio-periferico-highlight-src',
         paint: {
           'fill-color': '#10B981', // Verde esmeralda para destaque
-          'fill-opacity': 0.3
+          'fill-opacity': 0.5
         },
       });
       map.addLayer({
@@ -723,7 +649,7 @@ export default function MapLibrePolygons({
         paint: {
           'line-color': '#10B981',
           'line-width': 3,
-          'line-opacity': 0.9
+          'line-opacity': 0.5
         },
       });
 
@@ -764,12 +690,14 @@ export default function MapLibrePolygons({
         paint: { 'line-color': '#2563EB', 'line-width': 2 },
       });
 
-      // Aplicar visibilidade inicial (polos sempre visível)
+      // Aplicar visibilidade inicial
       try {
         map.setLayoutProperty('semtag-fill', 'visibility', showSemTag ? 'visible' : 'none');
         map.setLayoutProperty('semtag-line', 'visibility', showSemTag ? 'visible' : 'none');
-        map.setLayoutProperty('polos-fill', 'visibility', showPolos ? 'visible' : 'none');
-        map.setLayoutProperty('polos-line', 'visibility', showPolos ? 'visible' : 'none');
+        map.setLayoutProperty('polos-estrategicos-fill', 'visibility', showPolosEstrategicos ? 'visible' : 'none');
+        map.setLayoutProperty('polos-estrategicos-line', 'visibility', showPolosEstrategicos ? 'visible' : 'none');
+        map.setLayoutProperty('polos-logisticos-fill', 'visibility', showPolosLogisticos ? 'visible' : 'none');
+        map.setLayoutProperty('polos-logisticos-line', 'visibility', showPolosLogisticos ? 'visible' : 'none');
         map.setLayoutProperty('peri-fill', 'visibility', showPeriferia ? 'visible' : 'none');
         map.setLayoutProperty('peri-line', 'visibility', showPeriferia ? 'visible' : 'none');
         map.setLayoutProperty('polo-highlight-line', 'visibility', 'visible'); // Contorno sempre visível quando há dados
@@ -1082,27 +1010,50 @@ export default function MapLibrePolygons({
       setupMapLibreHoverSemTag(
         map, 
         'semtag-fill',
-        () => municipiosComRelacionamentoRef.current,
-        () => municipiosEmNegociacaoRef.current
+        () => municipiosComRelacionamentoRef.current
       );
       setupMapLibreHover(
         map, 
-        'polos-fill', 
+        'polos-estrategicos-fill', 
         true,  // true = é camada de polos
-        () => municipiosComRelacionamentoRef.current,
-        () => municipiosEmNegociacaoRef.current
+        () => municipiosComRelacionamentoRef.current
+      );
+      setupMapLibreHover(
+        map, 
+        'polos-logisticos-fill', 
+        true,  // true = é camada de polos
+        () => municipiosComRelacionamentoRef.current
       );
       setupMapLibreHover(
         map, 
         'peri-fill', 
         false, // false = é camada de periferias
-        () => municipiosComRelacionamentoRef.current,
-        () => municipiosEmNegociacaoRef.current
+        () => municipiosComRelacionamentoRef.current
       );
       console.log('🎯 [MapLibrePolygons] Hover handlers configurados para polos e periferias');
 
       // Eventos de clique nos polígonos
-      map.on('click', 'polos-fill', (e) => {
+      map.on('click', 'polos-estrategicos-fill', (e) => {
+        if (e.features && e.features.length > 0) {
+          closeActivePopup();
+          const feature = e.features[0];
+          const content = createPopupContent(feature.properties, true);
+          
+          const popup = new maplibregl.Popup({
+            closeButton: false,
+            closeOnClick: false,
+            offset: 8
+          })
+            .setLngLat(e.lngLat)
+            .setHTML(content)
+            .addTo(map);
+          
+          popup.addClassName('nexus-popup');
+          popupRef.current = popup;
+        }
+      });
+
+      map.on('click', 'polos-logisticos-fill', (e) => {
         if (e.features && e.features.length > 0) {
           closeActivePopup();
           const feature = e.features[0];
@@ -1177,8 +1128,9 @@ export default function MapLibrePolygons({
 
       // Clique no mapa (fora dos polígonos) fecha popup
       map.on('click', (e) => {
+        const existingLayers = ['polos-estrategicos-fill', 'polos-logisticos-fill', 'peri-fill', 'semtag-fill'].filter(layerId => map.getLayer(layerId));
         const features = map.queryRenderedFeatures(e.point, {
-          layers: ['polos-fill', 'peri-fill', 'semtag-fill']
+          layers: existingLayers
         });
         
         if (features.length === 0) {
@@ -1187,16 +1139,28 @@ export default function MapLibrePolygons({
       });
 
       // Cursor pointer ao passar sobre polígonos
-      map.on('mouseenter', 'polos-fill', () => {
+      map.on('mouseenter', 'polos-estrategicos-fill', () => {
         map.getCanvas().style.cursor = 'pointer';
       });
-      map.on('mouseleave', 'polos-fill', () => {
+      map.on('mouseleave', 'polos-estrategicos-fill', () => {
+        map.getCanvas().style.cursor = '';
+      });
+      map.on('mouseenter', 'polos-logisticos-fill', () => {
+        map.getCanvas().style.cursor = 'pointer';
+      });
+      map.on('mouseleave', 'polos-logisticos-fill', () => {
         map.getCanvas().style.cursor = '';
       });
       map.on('mouseenter', 'peri-fill', () => {
         map.getCanvas().style.cursor = 'pointer';
       });
       map.on('mouseleave', 'peri-fill', () => {
+        map.getCanvas().style.cursor = '';
+      });
+      map.on('mouseenter', 'semtag-fill', () => {
+        map.getCanvas().style.cursor = 'pointer';
+      });
+      map.on('mouseleave', 'semtag-fill', () => {
         map.getCanvas().style.cursor = '';
       });
     });
@@ -1207,7 +1171,8 @@ export default function MapLibrePolygons({
       if (upHandlerRef.current) window.removeEventListener('mouseup', upHandlerRef.current);
       
       // Remover hover handlers antes de destruir o mapa
-      removeMapLibreHover(map, 'polos-fill');
+      removeMapLibreHover(map, 'polos-estrategicos-fill');
+      removeMapLibreHover(map, 'polos-logisticos-fill');
       removeMapLibreHover(map, 'peri-fill');
       removeMapLibreHover(map, 'semtag-fill');
       map.remove();
@@ -1218,7 +1183,7 @@ export default function MapLibrePolygons({
     };
   }, []);
 
-  // Atualiza visibilidade quando os toggles mudam
+  // Atualiza cores e opacidades quando os toggles mudam
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
@@ -1236,11 +1201,87 @@ export default function MapLibrePolygons({
       } catch {}
     };
     
-    // Aplicar visibilidade conforme estados (polos agora controlável)
+    // Aplicar cores e opacidades para Polos Estratégicos
+    if (map.getLayer('polos-estrategicos-fill')) {
+      try {
+        if (showPolosEstrategicos) {
+          // Mostrar em verde com opacidade normal
+          map.setPaintProperty('polos-estrategicos-fill', 'fill-color', CORES_ESTRATEGIA.poloEstrategico);
+          map.setPaintProperty('polos-estrategicos-fill', 'fill-opacity', [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            0.65, // Opacidade de hover
+            0.5, // Opacidade base
+          ]);
+        } else {
+          // Mostrar em cinza com opacidade reduzida
+          map.setPaintProperty('polos-estrategicos-fill', 'fill-color', '#EDCA32');
+          map.setPaintProperty('polos-estrategicos-fill', 'fill-opacity', 0.18);
+        }
+      } catch {}
+    }
+    
+    // Aplicar cores e opacidades para Polos Logísticos
+    if (map.getLayer('polos-logisticos-fill')) {
+      try {
+        if (showPolosLogisticos) {
+          // Mostrar em azul com opacidade normal
+          map.setPaintProperty('polos-logisticos-fill', 'fill-color', CORES_ESTRATEGIA.poloLogistico);
+          map.setPaintProperty('polos-logisticos-fill', 'fill-opacity', [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            0.75, // Opacidade de hover
+            0.6, // Opacidade base
+          ]);
+        } else {
+          // Mostrar em cinza com opacidade reduzida
+          map.setPaintProperty('polos-logisticos-fill', 'fill-color', '#0022E0');
+          map.setPaintProperty('polos-logisticos-fill', 'fill-opacity', 0.7);
+        }
+      } catch {}
+    }
+
+    // 🆕 Sincronizar cores de TODAS as camadas com o estado de Polos Estratégicos
+    // Quando Polos Estratégicos está desmarcado, todos os municípios COM relacionamento ficam AMARELOS
+    if (map.getLayer('semtag-fill')) {
+      try {
+        if (showPolosEstrategicos) {
+          // Polos Estratégicos visíveis - usar expressão normal que colore verde se tem relacionamento
+          map.setPaintProperty('semtag-fill', 'fill-color', semTagFillWithRelacionamento as any);
+        } else {
+          // Polos Estratégicos desmarcados - forçar AMARELO para todos (inclusive os com relacionamento)
+          map.setPaintProperty('semtag-fill', 'fill-color', '#EDCA32');
+        }
+      } catch {}
+    }
+
+    // 🆕 Sincronizar cores da camada Periferia com o estado de Polos Estratégicos
+    if (map.getLayer('peri-fill')) {
+      try {
+        if (showPolosEstrategicos) {
+          // Polos Estratégicos visíveis - usar expressão normal que colore verde se tem relacionamento
+          map.setPaintProperty('peri-fill', 'fill-color', periFillWithRelacionamento as any);
+        } else {
+          // Polos Estratégicos desmarcados - forçar AMARELO para todos (inclusive os com relacionamento)
+          map.setPaintProperty('peri-fill', 'fill-color', '#EDCA32');
+        }
+        // Manter opacidade normal
+        map.setPaintProperty('peri-fill', 'fill-opacity', [
+          'case',
+          ['boolean', ['feature-state', 'hover'], false],
+          0.35, // Opacidade de hover
+          0.18, // Opacidade base
+        ]);
+      } catch {}
+    }
+
+    // Visibilidade das linhas dos polos (sempre visíveis, mas cor pode mudar)
+    setVis('polos-estrategicos-line', true);
+    setVis('polos-logisticos-line', true);
+
+    // Aplicar visibilidade para Sem Tag
     setVis('semtag-fill', showSemTag);
     setVis('semtag-line', showSemTag);
-    setVis('polos-fill', showPolos);
-    setVis('polos-line', showPolos);
 
     // Periferia: sempre visível quando há filtro aplicado, senão depende do toggle
     const shouldShowPeriferia = inFilterMode || showPeriferia;
@@ -1249,7 +1290,7 @@ export default function MapLibrePolygons({
     
     // Contorno azul sempre visível quando há dados (independente dos toggles individuais)
     setVis('polo-highlight-line', true);
-  }, [showPeriferia, showPolos, showSemTag, appliedUF, appliedPolo]);
+  }, [showPeriferia, showPolosEstrategicos, showPolosLogisticos, showSemTag, appliedUF, appliedPolo, periFillWithRelacionamento, semTagFillWithRelacionamento]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -1291,7 +1332,12 @@ export default function MapLibrePolygons({
       console.warn('Falha ao aplicar filtro de Radar na camada Sem Tag:', e);
     }
 
-  try { (map.getSource('polos-src') as any)?.setData(polosFilteredFC); } catch {}
+    // Separar polos estratégicos e logísticos
+    const polosEstrategicosFilteredFC: FC = { type: 'FeatureCollection', features: polosFilteredFC.features.filter(f => municipiosComRelacionamento?.has(f.properties?.codigo_origem)) };
+    const polosLogisticosFilteredFC: FC = { type: 'FeatureCollection', features: polosFilteredFC.features.filter(f => !municipiosComRelacionamento?.has(f.properties?.codigo_origem)) };
+
+  try { (map.getSource('polos-estrategicos-src') as any)?.setData(polosEstrategicosFilteredFC); } catch {}
+  try { (map.getSource('polos-logisticos-src') as any)?.setData(polosLogisticosFilteredFC); } catch {}
   try { (map.getSource('periferia-src') as any)?.setData(periFilteredFC); } catch {}
   try { (map.getSource('semtag-src') as any)?.setData(semTagFilteredByRadarFC); } catch {}
   // Atualizar refs com os dados mais recentes (evita stale closures no handler do raio)
@@ -1340,44 +1386,9 @@ export default function MapLibrePolygons({
         }
       : { type: 'FeatureCollection', features: [] };
     try { (map.getSource('municipio-semtag-highlight-src') as any)?.setData(municipioSemTagFC); } catch {}
-    
-    // Atualiza as propriedades de pintura para destacar o polo selecionado (apenas opacidade/espessura)
-    if (map.isStyleLoaded()) {
-      let poloFillOpacityExpr: any = colors.polo.fillOpacity;
-      let poloLineWidthExpr: any = colors.polo.lineWidth;
-      let periFillOpacityExpr: any = colors.periferia.fillOpacity;
-      let periLineWidthExpr: any = colors.periferia.lineWidth;
-
-      if (appliedPolo !== 'ALL') {
-        // Destaca apenas o polo selecionado
-        poloFillOpacityExpr = ['case', ['==', ['get', 'codigo_origem'], appliedPolo], colors.poloHighlighted.fillOpacity, colors.polo.fillOpacity];
-        poloLineWidthExpr = ['case', ['==', ['get', 'codigo_origem'], appliedPolo], colors.poloHighlighted.lineWidth, colors.polo.lineWidth];
-        periFillOpacityExpr = ['case', ['==', ['get', 'codigo_origem'], appliedPolo], colors.periferiaHighlighted.fillOpacity, colors.periferia.fillOpacity];
-        periLineWidthExpr = ['case', ['==', ['get', 'codigo_origem'], appliedPolo], colors.periferiaHighlighted.lineWidth, colors.periferia.lineWidth];
-      } else if (inUFMode) {
-        // Destaca todos os polos da UF e atenua o restante; periferias já filtradas
-        const attenuated = 0.15;
-        poloFillOpacityExpr = ['case', ['==', ['get', 'UF'], ufUpper], colors.poloHighlighted.fillOpacity, attenuated];
-        poloLineWidthExpr = ['case', ['==', ['get', 'UF'], ufUpper], colors.poloHighlighted.lineWidth, 0.2];
-        periFillOpacityExpr = colors.periferiaHighlighted.fillOpacity;
-        periLineWidthExpr = colors.periferiaHighlighted.lineWidth;
-      }
-
-      // Proteger contra erros quando as camadas ainda não existem
-      if (map.getLayer('polos-fill')) map.setPaintProperty('polos-fill', 'fill-opacity', poloFillOpacityExpr as any);
-      if (map.getLayer('polos-line')) map.setPaintProperty('polos-line', 'line-width', poloLineWidthExpr as any);
-      if (map.getLayer('peri-fill')) map.setPaintProperty('peri-fill', 'fill-opacity', periFillOpacityExpr as any);
-      if (map.getLayer('peri-line')) map.setPaintProperty('peri-line', 'line-width', periLineWidthExpr as any);
-    }
 
     // 🆕 GARANTIR que cores de relacionamento sejam sempre aplicadas (prevalecem sobre outras cores)
     try {
-      if (map.getLayer('polos-fill') && codigosComRelacionamento.length > 0) {
-        map.setPaintProperty('polos-fill', 'fill-color', poloFillWithRelacionamento as any);
-      }
-      if (map.getLayer('peri-fill') && codigosComRelacionamento.length > 0) {
-        map.setPaintProperty('peri-fill', 'fill-color', periFillWithRelacionamento as any);
-      }
       if (map.getLayer('semtag-fill') && codigosComRelacionamento.length > 0) {
         map.setPaintProperty('semtag-fill', 'fill-color', semTagFillWithRelacionamento as any);
       }
@@ -1423,79 +1434,28 @@ export default function MapLibrePolygons({
       // Modo geral - mostrar Brasil inteiro
       map.fitBounds([[-74, -34], [-34, 5]], { padding: 24, duration: 700 }); // Brasil aprox
     }
-  }, [polos, periferias, appliedUF, appliedPolo, municipioPerifericoSelecionado, municipioSemTagSelecionado, radarFilterActive, radarCenterLngLat, radarRadiusKm, semTagAllFC, codigosComRelacionamento, codigosEmNegociacao]);
+  }, [polos, periferias, appliedUF, appliedPolo, municipioPerifericoSelecionado, municipioSemTagSelecionado, radarFilterActive, radarCenterLngLat, radarRadiusKm, semTagAllFC, codigosComRelacionamento]);
 
-  // 🆕 Atualizar cores quando relacionamentos ou negociações mudarem
+  // 🆕 Atualizar cores quando relacionamentos mudarem (apenas cores, não opacidade)
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !map.isStyleLoaded()) return;
 
-    // Sempre aplicar as expressões de cor que priorizam negociação e relacionamento ativo
+    // Aplicar apenas expressões de cor (opacidade é controlada somente pelo hover)
     try {
-      // Polos: aplicar cores (negociação = roxo, relacionamento = amarelo)
-      if (map.getLayer('polos-fill')) {
-        map.setPaintProperty('polos-fill', 'fill-color', poloFillWithRelacionamento as any);
-        // Opacidade: negociação e relacionamento ativo têm opacidade maior
-        const opacityExpr = [
-          'case',
-          ['boolean', ['feature-state', 'hover'], false],
-          0.35, // Hover
-          ...(codigosEmNegociacao.length > 0 ? [
-            ['in', ['get', 'codigo_origem'], ['literal', codigosEmNegociacao]],
-            0.65, // Negociação - opacidade maior
-          ] : []),
-          ...(codigosComRelacionamento.length > 0 ? [
-            ['in', ['get', 'codigo_origem'], ['literal', codigosComRelacionamento]],
-            0.6, // Relacionamento ativo - opacidade maior
-          ] : []),
-          colors.polo.fillOpacity // Padrão
-        ];
-        map.setPaintProperty('polos-fill', 'fill-opacity', opacityExpr as any);
-      }
-
-      // Periferias: aplicar cores
+      // Periferias: aplicar cores (opacidade já definida na criação da camada)
       if (map.getLayer('peri-fill')) {
-        map.setPaintProperty('peri-fill', 'fill-color', periFillWithRelacionamento as any);
-        const opacityExpr = [
-          'case',
-          ['boolean', ['feature-state', 'hover'], false],
-          0.35, // Hover
-          ...(codigosEmNegociacao.length > 0 ? [
-            ['in', ['get', 'codigo_destino'], ['literal', codigosEmNegociacao]],
-            0.55, // Negociação - opacidade maior
-          ] : []),
-          ...(codigosComRelacionamento.length > 0 ? [
-            ['in', ['get', 'codigo_destino'], ['literal', codigosComRelacionamento]],
-            0.5, // Relacionamento ativo - opacidade maior
-          ] : []),
-          colors.periferia.fillOpacity // Padrão
-        ];
-        map.setPaintProperty('peri-fill', 'fill-opacity', opacityExpr as any);
+        map.setPaintProperty('peri-fill', 'fill-color', CORES_ESTRATEGIA.outrosMunicipios);
       }
 
-      // Sem Tag: aplicar cores
+      // Sem Tag: aplicar cores (opacidade já definida na criação da camada)
       if (map.getLayer('semtag-fill')) {
         map.setPaintProperty('semtag-fill', 'fill-color', semTagFillWithRelacionamento as any);
-        const opacityExpr = [
-          'case',
-          ['boolean', ['feature-state', 'hover'], false],
-          0.35, // Hover
-          ...(codigosEmNegociacao.length > 0 ? [
-            ['in', ['get', 'codigo'], ['literal', codigosEmNegociacao]],
-            0.45, // Negociação - opacidade maior
-          ] : []),
-          ...(codigosComRelacionamento.length > 0 ? [
-            ['in', ['get', 'codigo'], ['literal', codigosComRelacionamento]],
-            0.4, // Relacionamento ativo - opacidade maior
-          ] : []),
-          0.18 // Padrão
-        ];
-        map.setPaintProperty('semtag-fill', 'fill-opacity', opacityExpr as any);
       }
     } catch (e) {
       console.warn('Erro ao atualizar cores de relacionamento/negociação:', e);
     }
-  }, [codigosComRelacionamento, codigosEmNegociacao, poloFillWithRelacionamento, periFillWithRelacionamento, semTagFillWithRelacionamento]);
+  }, [codigosComRelacionamento, semTagFillWithRelacionamento]);
 
   // SINCRONIZAR refs COM STATE DE RAIO E CURSOR
   useEffect(() => {
@@ -1513,11 +1473,29 @@ export default function MapLibrePolygons({
   <div className="absolute bottom-3 left-3 z-50">
         <div className="bg-[#0b1220]/80 text-white rounded-md shadow-md p-2 text-sm">
           <div className="flex flex-col gap-2">
-            <button
-              onClick={() => {
-                setRadiusMode(!radiusMode);
-                if (!radiusMode) {
-                  // entrando no modo, limpar circulo anterior
+            <div className="flex flex-row gap-2">
+              <button
+                onClick={() => {
+                  setRadiusMode(!radiusMode);
+                  if (!radiusMode) {
+                    // entrando no modo, limpar circulo anterior
+                    setCircleGeoJSON(null);
+                    circleRef.current = null;
+                    setPolosInRadius([]);
+                    setPeriferiasInRadius([]);
+                    const map = mapRef.current;
+                    if (map) {
+                      (map.getSource('radius-circle-src') as any)?.setData({ type: 'FeatureCollection', features: [] });
+                      map.setLayoutProperty('radius-fill', 'visibility', 'none');
+                      map.setLayoutProperty('radius-line', 'visibility', 'none');
+                    }
+                  }
+                }}
+                className={`flex-1 bg-sky-600 hover:bg-sky-700 rounded-md px-2 py-1 ${radiusMode ? 'bg-emerald-600' : ''}`}
+              >{radiusMode ? 'Sair do Raio' : 'Raio'}</button>
+
+              <button
+                onClick={() => {
                   setCircleGeoJSON(null);
                   circleRef.current = null;
                   setPolosInRadius([]);
@@ -1528,35 +1506,30 @@ export default function MapLibrePolygons({
                     map.setLayoutProperty('radius-fill', 'visibility', 'none');
                     map.setLayoutProperty('radius-line', 'visibility', 'none');
                   }
-                }
-              }}
-              className={`w-full bg-sky-600 hover:bg-sky-700 rounded-md px-2 py-1 mb-1 ${radiusMode ? 'bg-emerald-600' : ''}`}
-            >{radiusMode ? 'Sair do Raio' : 'Raio'}</button>
-
-            <button
-              onClick={() => {
-                setCircleGeoJSON(null);
-                circleRef.current = null;
-                setPolosInRadius([]);
-                setPeriferiasInRadius([]);
-                const map = mapRef.current;
-                if (map) {
-                  (map.getSource('radius-circle-src') as any)?.setData({ type: 'FeatureCollection', features: [] });
-                  map.setLayoutProperty('radius-fill', 'visibility', 'none');
-                  map.setLayoutProperty('radius-line', 'visibility', 'none');
-                }
-                if (popupRef.current) { popupRef.current.remove(); popupRef.current=null; }
-              }}
-              className="w-full bg-red-600 hover:bg-red-700 rounded-md px-2 py-1"
-            >Limpar</button>
+                  if (popupRef.current) { popupRef.current.remove(); popupRef.current=null; }
+                }}
+                className="flex-1 bg-red-600 hover:bg-red-700 rounded-md px-2 py-1"
+              >Limpar</button>
+            </div>
             <label className="flex items-center gap-2">
               <input 
                 type="checkbox" 
-                checked={showPolos} 
-                onChange={(e) => setShowPolos(e.target.checked)} 
+                checked={showPolosEstrategicos} 
+                onChange={(e) => setShowPolosEstrategicos(e.target.checked)} 
                 className="w-4 h-4" 
               />
-              <span>Polos</span>
+              <div className="w-3 h-3 rounded" style={{ backgroundColor: CORES_ESTRATEGIA.poloEstrategico }}></div>
+              <span>Polos Estratégicos</span>
+            </label>
+            <label className="flex items-center gap-2">
+              <input 
+                type="checkbox" 
+                checked={showPolosLogisticos} 
+                onChange={(e) => setShowPolosLogisticos(e.target.checked)} 
+                className="w-4 h-4" 
+              />
+              <div className="w-3 h-3 rounded" style={{ backgroundColor: showPolosLogisticos ? CORES_ESTRATEGIA.poloLogistico : '#0022E0' }}></div>
+              <span>Polos Logísticos</span>
             </label>
             <label className="flex items-center gap-2">
               <input
@@ -1565,7 +1538,8 @@ export default function MapLibrePolygons({
                 onChange={(e) => setShowPeriferia(e.target.checked)}
                 className="w-4 h-4"
               />
-              <span>Periferia</span>
+              <div className="w-3 h-3 rounded" style={{ backgroundColor: CORES_ESTRATEGIA.outrosMunicipios }}></div>
+              <span>Municípios Satélites</span>
             </label>
             <label className="flex items-center gap-2">
               <input 
@@ -1574,7 +1548,8 @@ export default function MapLibrePolygons({
                 onChange={(e) => setShowSemTag(e.target.checked)} 
                 className="w-4 h-4" 
               />
-              <span>Fora dos Polos</span>
+              <div className="w-3 h-3 rounded" style={{ backgroundColor: CORES_ESTRATEGIA.outrosMunicipios }}></div>
+              <span>Outros Municípios</span>
             </label>
           </div>
         </div>
@@ -1610,7 +1585,7 @@ export default function MapLibrePolygons({
             <div className="flex-1 overflow-y-auto">
               {polosInRadius.length > 0 && (
                 <div className="mb-3">
-                  <div className="text-xs text-slate-300 mb-1">Polos ({polosInRadius.length})</div>
+                  <div className="text-xs text-slate-300 mb-1">Polos Logísticos ({polosInRadius.length})</div>
                   <div className="space-y-1">
                     {polosInRadius.map((m, idx) => (
                       <div key={`p-${idx}`} className="flex items-center justify-between bg-slate-800/50 border border-slate-700/40 rounded px-2 py-1">
@@ -1623,7 +1598,7 @@ export default function MapLibrePolygons({
               )}
               {periferiasInRadius.length > 0 && (
                 <div>
-                  <div className="text-xs text-slate-300 mb-1">Periferias ({periferiasInRadius.length})</div>
+                  <div className="text-xs text-slate-300 mb-1">Municípios ({periferiasInRadius.length})</div>
                   <div className="space-y-1">
                     {periferiasInRadius.map((m, idx) => (
                       <div key={`peri-${idx}`} className="flex items-center justify-between bg-slate-800/50 border border-slate-700/40 rounded px-2 py-1">

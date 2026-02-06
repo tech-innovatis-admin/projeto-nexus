@@ -24,7 +24,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // 2. Definição de rotas protegidas
-  const protectedPaths = ['/mapa', '/estrategia', '/rotas', '/perfil'];
+  const protectedPaths = ['/mapa', '/estrategia', '/rotas', '/perfil', '/polos'];
   const isProtectedPath = protectedPaths.some(path => pathname.startsWith(path));
 
   if (isProtectedPath) {

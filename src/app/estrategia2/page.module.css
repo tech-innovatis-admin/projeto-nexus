@@ -1,0 +1,17 @@
+/* Estilo para os spinners dos inputs numéricos */
+.input-number::-webkit-inner-spin-button,
+.input-number::-webkit-outer-spin-button {
+  background-color: #cbd5e1; /* bg-slate-300 em hex */
+  opacity: 1;
+  border-left: 1px solid rgba(100, 116, 139, 0.5); /* border-slate-700/50 */
+  height: 100%;
+  margin-right: 2px;
+  border-radius: 0 0.375rem 0.375rem 0; /* rounded-r-md */
+  cursor: pointer;
+}
+
+/* Estilo para o Firefox (não suporta modificação do spinner diretamente) */
+.input-number {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}

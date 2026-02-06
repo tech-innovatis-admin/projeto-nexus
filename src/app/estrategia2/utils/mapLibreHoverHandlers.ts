@@ -260,44 +260,38 @@ export function poloTooltipHtml(
 ): string {
   const { uf, ibge, nome } = extractPoloFields(properties);
   
-  // Determinar status: negociação > relacionamento > sem status
-  const isNegociacao = municipiosEmNegociacao ? municipiosEmNegociacao.has(ibge) : false;
+  // Determinar categoria: relacionamento tem prioridade
   const isRelacionamento = municipiosComRelacionamento ? municipiosComRelacionamento.has(ibge) : false;
+  const isNegociacao = municipiosEmNegociacao ? municipiosEmNegociacao.has(ibge) : false;
   
-  // Ícone e label baseados no status
-  let statusIcon: string;
-  let statusLabel: string;
-  let statusColor: string;
+  // Determinar tipo de polo: prioridade para relacionamento
+  let tipoPolo: string;
+  let tipoColor: string;
   
-  if (isNegociacao) {
-    statusIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A855F7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
-    statusLabel = 'Em negociação';
-    statusColor = '#A855F7';
-  } else if (isRelacionamento) {
-    statusIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
-    statusLabel = 'Relacionamento ativo';
-    statusColor = '#10b981';
+  if (isRelacionamento) {
+    tipoPolo = 'Polo Estratégico';
+    tipoColor = '#10b981'; // Verde
   } else {
-    statusIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="9" y1="12" x2="15" y2="12"/></svg>';
-    statusLabel = 'Sem relacionamento';
-    statusColor = '#94a3b8';
+    tipoPolo = 'Polo Logístico';
+    tipoColor = '#0022E0'; // Marrom
   }
   
-  const relHtml = `
-      <div class="t-row t-rel">
+  // Status adicional (negociação)
+  let statusHtml = '';
+  if (isNegociacao) {
+    statusHtml = `
+      <div class="t-row t-status">
         <span class="t-label">Status</span>
-        <span class="t-icon" aria-label="${statusLabel}" title="${statusLabel}" style="display: flex; align-items: center; gap: 4px;">
-          ${statusIcon}
-          <span style="color: ${statusColor}; font-size: 11px;">${isNegociacao ? 'Negociação' : isRelacionamento ? 'Relacionamento' : ''}</span>
-        </span>
+        <span class="t-status-badge" style="color: #EDCA32; font-size: 11px; font-weight: 500;">Em negociação</span>
       </div>`;
+  }
 
   return `
     <div class="t-muni">
       <div class="t-title">${escapeHtml(nome)}</div>
       <div class="t-row">UF: <b>${escapeHtml(uf)}</b></div>
-      <div class="t-row t-tipo"><span class="t-badge t-badge-polo">Polo</span></div>
-      ${relHtml}
+      <div class="t-row t-tipo"><span class="t-badge" style="background-color: ${tipoColor}; color: white; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 500;">${tipoPolo}</span></div>
+      ${statusHtml}
     </div>
   `.trim();
 }
@@ -319,44 +313,38 @@ export function periferiaTooltipHtml(
 ): string {
   const { uf, ibge, nome } = extractPeriferiaFields(properties);
   
-  // Determinar status: negociação > relacionamento > sem status
-  const isNegociacao = municipiosEmNegociacao ? municipiosEmNegociacao.has(ibge) : false;
+  // Determinar categoria: relacionamento tem prioridade
   const isRelacionamento = municipiosComRelacionamento ? municipiosComRelacionamento.has(ibge) : false;
+  const isNegociacao = municipiosEmNegociacao ? municipiosEmNegociacao.has(ibge) : false;
   
-  // Ícone e label baseados no status
-  let statusIcon: string;
-  let statusLabel: string;
-  let statusColor: string;
+  // Determinar tipo: prioridade para relacionamento
+  let tipoMunicipio: string;
+  let tipoColor: string;
   
-  if (isNegociacao) {
-    statusIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A855F7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
-    statusLabel = 'Em negociação';
-    statusColor = '#A855F7';
-  } else if (isRelacionamento) {
-    statusIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
-    statusLabel = 'Relacionamento ativo';
-    statusColor = '#10b981';
+  if (isRelacionamento) {
+    tipoMunicipio = 'Polo Estratégico';
+    tipoColor = '#10b981'; // Verde
   } else {
-    statusIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="9" y1="12" x2="15" y2="12"/></svg>';
-    statusLabel = 'Sem relacionamento';
-    statusColor = '#94a3b8';
+    tipoMunicipio = 'Munic. Satélite';
+    tipoColor = '#6b7280'; // Cinza
   }
   
-  const relHtml = `
-      <div class="t-row t-rel">
+  // Status adicional (negociação)
+  let statusHtml = '';
+  if (isNegociacao) {
+    statusHtml = `
+      <div class="t-row t-status">
         <span class="t-label">Status</span>
-        <span class="t-icon" aria-label="${statusLabel}" title="${statusLabel}" style="display: flex; align-items: center; gap: 4px;">
-          ${statusIcon}
-          <span style="color: ${statusColor}; font-size: 11px;">${isNegociacao ? 'Negociação' : isRelacionamento ? 'Relacionamento' : ''}</span>
-        </span>
+        <span class="t-status-badge" style="color: #A855F7; font-size: 11px; font-weight: 500;">Em negociação</span>
       </div>`;
+  }
 
   return `
     <div class="t-muni">
       <div class="t-title">${escapeHtml(nome)}</div>
       <div class="t-row">UF: <b>${escapeHtml(uf)}</b></div>
-      <div class="t-row t-tipo"><span class="t-badge t-badge-periferia">Periferia</span></div>
-      ${relHtml}
+      <div class="t-row t-tipo"><span class="t-badge" style="background-color: ${tipoColor}; color: white; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 500;">${tipoMunicipio}</span></div>
+      ${statusHtml}
     </div>
   `.trim();
 }
@@ -375,44 +363,38 @@ export function semTagTooltipHtml(
 ): string {
   const { uf, ibge, nome } = extractSemTagFields(properties);
   
-  // Determinar status: negociação > relacionamento > sem status
-  const isNegociacao = municipiosEmNegociacao ? municipiosEmNegociacao.has(ibge) : false;
+  // Determinar status: relacionamento > sem status
   const isRelacionamento = municipiosComRelacionamento ? municipiosComRelacionamento.has(ibge) : false;
+  const isNegociacao = municipiosEmNegociacao ? municipiosEmNegociacao.has(ibge) : false;
   
-  // Ícone e label baseados no status
-  let statusIcon: string;
-  let statusLabel: string;
-  let statusColor: string;
+  // Determinar tipo: prioridade para relacionamento
+  let tipoMunicipio: string;
+  let tipoColor: string;
   
-  if (isNegociacao) {
-    statusIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#A855F7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
-    statusLabel = 'Em negociação';
-    statusColor = '#A855F7';
-  } else if (isRelacionamento) {
-    statusIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
-    statusLabel = 'Relacionamento ativo';
-    statusColor = '#10b981';
+  if (isRelacionamento) {
+    tipoMunicipio = 'Polo Estratégico';
+    tipoColor = '#10b981'; // Verde
   } else {
-    statusIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="9" y1="12" x2="15" y2="12"/></svg>';
-    statusLabel = 'Sem relacionamento';
-    statusColor = '#94a3b8';
+    tipoMunicipio = 'Munic. Oportunidade';
+    tipoColor = '#6b7280'; // Cinza
   }
   
-  const relHtml = `
-      <div class="t-row t-rel">
+  // Status adicional (negociação)
+  let statusHtml = '';
+  if (isNegociacao) {
+    statusHtml = `
+      <div class="t-row t-status">
         <span class="t-label">Status</span>
-        <span class="t-icon" aria-label="${statusLabel}" title="${statusLabel}" style="display: flex; align-items: center; gap: 4px;">
-          ${statusIcon}
-          <span style="color: ${statusColor}; font-size: 11px;">${isNegociacao ? 'Negociação' : isRelacionamento ? 'Relacionamento' : ''}</span>
-        </span>
+        <span class="t-status-badge" style="color: #A855F7; font-size: 11px; font-weight: 500;">Em negociação</span>
       </div>`;
+  }
 
   return `
     <div class="t-muni">
       <div class="t-title">${escapeHtml(nome)}</div>
       <div class="t-row">UF: <b>${escapeHtml(uf)}</b></div>
-      <div class="t-row t-tipo"><span class="t-badge t-badge-semtag">Fora do polo</span></div>
-      ${relHtml}
+      <div class="t-row t-tipo"><span class="t-badge" style="background-color: ${tipoColor}; color: white; padding: 2px 8px; border-radius: 3px; font-size: 11px; font-weight: 500;">${tipoMunicipio}</span></div>
+      ${statusHtml}
     </div>
   `.trim();
 }

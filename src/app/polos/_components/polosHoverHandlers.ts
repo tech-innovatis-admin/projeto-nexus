@@ -40,6 +40,12 @@ export const CORES_MUNICIPIOS = {
     badge: '#36C244',
     text: '#ffffff',
   },
+  poloLogistico: {
+    fill: '#9333EA',
+    stroke: '#7E22CE',
+    badge: '#9333EA',
+    text: '#ffffff',
+  },
   municOportunidade: {
     fill: '#F5DF09',
     stroke: '#C4A800',
@@ -169,6 +175,45 @@ export function poloEstrategicoTooltipHtml(properties: MuniProps): string {
 }
 
 /**
+ * Gera HTML do tooltip para Polo Logístico (roxo)
+ * @param properties - Propriedades do feature GeoJSON
+ * @returns String com HTML do tooltip
+ */
+export function poloLogisticoTooltipHtml(properties: MuniProps): string {
+  const { uf, nome, valorTotal } = extractMunicipioFields(properties);
+  const cores = CORES_MUNICIPIOS.poloLogistico;
+
+  return `
+    <div style="padding: 12px; font-family: system-ui, -apple-system, sans-serif; min-width: 200px; background: #ffffff; border-radius: 14px; text-align: center; box-shadow: 0 10px 30px rgba(2,6,23,0.08); border: 1px solid rgba(15,23,42,0.06);">
+      <!-- Badge Polo Logístico -->
+      <div style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; background: ${cores.badge}; color: ${cores.text}; font-size: 10px; font-weight: 600; padding: 4px 10px; border-radius: 14px; margin: 0 auto 10px;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;" class="lucide lucide-package-icon lucide-package"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg> Polo Logístico
+      </div>
+      
+      <!-- Nome do Município -->
+      <div style="font-weight: 700; font-size: 14px; margin-bottom: 8px; color: #0f172a; text-align: center;">
+        ${escapeHtml(nome)}
+      </div>
+      
+      <!-- Estado (UF) -->
+      <div style="font-size: 12px; color: #64748b; margin-bottom: 4px; text-align: center;">
+        <span style="font-weight: 500;">UF:</span> ${escapeHtml(uf)}
+      </div>
+      
+      <!-- Separador e Valor -->
+      <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e2e8f0;">
+        <div style="font-size: 11px; color: #94a3b8; margin-bottom: 2px;">
+          Valor Total Produtos
+        </div>
+        <div style="font-size: 14px; font-weight: 600; color: #9333EA;">
+          ${formatarValorBRL(valorTotal)}
+        </div>
+      </div>
+    </div>
+  `.trim();
+}
+
+/**
  * Gera HTML do tooltip para Município Oportunidade (amarelo)
  * @param properties - Propriedades do feature GeoJSON
  * @returns String com HTML do tooltip
@@ -209,14 +254,29 @@ export function municOportunidadeTooltipHtml(properties: MuniProps): string {
 
 /**
  * Gera HTML do tooltip dinâmico baseado no tipo do município
+ * 
+ * Lógica de prioridade:
+ * 1. isPolo = true -> Polo Estratégico (verde) - relacionamento_ativo
+ * 2. isPoloLogistico = true -> Polo Logístico (roxo) - tipo_polo_satelite = 'polo_logistico'
+ * 3. Caso contrário -> Munic. Oportunidade (amarelo)
+ * 
  * @param properties - Propriedades do feature GeoJSON
- * @param isPolo - true se for Polo Estratégico, false se for Munic. Oportunidade
+ * @param isPolo - true se for Polo Estratégico
+ * @param isPoloLogistico - true se for Polo Logístico
  * @returns String com HTML do tooltip
  */
-export function gerarTooltipDinamico(properties: MuniProps, isPolo: boolean): string {
-  return isPolo 
-    ? poloEstrategicoTooltipHtml(properties)
-    : municOportunidadeTooltipHtml(properties);
+export function gerarTooltipDinamico(
+  properties: MuniProps,
+  isPolo: boolean,
+  isPoloLogistico: boolean
+): string {
+  if (isPolo) {
+    return poloEstrategicoTooltipHtml(properties);
+  }
+  if (isPoloLogistico) {
+    return poloLogisticoTooltipHtml(properties);
+  }
+  return municOportunidadeTooltipHtml(properties);
 }
 
 /**
@@ -247,12 +307,20 @@ export const POPUP_HOVER_CONFIG: maplibregl.PopupOptions = {
  * @param layerId - ID da camada (ex: 'municipios-fill')
  * @param sourceId - ID da source GeoJSON
  * @param getPolosEstrategicos - Função que retorna Set de códigos IBGE dos Polos Estratégicos
+ * @param getPolosLogisticos - Função que retorna Set de códigos IBGE dos Polos Logísticos
  * @param onMunicipioClick - Callback opcional acionado ao clicar em um município
  * 
  * @returns Função de cleanup para remover os handlers
  * 
  * Uso:
- *   const cleanup = setupPolosHover(map, 'municipios-fill', 'municipios-src', () => polosSet, (codigo) => console.log(codigo));
+ *   const cleanup = setupPolosHover(
+ *     map, 
+ *     'municipios-fill', 
+ *     'municipios-src', 
+ *     () => polosEstrategicosSet,
+ *     () => polosLogisticosSet,
+ *     (codigo) => console.log(codigo)
+ *   );
  *   // Quando precisar remover:
  *   cleanup();
  */
@@ -261,6 +329,7 @@ export function setupPolosHover(
   layerId: string,
   sourceId: string,
   getPolosEstrategicos: () => Set<string>,
+  getPolosLogisticos: () => Set<string>,
   onMunicipioClick?: (codigoMunicipio: string) => void
 ): () => void {
   let popup: maplibregl.Popup | null = null;
@@ -274,13 +343,15 @@ export function setupPolosHover(
     const properties = feature.properties || {};
     const featureId = feature.id;
     
-    // Obtém o Set atualizado de Polos Estratégicos
-    const polosSet = getPolosEstrategicos();
+    // Obtém os Sets atualizados
+    const polosEstrategicosSet = getPolosEstrategicos();
+    const polosLogisticosSet = getPolosLogisticos();
     const codeMuni = String(properties.code_muni || '');
-    const isPolo = polosSet.has(codeMuni);
+    const isPolo = polosEstrategicosSet.has(codeMuni);
+    const isPoloLogistico = polosLogisticosSet.has(codeMuni) && !isPolo;
 
-    // Gera HTML do tooltip baseado no tipo
-    const tooltipHtml = gerarTooltipDinamico(properties, isPolo);
+    // Gera HTML do tooltip baseado no tipo (com os 3 parâmetros)
+    const tooltipHtml = gerarTooltipDinamico(properties, isPolo, isPoloLogistico);
 
     // Remove popup anterior se existir
     if (popup) {
@@ -355,17 +426,19 @@ export function setupPolosHover(
     const properties = feature.properties || {};
     const codeMuni = String(properties.code_muni || '');
     
-    // Chamar callback ao clicar (funciona para Polo Estratégico e Munic. Oportunidade)
+    // Chamar callback ao clicar (funciona para todos os tipos)
     if (onMunicipioClick && codeMuni) {
       onMunicipioClick(codeMuni);
     }
     
-    // Obtém o Set atualizado de Polos Estratégicos
-    const polosSet = getPolosEstrategicos();
-    const isPolo = polosSet.has(codeMuni);
+    // Obtém os Sets atualizados
+    const polosEstrategicosSet = getPolosEstrategicos();
+    const polosLogisticosSet = getPolosLogisticos();
+    const isPolo = polosEstrategicosSet.has(codeMuni);
+    const isPoloLogistico = polosLogisticosSet.has(codeMuni) && !isPolo;
 
-    // Gera HTML do tooltip baseado no tipo
-    const tooltipHtml = gerarTooltipDinamico(properties, isPolo);
+    // Gera HTML do tooltip baseado no tipo (com os 3 parâmetros)
+    const tooltipHtml = gerarTooltipDinamico(properties, isPolo, isPoloLogistico);
 
     // Remove popup anterior
     if (popup) {

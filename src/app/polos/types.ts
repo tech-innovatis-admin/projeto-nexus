@@ -23,6 +23,9 @@ export interface MunicipioProperties {
   LIVRO_FUND_1_2: number | null;           // Saber+
   valor_start_iniciais_finais_: number | null; // Start Lab
   PLHIS: number | null;                    // PLHIS
+
+  // Classificação de polo
+  tipo_polo_satelite?: string | null;      // Tipo do polo (polo_logistico, etc)
 }
 
 // Feature GeoJSON do município

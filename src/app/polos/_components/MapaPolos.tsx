@@ -37,11 +37,6 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
   const prevSelectedRef = useRef<string | null>(null);
   const prevSelectedUFsRef = useRef<string[]>([]);
   
-  // Estados para controlar visibilidade das camadas
-  const [showMunicipios, setShowMunicipios] = useState(true);
-  const [showPolos, setShowPolos] = useState(true);
-  const [showOportunidades, setShowOportunidades] = useState(true);
-
   // Dados vazios para inicialização
   const emptyFC: MunicipiosGeoJSON = { type: 'FeatureCollection', features: [] };
 
@@ -64,11 +59,35 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
     return set;
   }, [municipiosRelacionamento]);
 
+  // Set de códigos de municípios que são Polos Logísticos (tipo_polo_satelite = 'polo_logistico')
+  // Nota: Esta informação vem do GeoJSON (baseMunicipios), não do relacionamento
+  const polosLogisticosSet = useMemo(() => {
+    const set = new Set<string>();
+    baseMunicipios?.features?.forEach(f => {
+      const tipoPoloSatelite = f.properties?.tipo_polo_satelite;
+      if (tipoPoloSatelite === 'polo_logistico') {
+        set.add(String(f.properties?.code_muni || ''));
+      }
+    });
+    
+    if (set.size > 0) {
+      console.log('[MapaPolos] Polos Logísticos (tipo_polo_satelite=polo_logistico):', set.size);
+    }
+    
+    return set;
+  }, [baseMunicipios]);
+
   // Ref para acessar polosEstrategicosSet dentro dos handlers
   const polosSetRef = useRef(polosEstrategicosSet);
   useEffect(() => {
     polosSetRef.current = polosEstrategicosSet;
   }, [polosEstrategicosSet]);
+
+  // Ref para acessar polosLogisticosSet dentro dos handlers
+  const polosLogisticosSetRef = useRef(polosLogisticosSet);
+  useEffect(() => {
+    polosLogisticosSetRef.current = polosLogisticosSet;
+  }, [polosLogisticosSet]);
 
   // Função para aplicar feature state nos municípios
   const applyFeatureStates = useCallback(() => {
@@ -83,18 +102,33 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
       return;
     }
 
-    let matchCount = 0;
-    const matchedCodes: string[] = [];
+    let matchCountEstrategico = 0;
+    let matchCountLogistico = 0;
+    const matchedEstrategicos: string[] = [];
+    const matchedLogisticos: string[] = [];
 
-    // Aplicar isPolo feature state para cada município
+    // Aplicar isPolo e isPoloLogistico feature state para cada município
+    // Lógica:
+    // - isPolo (verde): tem relacionamento_ativo = true (prioridade sobre polo_logistico)
+    // - isPoloLogistico (roxo): tem tipo_polo_satelite = 'polo_logistico' E NÃO tem relacionamento_ativo
     baseMunicipios.features.forEach(feature => {
       const codeMuni = String(feature.properties?.code_muni || '');
       const isPolo = polosEstrategicosSet.has(codeMuni);
+      const isPoloLogisticoRaw = polosLogisticosSet.has(codeMuni);
+      // Polo Logístico só se NÃO for Polo Estratégico
+      const isPoloLogistico = isPoloLogisticoRaw && !isPolo;
       
       if (isPolo) {
-        matchCount++;
-        if (matchedCodes.length < 5) {
-          matchedCodes.push(`${feature.properties?.nome_municipio} (${codeMuni})`);
+        matchCountEstrategico++;
+        if (matchedEstrategicos.length < 5) {
+          matchedEstrategicos.push(`${feature.properties?.nome_municipio} (${codeMuni})`);
+        }
+      }
+      
+      if (isPoloLogistico) {
+        matchCountLogistico++;
+        if (matchedLogisticos.length < 5) {
+          matchedLogisticos.push(`${feature.properties?.nome_municipio} (${codeMuni})`);
         }
       }
       
@@ -102,7 +136,7 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
         try {
           map.setFeatureState(
             { source: 'municipios-src', id: codeMuni },
-            { isPolo }
+            { isPolo, isPoloLogistico }
           );
         } catch (err) {
           // Ignora erros silenciosamente
@@ -114,15 +148,20 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
     console.log('[MapaPolos] ========== RESULTADO DO MATCHING ==========');
     console.log('[MapaPolos] Total de features no GeoJSON:', baseMunicipios.features.length);
     console.log('[MapaPolos] Total de Polos Estratégicos no Set:', polosEstrategicosSet.size);
-    console.log('[MapaPolos] ✅ MATCHES ENCONTRADOS:', matchCount);
-    if (matchedCodes.length > 0) {
-      console.log('[MapaPolos] Exemplos de matches:', matchedCodes);
+    console.log('[MapaPolos] Total de Polos Logísticos no Set:', polosLogisticosSet.size);
+    console.log('[MapaPolos] ✅ MATCHES Estratégicos:', matchCountEstrategico);
+    console.log('[MapaPolos] ✅ MATCHES Logísticos (sem relacionamento):', matchCountLogistico);
+    if (matchedEstrategicos.length > 0) {
+      console.log('[MapaPolos] Exemplos Estratégicos:', matchedEstrategicos);
+    }
+    if (matchedLogisticos.length > 0) {
+      console.log('[MapaPolos] Exemplos Logísticos:', matchedLogisticos);
     }
     console.log('[MapaPolos] ================================================');
     
     // Forçar re-render do mapa
     map.triggerRepaint();
-  }, [baseMunicipios, polosEstrategicosSet, mapReady]);
+  }, [baseMunicipios, polosEstrategicosSet, polosLogisticosSet, mapReady]);
 
   // Inicializar o mapa (apenas uma vez)
   useEffect(() => {
@@ -149,6 +188,10 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
       });
 
       // Camada de preenchimento dos municípios
+      // Cores:
+      // - Verde (#36C244): Polo Estratégico (relacionamento_ativo = true)
+      // - Roxo (#9333EA): Polo Logístico (tipo_polo_satelite = 'polo_logistico' sem relacionamento)
+      // - Amarelo (#F5DF09): Município Oportunidade (demais)
       map.addLayer({
         id: 'municipios-fill',
         type: 'fill',
@@ -158,6 +201,8 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
             'case',
             ['boolean', ['feature-state', 'isPolo'], false],
             '#36C244',
+            ['boolean', ['feature-state', 'isPoloLogistico'], false],
+            '#9333EA',
             '#F5DF09'
           ],
           'fill-opacity': [
@@ -182,12 +227,16 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
               'case',
               ['boolean', ['feature-state', 'isPolo'], false],
               '#2A9A35',
+              ['boolean', ['feature-state', 'isPoloLogistico'], false],
+              '#7E22CE',
               '#D4B800'
             ],
             [
               'case',
               ['boolean', ['feature-state', 'isPolo'], false],
               '#2A9A35',
+              ['boolean', ['feature-state', 'isPoloLogistico'], false],
+              '#6B21A8',
               '#C4A800'
             ]
           ],
@@ -249,6 +298,7 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
         'municipios-fill',
         'municipios-src',
         () => polosSetRef.current,
+        () => polosLogisticosSetRef.current,
         onMunicipioClick
       );
 
@@ -295,22 +345,6 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
       applyFeatureStates();
     }
   }, [polosEstrategicosSet, mapReady, baseMunicipios, applyFeatureStates]);
-
-  // Atualizar visibilidade das camadas
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !mapReady) return;
-
-    const visibility = showMunicipios ? 'visible' : 'none';
-    
-    try {
-      map.setLayoutProperty('municipios-fill', 'visibility', visibility);
-      map.setLayoutProperty('municipios-line', 'visibility', visibility);
-      map.setLayoutProperty('municipio-selected-line', 'visibility', visibility);
-    } catch (e) {
-      console.warn('Erro ao atualizar visibilidade das camadas:', e);
-    }
-  }, [showMunicipios, mapReady]);
 
   // Aplicar filtro visual do Raio Estratégico
   useEffect(() => {
@@ -561,57 +595,26 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
     <div className="w-full h-full relative">
       <div ref={containerRef} className="w-full h-full rounded-xl" />
 
-      {/* Controles de camadas */}
+      {/* Legenda Estática */}
       <div className="absolute bottom-3 left-3 bg-slate-800/95 backdrop-blur-sm rounded-lg shadow-lg p-4 z-10 border border-slate-700/50 space-y-3 max-w-xs">
-        {/* Mostrar Todos */}
-        <div className="flex items-center gap-3">
-          <input
-            type="checkbox"
-            id="toggle-municipios"
-            checked={showMunicipios}
-            onChange={(e) => setShowMunicipios(e.target.checked)}
-            className="w-4 h-4 rounded border-slate-600 text-sky-600 focus:ring-sky-500 focus:ring-2 bg-slate-700 cursor-pointer"
-          />
-          <label
-            htmlFor="toggle-municipios"
-            className="text-sm font-medium text-slate-200 cursor-pointer select-none hover:text-white transition-colors"
-          >
-            Mostrar todos
-          </label>
+        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Legenda</h4>
+        
+        {/* Polos Estratégicos */}
+        <div className="flex items-center gap-2">
+          <span className="inline-block w-3 h-3 rounded-full bg-[#36C244] border border-[#2A9A35]" />
+          <span className="text-sm font-medium text-slate-200">Polos Estratégicos</span>
         </div>
 
-        {/* Polos Estratégicos */}
-        <div className="flex items-center gap-3">
-          <input
-            type="checkbox"
-            id="toggle-polos"
-            checked={showPolos}
-            onChange={(e) => setShowPolos(e.target.checked)}
-            className="w-4 h-4 rounded border-slate-600 text-green-500 focus:ring-green-500 focus:ring-2 bg-slate-700 cursor-pointer"
-          />
-          <label
-            htmlFor="toggle-polos"
-            className="text-sm font-medium text-green-400 cursor-pointer select-none hover:text-green-300 transition-colors flex items-center gap-2"
-          >
-            <span className="inline-block w-3 h-3 rounded-full bg-green-400 border border-green-600" /> Polos Estratégicos
-          </label>
+        {/* Polos Logísticos */}
+        <div className="flex items-center gap-2">
+          <span className="inline-block w-3 h-3 rounded-full bg-[#9333EA] border border-[#7E22CE]" />
+          <span className="text-sm font-medium text-slate-200">Polos Logísticos</span>
         </div>
 
         {/* Municípios Oportunidade */}
-        <div className="flex items-center gap-3">
-          <input
-            type="checkbox"
-            id="toggle-oportunidades"
-            checked={showOportunidades}
-            onChange={(e) => setShowOportunidades(e.target.checked)}
-            className="w-4 h-4 rounded border-slate-600 text-yellow-500 focus:ring-yellow-500 focus:ring-2 bg-slate-700 cursor-pointer"
-          />
-          <label
-            htmlFor="toggle-oportunidades"
-            className="text-sm font-medium text-yellow-400 cursor-pointer select-none hover:text-yellow-300 transition-colors flex items-center gap-2"
-          >
-            <span className="inline-block w-3 h-3 rounded-full bg-yellow-400 border border-yellow-600" /> Munic. Oportunidade
-          </label>
+        <div className="flex items-center gap-2">
+          <span className="inline-block w-3 h-3 rounded-full bg-[#F5DF09] border border-[#D4B800]" />
+          <span className="text-sm font-medium text-slate-200">Municípios Oportunidade</span>
         </div>
       </div>
 

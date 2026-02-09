@@ -131,6 +131,7 @@ export default function PolosPage() {
   const [currentPage, setCurrentPage] = useState(0);
   const [isRadarActive, setIsRadarActive] = useState(false);
   const [isRelActive, setIsRelActive] = useState(false);
+  const [isPoloLogisticoActive, setIsPoloLogisticoActive] = useState(false); // Por padrão ativo
   const [isRelacionamentoModalOpen, setIsRelacionamentoModalOpen] = useState(false);
   const [showConfetti, setShowConfetti] = useState<boolean>(false);
   const [confettiMessage, setConfettiMessage] = useState<string>('');
@@ -520,6 +521,8 @@ export default function PolosPage() {
                     setIsRadarActive={setIsRadarActive}
                     isRelActive={isRelActive}
                     setIsRelActive={setIsRelActive}
+                    isPoloLogisticoActive={isPoloLogisticoActive}
+                    setIsPoloLogisticoActive={setIsPoloLogisticoActive}
                     onOpenRelacionamentoModal={handleOpenRelacionamentoModal}
                   />
                 </div>
@@ -1225,6 +1228,7 @@ export default function PolosPage() {
                       selectedMunicipio={municipioSelecionado}
                       selectedUFs={appliedUFs}
                       radarFilterActive={isRadarActive}
+                      poloLogisticoFilterActive={isPoloLogisticoActive}
                       onMunicipioClick={(codigoMunicipio) => {
                         // Atualizar seleção do município ao clicar no polígono
                         setSelectedMunicipio(codigoMunicipio);

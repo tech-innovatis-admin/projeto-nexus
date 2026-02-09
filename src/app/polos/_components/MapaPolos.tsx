@@ -26,10 +26,11 @@ interface MapaPolosProps {
   selectedMunicipio?: MunicipioSelecionado | null;
   selectedUFs?: string[]; // Estados selecionados (siglas)
   radarFilterActive?: boolean; // Raio Estratégico ativo
+  poloLogisticoFilterActive?: boolean; // Filtro de Polos Logísticos ativo
   onMunicipioClick?: (codigoMunicipio: string) => void; // Callback ao clicar em polígono
 }
 
-export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [], selectedMunicipio, selectedUFs = [], radarFilterActive = false, onMunicipioClick }: MapaPolosProps) {
+export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [], selectedMunicipio, selectedUFs = [], radarFilterActive = false, poloLogisticoFilterActive = true, onMunicipioClick }: MapaPolosProps) {
   const mapRef = useRef<MapLibreMap | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const hoverCleanupRef = useRef<(() => void) | null>(null);
@@ -110,13 +111,13 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
     // Aplicar isPolo e isPoloLogistico feature state para cada município
     // Lógica:
     // - isPolo (verde): tem relacionamento_ativo = true (prioridade sobre polo_logistico)
-    // - isPoloLogistico (roxo): tem tipo_polo_satelite = 'polo_logistico' E NÃO tem relacionamento_ativo
+    // - isPoloLogistico (roxo): tem tipo_polo_satelite = 'polo_logistico' E NÃO tem relacionamento_ativo E filtro está ativo
     baseMunicipios.features.forEach(feature => {
       const codeMuni = String(feature.properties?.code_muni || '');
       const isPolo = polosEstrategicosSet.has(codeMuni);
       const isPoloLogisticoRaw = polosLogisticosSet.has(codeMuni);
-      // Polo Logístico só se NÃO for Polo Estratégico
-      const isPoloLogistico = isPoloLogisticoRaw && !isPolo;
+      // Polo Logístico só se NÃO for Polo Estratégico E filtro estiver ativo
+      const isPoloLogistico = isPoloLogisticoRaw && !isPolo && poloLogisticoFilterActive;
       
       if (isPolo) {
         matchCountEstrategico++;
@@ -161,7 +162,7 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
     
     // Forçar re-render do mapa
     map.triggerRepaint();
-  }, [baseMunicipios, polosEstrategicosSet, polosLogisticosSet, mapReady]);
+  }, [baseMunicipios, polosEstrategicosSet, polosLogisticosSet, mapReady, poloLogisticoFilterActive]);
 
   // Inicializar o mapa (apenas uma vez)
   useEffect(() => {
@@ -345,6 +346,14 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
       applyFeatureStates();
     }
   }, [polosEstrategicosSet, mapReady, baseMunicipios, applyFeatureStates]);
+
+  // Aplicar feature states quando o filtro de Polos Logísticos mudar
+  useEffect(() => {
+    if (mapReady && baseMunicipios?.features?.length) {
+      console.log('[MapaPolos] 🔄 Aplicando feature state para Polos Logísticos (filtro:', poloLogisticoFilterActive ? 'ativo' : 'inativo', ')...');
+      applyFeatureStates();
+    }
+  }, [poloLogisticoFilterActive, mapReady, baseMunicipios, applyFeatureStates]);
 
   // Aplicar filtro visual do Raio Estratégico
   useEffect(() => {

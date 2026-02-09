@@ -6,6 +6,8 @@ export type EstrategiaFiltersMenuProps = {
   setIsRadarActive: (v: boolean) => void;
   isRelActive: boolean;
   setIsRelActive: (v: boolean) => void;
+  isPoloLogisticoActive: boolean;
+  setIsPoloLogisticoActive: (v: boolean) => void;
   onOpenRelacionamentoModal?: () => void;
 };
 
@@ -14,6 +16,8 @@ const EstrategiaFiltersMenu = memo(function EstrategiaFiltersMenu({
   setIsRadarActive,
   isRelActive,
   setIsRelActive,
+  isPoloLogisticoActive,
+  setIsPoloLogisticoActive,
   onOpenRelacionamentoModal,
 }: EstrategiaFiltersMenuProps) {
   const [open, setOpen] = useState(false);
@@ -33,7 +37,7 @@ const EstrategiaFiltersMenu = memo(function EstrategiaFiltersMenu({
     };
   }, [open]);
 
-  const activeCount = (isRadarActive ? 1 : 0) + (isRelActive ? 1 : 0);
+  const activeCount = (isRadarActive ? 1 : 0) + (isRelActive ? 1 : 0) + (isPoloLogisticoActive ? 1 : 0);
   const anyActive = activeCount > 0;
 
   return (
@@ -80,6 +84,25 @@ const EstrategiaFiltersMenu = memo(function EstrategiaFiltersMenu({
               aria-label="Ativar filtro Radar Estratégico"
             >
               <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-all duration-300 ${isRadarActive ? 'translate-x-6 scale-110' : 'translate-x-1'}`} />
+            </button>
+          </div>
+
+          <div className="my-1 border-t border-slate-700/60" />
+
+          {/* Item: Polos Logísticos */}
+          <div className="flex items-center justify-between px-2 py-2 rounded hover:bg-slate-800/50">
+            <div className="min-w-0 flex-1">
+              <span className="text-sm text-white font-medium truncate">Polos Logísticos</span>
+              <p className="mt-0.5 text-[11px] text-slate-400">Destacar polos logísticos</p>
+            </div>
+            <button
+              onClick={() => setIsPoloLogisticoActive(!isPoloLogisticoActive)}
+              className={`relative inline-flex h-6 w-11 ml-2 items-center rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-purple-500 flex-shrink-0 ${isPoloLogisticoActive ? 'bg-purple-600 shadow-lg shadow-purple-500/30' : 'bg-slate-600'}`}
+              role="switch"
+              aria-checked={isPoloLogisticoActive}
+              aria-label="Ativar filtro Polos Logísticos"
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-all duration-300 ${isPoloLogisticoActive ? 'translate-x-6 scale-110' : 'translate-x-1'}`} />
             </button>
           </div>
 

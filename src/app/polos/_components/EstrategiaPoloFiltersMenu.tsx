@@ -8,6 +8,8 @@ export type EstrategiaFiltersMenuProps = {
   setIsRelActive: (v: boolean) => void;
   isPoloLogisticoActive: boolean;
   setIsPoloLogisticoActive: (v: boolean) => void;
+  isPistasActive: boolean;
+  setIsPistasActive: (v: boolean) => void;
   onOpenRelacionamentoModal?: () => void;
 };
 
@@ -18,6 +20,8 @@ const EstrategiaFiltersMenu = memo(function EstrategiaFiltersMenu({
   setIsRelActive,
   isPoloLogisticoActive,
   setIsPoloLogisticoActive,
+  isPistasActive,
+  setIsPistasActive,
   onOpenRelacionamentoModal,
 }: EstrategiaFiltersMenuProps) {
   const [open, setOpen] = useState(false);
@@ -37,7 +41,7 @@ const EstrategiaFiltersMenu = memo(function EstrategiaFiltersMenu({
     };
   }, [open]);
 
-  const activeCount = (isRadarActive ? 1 : 0) + (isRelActive ? 1 : 0) + (isPoloLogisticoActive ? 1 : 0);
+  const activeCount = (isRadarActive ? 1 : 0) + (isRelActive ? 1 : 0) + (isPoloLogisticoActive ? 1 : 0) + (isPistasActive ? 1 : 0);
   const anyActive = activeCount > 0;
 
   return (
@@ -103,6 +107,25 @@ const EstrategiaFiltersMenu = memo(function EstrategiaFiltersMenu({
               aria-label="Ativar filtro Polos Logísticos"
             >
               <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-all duration-300 ${isPoloLogisticoActive ? 'translate-x-6 scale-110' : 'translate-x-1'}`} />
+            </button>
+          </div>
+
+          <div className="my-1 border-t border-slate-700/60" />
+
+          {/* Item: Pistas de Voo */}
+          <div className="flex items-center justify-between px-2 py-2 rounded hover:bg-slate-800/50">
+            <div className="min-w-0 flex-1">
+              <span className="text-sm text-white font-medium truncate">Pistas de Voo</span>
+              <p className="mt-0.5 text-[11px] text-slate-400">Mostrar pistas de voo no mapa</p>
+            </div>
+            <button
+              onClick={() => setIsPistasActive(!isPistasActive)}
+              className={`relative inline-flex h-6 w-11 ml-2 items-center rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-gray-500 flex-shrink-0 ${isPistasActive ? 'bg-gray-600 shadow-lg shadow-gray-500/30' : 'bg-slate-600'}`}
+              role="switch"
+              aria-checked={isPistasActive}
+              aria-label="Ativar filtro Pistas de Voo"
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-all duration-300 ${isPistasActive ? 'translate-x-6 scale-110' : 'translate-x-1'}`} />
             </button>
           </div>
 

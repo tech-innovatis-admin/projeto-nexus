@@ -22,6 +22,7 @@ interface PolosDataContextType {
   loadingProgress: number;
   error: string | null;
   refreshPolosData: () => Promise<void>;
+  refreshRelacionamentos: () => Promise<void>;
 }
 
 const PolosDataContext = createContext<PolosDataContextType | undefined>(undefined);
@@ -151,14 +152,73 @@ export function PolosDataProvider({ children }: { children: React.ReactNode }) {
     await fetchAndStore(true);
   }, []);
 
+  // Função para atualizar apenas os relacionamentos (sem buscar GeoJSON novamente)
+  const refreshRelacionamentos = useCallback(async () => {
+    if (!polosData) {
+      // Se não há dados ainda, fazer refresh completo
+      await refreshPolosData();
+      return;
+    }
+
+    try {
+      // Buscar apenas relacionamentos usando a rota existente (todos, incluindo inativos)
+      const response = await fetch('/api/relacionamentos?apenas_ativos=false');
+      
+      if (!response.ok) {
+        throw new Error(`Erro na API: ${response.status} ${response.statusText}`);
+      }
+
+      const json = await response.json();
+
+      // A rota retorna { success: true, data: [...], total: N }
+      if (!json.success || !Array.isArray(json.data)) {
+        throw new Error('Resposta inválida da API de relacionamentos');
+      }
+
+      const relacionamentos = json.data;
+
+      // Atualizar apenas a parte de relacionamentos, mantendo baseMunicipios
+      const updatedData: PolosData = {
+        ...polosData,
+        municipiosRelacionamento: relacionamentos,
+        metadata: {
+          ...polosData.metadata,
+          totalRelacionamentos: relacionamentos.length,
+          loadedAt: new Date().toISOString()
+        }
+      };
+
+      setPolosData(updatedData);
+      setError(null);
+
+      // Atualizar cache também
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(CACHE_KEY, JSON.stringify({ 
+            timestamp: Date.now(), 
+            data: updatedData 
+          }));
+        } catch (e) {
+          console.warn('Erro ao salvar cache de polos:', e);
+        }
+      }
+
+      console.log('[PolosData] Relacionamentos atualizados:', relacionamentos.length);
+    } catch (err) {
+      console.error('Erro ao atualizar relacionamentos:', err);
+      setError(err instanceof Error ? err.message : 'Erro ao atualizar relacionamentos');
+    }
+  }, [polosData, refreshPolosData]);
+
   // Evita recriar o objeto value sem necessidade
   const contextValue = useMemo(() => ({
     polosData,
     loading,
     loadingProgress,
     error,
-    refreshPolosData
-  }), [polosData, loading, loadingProgress, error, refreshPolosData]);
+    refreshPolosData,
+    refreshRelacionamentos
+  }), [polosData, loading, loadingProgress, error, refreshPolosData, refreshRelacionamentos]);
 
   return (
     <PolosDataContext.Provider value={contextValue}>

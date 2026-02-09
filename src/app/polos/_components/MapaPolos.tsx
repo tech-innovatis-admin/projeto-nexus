@@ -6,7 +6,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import * as turf from '@turf/turf';
 import type GeoJSON from 'geojson';
 import type { MunicipiosGeoJSON, MunicipioRelacionamento } from '@/contexts/PolosDataContext';
-import { setupPolosHover } from './polosHoverHandlers';
+import { setupPolosHover, POPUP_HOVER_CONFIG } from './polosHoverHandlers';
 
 type MapLibreMap = maplibregl.Map;
 
@@ -20,6 +20,17 @@ interface MunicipioSelecionado {
   };
 }
 
+interface PistaVoo {
+  codigo: string;
+  uf: string;
+  cidade: string;
+  codigo_pista: string;
+  nome_pista: string;
+  tipo_pista: string;
+  latitude_pista: string | number;
+  longitude_pista: string | number;
+}
+
 interface MapaPolosProps {
   baseMunicipios: MunicipiosGeoJSON | null;
   municipiosRelacionamento?: MunicipioRelacionamento[];
@@ -27,13 +38,16 @@ interface MapaPolosProps {
   selectedUFs?: string[]; // Estados selecionados (siglas)
   radarFilterActive?: boolean; // Raio Estratégico ativo
   poloLogisticoFilterActive?: boolean; // Filtro de Polos Logísticos ativo
+  pistas?: PistaVoo[]; // Pistas de voo
+  pistasFilterActive?: boolean; // Filtro de Pistas de Voo ativo
   onMunicipioClick?: (codigoMunicipio: string) => void; // Callback ao clicar em polígono
 }
 
-export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [], selectedMunicipio, selectedUFs = [], radarFilterActive = false, poloLogisticoFilterActive = true, onMunicipioClick }: MapaPolosProps) {
+export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [], selectedMunicipio, selectedUFs = [], radarFilterActive = false, poloLogisticoFilterActive = false, pistas = [], pistasFilterActive = false, onMunicipioClick }: MapaPolosProps) {
   const mapRef = useRef<MapLibreMap | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const hoverCleanupRef = useRef<(() => void) | null>(null);
+  const pistasHoverCleanupRef = useRef<(() => void) | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const prevSelectedRef = useRef<string | null>(null);
   const prevSelectedUFsRef = useRef<string[]>([]);
@@ -89,6 +103,60 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
   useEffect(() => {
     polosLogisticosSetRef.current = polosLogisticosSet;
   }, [polosLogisticosSet]);
+
+  // Função centralizada para aplicar filtros de municípios em sequência
+  // Pipeline: UF → Radar → (outros filtros futuros)
+  const applyMunicipiosFilters = useCallback((): GeoJSON.FeatureCollection => {
+    if (!baseMunicipios?.features?.length) {
+      return { type: 'FeatureCollection', features: [] };
+    }
+
+    let filteredFeatures = [...baseMunicipios.features];
+
+    // PASSO 1: Filtrar por UF/Região (se houver seleção)
+    if (selectedUFs && selectedUFs.length > 0) {
+      const siglaToNome: Record<string, string> = {
+        'AC': 'Acre', 'AL': 'Alagoas', 'AP': 'Amapá', 'AM': 'Amazonas',
+        'BA': 'Bahia', 'CE': 'Ceará', 'DF': 'Distrito Federal',
+        'ES': 'Espírito Santo', 'GO': 'Goiás', 'MA': 'Maranhão',
+        'MT': 'Mato Grosso', 'MS': 'Mato Grosso do Sul', 'MG': 'Minas Gerais',
+        'PA': 'Pará', 'PB': 'Paraíba', 'PR': 'Paraná', 'PE': 'Pernambuco',
+        'PI': 'Piauí', 'RJ': 'Rio de Janeiro', 'RN': 'Rio Grande do Norte',
+        'RS': 'Rio Grande do Sul', 'RO': 'Rondônia', 'RR': 'Roraima',
+        'SC': 'Santa Catarina', 'SP': 'São Paulo', 'SE': 'Sergipe', 'TO': 'Tocantins'
+      };
+      
+      const estadosNomes = new Set(selectedUFs.map(uf => siglaToNome[uf] || uf));
+      filteredFeatures = filteredFeatures.filter(feature => {
+        const estado = feature.properties?.name_state || '';
+        return estadosNomes.has(estado);
+      });
+    }
+
+    // PASSO 2: Filtrar por Radar Estratégico (se ativo)
+    if (radarFilterActive) {
+      const JOAO_PESSOA_COORDS: [number, number] = [-34.95096946933421, -7.14804917856058];
+      const JOAO_PESSOA_RADIUS_KM = 1300;
+      
+      const circle = turf.circle(JOAO_PESSOA_COORDS, JOAO_PESSOA_RADIUS_KM, {
+        steps: 128,
+        units: 'kilometers',
+      });
+
+      filteredFeatures = filteredFeatures.filter(f => {
+        try {
+          return turf.booleanIntersects(circle as any, f as any);
+        } catch {
+          return false;
+        }
+      });
+    }
+
+    return {
+      type: 'FeatureCollection',
+      features: filteredFeatures as any[]
+    };
+  }, [baseMunicipios, selectedUFs, radarFilterActive]);
 
   // Função para aplicar feature state nos municípios
   const applyFeatureStates = useCallback(() => {
@@ -303,15 +371,150 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
         onMunicipioClick
       );
 
+      // Criar ícone SVG de avião (branco com contorno escuro) e adicionar ao mapa
+      const airplaneSvg = `
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z" fill="#FFFFFF" stroke="#111827" stroke-width="0.7"/>
+        </svg>
+      `;
+      
+      // Converter SVG para imagem
+      const img = new Image();
+      img.onload = () => {
+        if (!map.hasImage('airplane-icon')) {
+          map.addImage('airplane-icon', img);
+        }
+        
+        // Adicionar source para pistas de voo (só se ainda não existir)
+        if (!map.getSource('pistas-src')) {
+          map.addSource('pistas-src', {
+            type: 'geojson',
+            data: { type: 'FeatureCollection', features: [] } as GeoJSON.FeatureCollection,
+          });
+
+          // Adicionar camada de símbolos para pistas
+          // Visibilidade inicial: 'none' (desativado por padrão)
+          map.addLayer({
+            id: 'pistas-layer',
+            type: 'symbol',
+            source: 'pistas-src',
+            layout: {
+              'icon-image': 'airplane-icon',
+              'icon-size': 0.8,
+              'icon-allow-overlap': true,
+              'icon-ignore-placement': false,
+              'visibility': 'none', // Inicialmente oculta
+            },
+          });
+
+          // Handler de hover para pistas de voo (similar aos polígonos)
+          let pistasPopup: maplibregl.Popup | null = null;
+
+          // Handler de mousemove (exibe tooltip)
+          const handlePistasMouseMove = (e: maplibregl.MapMouseEvent & { features?: maplibregl.MapGeoJSONFeature[] }) => {
+            if (!e.features || e.features.length === 0) return;
+
+            const feature = e.features[0];
+            const props = feature.properties as any;
+
+            // Escapar HTML para segurança
+            const escapeHtml = (text: string) => {
+              const div = document.createElement('div');
+              div.textContent = text;
+              return div.innerHTML;
+            };
+
+            // Criar HTML do tooltip (mesmo estilo dos polos)
+            const tooltipHtml = `
+              <div style="padding: 12px; font-family: system-ui, -apple-system, sans-serif; min-width: 200px; background: #ffffff; border-radius: 14px; text-align: center; box-shadow: 0 10px 30px rgba(2,6,23,0.08); border: 1px solid rgba(15,23,42,0.06);">
+                <!-- Badge Pista de Voo -->
+                <div style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; background: #6B7280; color: #ffffff; font-size: 10px; font-weight: 600; padding: 4px 10px; border-radius: 14px; margin: 0 auto 10px;">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:4px;"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg> Pista de Voo
+                </div>
+                
+                <!-- Nome da Cidade -->
+                <div style="font-weight: 700; font-size: 14px; margin-bottom: 8px; color: #0f172a; text-align: center;">
+                  ${escapeHtml(props.cidade || '-')}
+                </div>
+                
+                <!-- Estado (UF) -->
+                <div style="font-size: 12px; color: #64748b; margin-bottom: 4px; text-align: center;">
+                  <span style="font-weight: 500;">UF:</span> ${escapeHtml(props.uf || '-')}
+                </div>
+                
+                <!-- Separador e Informações da Pista -->
+                <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #e2e8f0;">
+                  <div style="font-size: 12px; color: #0f172a; margin-bottom: 4px; text-align: center;">
+                    <span style="font-weight: 500;">Código:</span> ${escapeHtml(props.codigo_pista || '-')}
+                  </div>
+                  <div style="font-size: 12px; color: #0f172a; margin-bottom: 4px; text-align: center;">
+                    <span style="font-weight: 500;">Nome:</span> ${escapeHtml(props.nome_pista || '-')}
+                  </div>
+                  <div style="font-size: 12px; color: #0f172a; text-align: center;">
+                    <span style="font-weight: 500;">Tipo:</span> ${escapeHtml(props.tipo_pista || '-')}
+                  </div>
+                </div>
+              </div>
+            `;
+
+            // Remove popup anterior se existir
+            if (pistasPopup) {
+              pistasPopup.remove();
+            }
+
+            // Cria novo popup de hover
+            pistasPopup = new maplibregl.Popup(POPUP_HOVER_CONFIG)
+              .setLngLat(e.lngLat)
+              .setHTML(tooltipHtml)
+              .addTo(map);
+
+            // Muda cursor para pointer
+            map.getCanvas().style.cursor = 'pointer';
+          };
+
+          // Handler de mouseleave (remove tooltip)
+          const handlePistasMouseLeave = () => {
+            // Remove popup
+            if (pistasPopup) {
+              pistasPopup.remove();
+              pistasPopup = null;
+            }
+
+            // Reseta cursor
+            map.getCanvas().style.cursor = '';
+          };
+
+          // Registrar handlers de hover
+          map.on('mousemove', 'pistas-layer', handlePistasMouseMove);
+          map.on('mouseleave', 'pistas-layer', handlePistasMouseLeave);
+
+          // Guardar função de cleanup (captura pistasPopup do escopo)
+          pistasHoverCleanupRef.current = () => {
+            map.off('mousemove', 'pistas-layer', handlePistasMouseMove);
+            map.off('mouseleave', 'pistas-layer', handlePistasMouseLeave);
+            // Nota: pistasPopup será limpo quando o mapa for removido
+          };
+        }
+      };
+      
+      const svgBlob = new Blob([airplaneSvg], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(svgBlob);
+      img.src = url;
+
       // Marcar mapa como pronto
       setMapReady(true);
     });
 
     return () => {
-      // Limpar handlers de hover
+      // Limpar handlers de hover dos polígonos
       if (hoverCleanupRef.current) {
         hoverCleanupRef.current();
         hoverCleanupRef.current = null;
+      }
+      // Limpar handlers de hover das pistas
+      if (pistasHoverCleanupRef.current) {
+        pistasHoverCleanupRef.current();
+        pistasHoverCleanupRef.current = null;
       }
       if (mapRef.current) {
         mapRef.current.remove();
@@ -321,7 +524,7 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
     };
   }, []);
 
-  // Atualizar dados do mapa quando baseMunicipios mudar
+  // Atualizar dados do mapa quando baseMunicipios mudar (usando pipeline centralizado)
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapReady || !baseMunicipios) return;
@@ -329,7 +532,23 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
     const source = map.getSource('municipios-src') as maplibregl.GeoJSONSource | undefined;
     if (source) {
       console.log('[MapaPolos] 📥 Atualizando dados do mapa...');
-      source.setData(baseMunicipios as GeoJSON.FeatureCollection);
+      
+      // Se há município selecionado, mostrar apenas ele
+      if (selectedMunicipio?.codigo) {
+        const municipioFeature = baseMunicipios.features.find(
+          f => String(f.properties?.code_muni) === selectedMunicipio.codigo
+        );
+        if (municipioFeature) {
+          source.setData({
+            type: 'FeatureCollection',
+            features: [municipioFeature as any]
+          });
+        }
+      } else {
+        // Usar pipeline centralizado que respeita UF + Radar
+        const filteredFC = applyMunicipiosFilters();
+        source.setData(filteredFC);
+      }
       
       // Aplicar feature states após atualizar os dados
       // Pequeno delay para garantir que os dados foram processados
@@ -337,7 +556,7 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
         applyFeatureStates();
       }, 100);
     }
-  }, [baseMunicipios, mapReady, applyFeatureStates]);
+  }, [baseMunicipios, mapReady, applyFeatureStates, applyMunicipiosFilters, selectedMunicipio]);
 
   // Aplicar feature states quando polosEstrategicosSet mudar
   useEffect(() => {
@@ -355,7 +574,7 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
     }
   }, [poloLogisticoFilterActive, mapReady, baseMunicipios, applyFeatureStates]);
 
-  // Aplicar filtro visual do Raio Estratégico
+  // Aplicar filtro visual do Raio Estratégico e atualizar municípios usando pipeline centralizado
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapReady || !baseMunicipios?.features?.length) return;
@@ -380,43 +599,28 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
         features: [circle]
       };
       radarSource.setData(circleFeatureCollection);
-
-      // Filtrar municípios que estão dentro do raio
-      const municipiosDentroDoRaio = baseMunicipios.features.filter(f => {
-        try {
-          return turf.booleanIntersects(circle as any, f as any);
-        } catch {
-          return false;
-        }
-      });
-
-      // Atualizar source de municípios com apenas os dentro do raio
-      const municipiosSrc = map.getSource('municipios-src') as maplibregl.GeoJSONSource | undefined;
-      if (municipiosSrc) {
-        const filteredFC: GeoJSON.FeatureCollection = {
-          type: 'FeatureCollection',
-          features: municipiosDentroDoRaio as any[] // Cast necessário para compatibilidade
-        };
-        municipiosSrc.setData(filteredFC);
-      }
-
-      console.log('[MapaPolos] 🎯 Raio ativo: ', municipiosDentroDoRaio.length, 'municípios dentro do raio');
     } else {
-      // Desativar raio: mostrar todos os municípios e limpar círculo
-      const municipiosSrc = map.getSource('municipios-src') as maplibregl.GeoJSONSource | undefined;
-      if (municipiosSrc) {
-        municipiosSrc.setData(baseMunicipios as GeoJSON.FeatureCollection);
-      }
-
       // Limpar círculo do raio
       const emptyFC: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [] };
       radarSource.setData(emptyFC);
+    }
 
-      console.log('[MapaPolos] ✓ Raio desativado: mostrando todos os municípios');
+    // IMPORTANTE: Usar função centralizada que respeita UF + Radar
+    // Se há município selecionado, não aplicar filtros (prioridade do município)
+    if (selectedMunicipio?.codigo) {
+      map.triggerRepaint();
+      return;
+    }
+
+    const municipiosSrc = map.getSource('municipios-src') as maplibregl.GeoJSONSource | undefined;
+    if (municipiosSrc) {
+      const filteredFC = applyMunicipiosFilters();
+      municipiosSrc.setData(filteredFC);
+      console.log('[MapaPolos] 🔄 Pipeline de filtros aplicado:', filteredFC.features.length, 'municípios visíveis');
     }
 
     map.triggerRepaint();
-  }, [radarFilterActive, baseMunicipios, mapReady]);
+  }, [radarFilterActive, baseMunicipios, mapReady, applyMunicipiosFilters, selectedMunicipio]);
 
   // Aplicar destaque no município selecionado e fazer flyTo
   useEffect(() => {
@@ -503,7 +707,7 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
     map.triggerRepaint();
   }, [selectedMunicipio, mapReady, baseMunicipios]);
 
-  // Aplicar filtro nos estados/regiões selecionados: mostrar apenas municípios da região
+  // Aplicar filtro nos estados/regiões selecionados usando pipeline centralizado
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapReady || !baseMunicipios?.features?.length) return;
@@ -514,83 +718,52 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
     const municipiosSrc = map.getSource('municipios-src') as maplibregl.GeoJSONSource | undefined;
     if (!municipiosSrc) return;
     
-    const currentUFs = selectedUFs || [];
-    
-    // Mapeamento de sigla para nome do estado
-    const siglaToNome: Record<string, string> = {
-      'AC': 'Acre', 'AL': 'Alagoas', 'AP': 'Amapá', 'AM': 'Amazonas',
-      'BA': 'Bahia', 'CE': 'Ceará', 'DF': 'Distrito Federal',
-      'ES': 'Espírito Santo', 'GO': 'Goiás', 'MA': 'Maranhão',
-      'MT': 'Mato Grosso', 'MS': 'Mato Grosso do Sul', 'MG': 'Minas Gerais',
-      'PA': 'Pará', 'PB': 'Paraíba', 'PR': 'Paraná', 'PE': 'Pernambuco',
-      'PI': 'Piauí', 'RJ': 'Rio de Janeiro', 'RN': 'Rio Grande do Norte',
-      'RS': 'Rio Grande do Sul', 'RO': 'Rondônia', 'RR': 'Roraima',
-      'SC': 'Santa Catarina', 'SP': 'São Paulo', 'SE': 'Sergipe', 'TO': 'Tocantins'
-    };
-    
-    // Converter siglas para nomes de estados
-    const estadosNomes = new Set(currentUFs.map(uf => siglaToNome[uf] || uf));
-    
-    // Se não há estados selecionados, mostrar todos os municípios
-    if (currentUFs.length === 0) {
-      municipiosSrc.setData(baseMunicipios as GeoJSON.FeatureCollection);
-      prevSelectedUFsRef.current = currentUFs;
-      map.triggerRepaint();
-      return;
-    }
-    
-    // Filtrar apenas os municípios dos estados selecionados
-    const municipiosFiltrados = baseMunicipios.features.filter(feature => {
-      const estado = feature.properties?.name_state || '';
-      return estadosNomes.has(estado);
-    });
-    
-    // Atualizar source com os municípios filtrados
-    const filteredFC: GeoJSON.FeatureCollection = {
-      type: 'FeatureCollection',
-      features: municipiosFiltrados as any[]
-    };
+    // Usar função centralizada que respeita UF + Radar
+    const filteredFC = applyMunicipiosFilters();
     municipiosSrc.setData(filteredFC);
     
-    // Calcular bounds para fazer flyTo
-    let minLng = Infinity, maxLng = -Infinity;
-    let minLat = Infinity, maxLat = -Infinity;
-    
-    const processCoordinates = (coords: number[][]) => {
-      coords.forEach(([lng, lat]) => {
-        minLng = Math.min(minLng, lng);
-        maxLng = Math.max(maxLng, lng);
-        minLat = Math.min(minLat, lat);
-        maxLat = Math.max(maxLat, lat);
-      });
-    };
-    
-    municipiosFiltrados.forEach(feature => {
-      if (feature.geometry) {
-        if (feature.geometry.type === 'Polygon') {
-          feature.geometry.coordinates.forEach(ring => processCoordinates(ring as number[][]));
-        } else if (feature.geometry.type === 'MultiPolygon') {
-          feature.geometry.coordinates.forEach(polygon => {
-            polygon.forEach(ring => processCoordinates(ring as number[][]));
-          });
+    // Calcular bounds para fazer flyTo (apenas se houver UF selecionada)
+    const currentUFs = selectedUFs || [];
+    if (currentUFs.length > 0 && filteredFC.features.length > 0) {
+      let minLng = Infinity, maxLng = -Infinity;
+      let minLat = Infinity, maxLat = -Infinity;
+      
+      const processCoordinates = (coords: number[][]) => {
+        coords.forEach(([lng, lat]) => {
+          minLng = Math.min(minLng, lng);
+          maxLng = Math.max(maxLng, lng);
+          minLat = Math.min(minLat, lat);
+          maxLat = Math.max(maxLat, lat);
+        });
+      };
+      
+      filteredFC.features.forEach(feature => {
+        if (feature.geometry) {
+          if (feature.geometry.type === 'Polygon') {
+            feature.geometry.coordinates.forEach(ring => processCoordinates(ring as number[][]));
+          } else if (feature.geometry.type === 'MultiPolygon') {
+            feature.geometry.coordinates.forEach(polygon => {
+              polygon.forEach(ring => processCoordinates(ring as number[][]));
+            });
+          }
         }
-      }
-    });
-    
-    // Fazer flyTo para os bounds dos estados selecionados
-    if (minLng !== Infinity && municipiosFiltrados.length > 0) {
-      const bounds: [[number, number], [number, number]] = [
-        [minLng, minLat],
-        [maxLng, maxLat]
-      ];
-      
-      map.fitBounds(bounds, {
-        padding: { top: 50, bottom: 50, left: 50, right: 50 },
-        maxZoom: 8,
-        duration: 1000
       });
       
-      console.log(`[MapaPolos] 🎯 Filtrando para ${currentUFs.length} estado(s): ${currentUFs.join(', ')} (${municipiosFiltrados.length} municípios visíveis)`);
+      // Fazer flyTo para os bounds dos estados selecionados
+      if (minLng !== Infinity) {
+        const bounds: [[number, number], [number, number]] = [
+          [minLng, minLat],
+          [maxLng, maxLat]
+        ];
+        
+        map.fitBounds(bounds, {
+          padding: { top: 50, bottom: 50, left: 50, right: 50 },
+          maxZoom: 8,
+          duration: 1000
+        });
+        
+        console.log(`[MapaPolos] 🎯 Filtrando para ${currentUFs.length} estado(s): ${currentUFs.join(', ')} (${filteredFC.features.length} municípios visíveis)`);
+      }
     }
     
     // Atualizar referência
@@ -598,7 +771,117 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
     
     // Forçar re-render
     map.triggerRepaint();
-  }, [selectedUFs, selectedMunicipio, mapReady, baseMunicipios]);
+  }, [selectedUFs, selectedMunicipio, mapReady, baseMunicipios, applyMunicipiosFilters]);
+
+  // Atualizar pistas de voo no mapa (respeitando filtro de UF e Raio Estratégico)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady || !pistas.length) return;
+
+    const pistasSource = map.getSource('pistas-src') as maplibregl.GeoJSONSource | undefined;
+    if (!pistasSource) return;
+
+    // Filtrar pistas por UF se houver seleção
+    let pistasFiltradas = pistas;
+    if (selectedUFs && selectedUFs.length > 0) {
+      pistasFiltradas = pistasFiltradas.filter(p => selectedUFs.includes(p.uf));
+    }
+
+    // Filtrar pistas por Raio Estratégico se ativo
+    if (radarFilterActive) {
+      const JOAO_PESSOA_COORDS: [number, number] = [-34.95096946933421, -7.14804917856058]; // [lng, lat]
+      const JOAO_PESSOA_RADIUS_KM = 1300;
+      
+      const circle = turf.circle(JOAO_PESSOA_COORDS, JOAO_PESSOA_RADIUS_KM, {
+        steps: 128,
+        units: 'kilometers',
+      });
+
+      // Filtrar pistas que estão dentro do raio
+      pistasFiltradas = pistasFiltradas.filter(p => {
+        const lat = typeof p.latitude_pista === 'string' ? parseFloat(p.latitude_pista) : p.latitude_pista;
+        const lng = typeof p.longitude_pista === 'string' ? parseFloat(p.longitude_pista) : p.longitude_pista;
+        
+        if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) {
+          return false;
+        }
+
+        // Criar um ponto GeoJSON para a pista
+        const pistaPoint: GeoJSON.Feature = {
+          type: 'Feature',
+          geometry: {
+            type: 'Point',
+            coordinates: [lng, lat],
+          },
+          properties: {},
+        };
+
+        // Verificar se o ponto está dentro ou intersecta o círculo
+        try {
+          return turf.booleanIntersects(circle as any, pistaPoint as any);
+        } catch {
+          return false;
+        }
+      });
+    }
+
+    // Converter pistas filtradas para GeoJSON FeatureCollection
+    const pistasFeatures: GeoJSON.Feature[] = pistasFiltradas
+      .map(p => {
+        const lat = typeof p.latitude_pista === 'string' ? parseFloat(p.latitude_pista) : p.latitude_pista;
+        const lng = typeof p.longitude_pista === 'string' ? parseFloat(p.longitude_pista) : p.longitude_pista;
+        
+        return {
+          type: 'Feature' as const,
+          geometry: {
+            type: 'Point' as const,
+            coordinates: [lng, lat],
+          },
+          properties: {
+            codigo: p.codigo,
+            uf: p.uf,
+            cidade: p.cidade,
+            codigo_pista: p.codigo_pista,
+            nome_pista: p.nome_pista,
+            tipo_pista: p.tipo_pista,
+          },
+        };
+      });
+
+    const pistasGeoJSON: GeoJSON.FeatureCollection = {
+      type: 'FeatureCollection',
+      features: pistasFeatures,
+    };
+
+    pistasSource.setData(pistasGeoJSON);
+    const filtrosAplicados = [];
+    if (selectedUFs?.length) filtrosAplicados.push(`UF: ${selectedUFs.join(', ')}`);
+    if (radarFilterActive) filtrosAplicados.push('Raio Estratégico');
+    console.log('[MapaPolos] ✈️ Pistas de voo atualizadas:', pistasFeatures.length, filtrosAplicados.length ? `(filtros: ${filtrosAplicados.join(', ')})` : '');
+  }, [pistas, mapReady, selectedUFs, radarFilterActive]);
+
+  // Controlar visibilidade da camada de pistas baseado no filtro
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+
+    // Verificar se a camada existe antes de tentar alterar
+    const pistasLayer = map.getLayer('pistas-layer');
+    if (!pistasLayer) {
+      // Se a camada ainda não existe, tentar novamente após um pequeno delay
+      setTimeout(() => {
+        const retryLayer = map.getLayer('pistas-layer');
+        if (retryLayer) {
+          map.setLayoutProperty('pistas-layer', 'visibility', pistasFilterActive ? 'visible' : 'none');
+        }
+      }, 100);
+      return;
+    }
+
+    // Mostrar ou esconder a camada baseado no filtro
+    map.setLayoutProperty('pistas-layer', 'visibility', pistasFilterActive ? 'visible' : 'none');
+    console.log('[MapaPolos] ✈️ Visibilidade das pistas:', pistasFilterActive ? 'visível' : 'oculta');
+  }, [pistasFilterActive, mapReady]);
 
   return (
     <div className="w-full h-full relative">

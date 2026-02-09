@@ -131,7 +131,8 @@ export default function PolosPage() {
   const [currentPage, setCurrentPage] = useState(0);
   const [isRadarActive, setIsRadarActive] = useState(false);
   const [isRelActive, setIsRelActive] = useState(false);
-  const [isPoloLogisticoActive, setIsPoloLogisticoActive] = useState(false); // Por padrão ativo
+  const [isPoloLogisticoActive, setIsPoloLogisticoActive] = useState(false); // Por padrão desativado
+  const [isPistasActive, setIsPistasActive] = useState(false);
   const [isRelacionamentoModalOpen, setIsRelacionamentoModalOpen] = useState(false);
   const [showConfetti, setShowConfetti] = useState<boolean>(false);
   const [confettiMessage, setConfettiMessage] = useState<string>('');
@@ -168,7 +169,26 @@ export default function PolosPage() {
   const [appliedProducts, setAppliedProducts] = useState<string[]>([]);
 
   // Dados do contexto
-  const { polosData, loading, error, loadingProgress } = usePolosData();
+  const { polosData, loading, error, loadingProgress, refreshPolosData, refreshRelacionamentos } = usePolosData();
+  
+  // Estado para pistas de voo
+  const [pistas, setPistas] = useState<any[]>([]);
+  
+  // Carregar pistas de voo
+  useEffect(() => {
+    const loadPistas = async () => {
+      try {
+        const response = await fetch('/api/proxy-geojson/pistas_s3_lat_log.json');
+        if (response.ok) {
+          const data = await response.json();
+          setPistas(Array.isArray(data) ? data : []);
+        }
+      } catch (err) {
+        console.error('Erro ao carregar pistas:', err);
+      }
+    };
+    loadPistas();
+  }, []);
 
   // Handler para abrir modal de relacionamento
   const handleOpenRelacionamentoModal = () => {
@@ -186,11 +206,22 @@ export default function PolosPage() {
     return set;
   }, [polosData?.municipiosRelacionamento]);
 
-  // Lista de Polos Estratégicos para o dropdown
+  // Lista de Polos Estratégicos para o dropdown (filtrada por estado se houver seleção)
   const polosEstrategicosList = useMemo(() => {
     if (!polosData?.baseMunicipios?.features) return [];
     
-    return polosData.baseMunicipios.features
+    let features = polosData.baseMunicipios.features;
+    
+    // Filtrar por estados selecionados se houver
+    if (selectedUFs.length > 0) {
+      const estadosNomes = new Set(selectedUFs.map(uf => UF_NAMES[uf] || uf));
+      features = features.filter(f => {
+        const estado = f.properties?.name_state || '';
+        return estadosNomes.has(estado);
+      });
+    }
+    
+    return features
       .filter(f => polosEstrategicosSet.has(String(f.properties?.code_muni)))
       .map(f => ({
         codigo: String(f.properties?.code_muni || ''),
@@ -199,13 +230,24 @@ export default function PolosPage() {
         valor: f.properties?.valor_total_produtos || 0
       }))
       .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-  }, [polosData?.baseMunicipios, polosEstrategicosSet]);
+  }, [polosData?.baseMunicipios, polosEstrategicosSet, selectedUFs]);
 
-  // Lista de todos os municípios para o dropdown
+  // Lista de todos os municípios para o dropdown (filtrada por estado se houver seleção)
   const todosMunicipiosList = useMemo(() => {
     if (!polosData?.baseMunicipios?.features) return [];
     
-    return polosData.baseMunicipios.features
+    let features = polosData.baseMunicipios.features;
+    
+    // Filtrar por estados selecionados se houver
+    if (selectedUFs.length > 0) {
+      const estadosNomes = new Set(selectedUFs.map(uf => UF_NAMES[uf] || uf));
+      features = features.filter(f => {
+        const estado = f.properties?.name_state || '';
+        return estadosNomes.has(estado);
+      });
+    }
+    
+    return features
       .map(f => ({
         codigo: String(f.properties?.code_muni || ''),
         nome: f.properties?.nome_municipio || 'N/A',
@@ -213,7 +255,7 @@ export default function PolosPage() {
         valor: f.properties?.valor_total_produtos || 0
       }))
       .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-  }, [polosData?.baseMunicipios]);
+  }, [polosData?.baseMunicipios, selectedUFs]);
 
   // Polos filtrados pelo input de busca
   const polosFiltrados = useMemo(() => {
@@ -248,6 +290,90 @@ export default function PolosPage() {
     setIsMunicipioDropdownOpen(false);
     setIsProdutosOpen(false);
   }, [selectedUFs, selectedPolo, selectedMunicipio, selectedProducts]);
+
+  // Handler para selecionar município do card flip
+  const handleMunicipioFromCard = useCallback((nomeMunicipio: string) => {
+    if (!polosData?.baseMunicipios?.features) return;
+
+    // Buscar o município pelo nome nos dados filtrados (mesmos filtros aplicados)
+    let features = polosData.baseMunicipios.features;
+    
+    // Aplicar os mesmos filtros que foram aplicados no computedData
+    if (appliedUFs.length > 0) {
+      const estadosNomes = new Set(appliedUFs.map(uf => UF_NAMES[uf] || uf));
+      features = features.filter(f => {
+        const estado = f.properties?.name_state || '';
+        return estadosNomes.has(estado);
+      });
+    }
+
+    if (isRadarActive) {
+      features = features.filter(f => {
+        let lat: number | undefined;
+        let lon: number | undefined;
+
+        if (f.geometry && f.geometry.coordinates && f.geometry.coordinates.length > 0) {
+          if (f.geometry.type === 'MultiPolygon') {
+            const coords = f.geometry.coordinates as number[][][][];
+            const firstCoords = coords[0]?.[0];
+            if (firstCoords && firstCoords.length > 0) {
+              [lon, lat] = firstCoords[0];
+            }
+          } else if (f.geometry.type === 'Polygon') {
+            const coords = f.geometry.coordinates as number[][][];
+            const firstCoords = coords[0];
+            if (firstCoords && firstCoords.length > 0) {
+              [lon, lat] = firstCoords[0];
+            }
+          }
+        }
+        
+        if (typeof lat !== 'number' || typeof lon !== 'number') {
+          return false;
+        }
+        
+        const distance = calculateDistance(
+          JOAO_PESSOA_COORDS[0],
+          JOAO_PESSOA_COORDS[1],
+          lat,
+          lon
+        );
+        
+        return distance <= JOAO_PESSOA_RADIUS_KM;
+      });
+    }
+
+    // Encontrar o município pelo nome
+    const municipioFeature = features.find(
+      f => f.properties?.nome_municipio === nomeMunicipio
+    );
+
+    if (municipioFeature) {
+      const codigoMunicipio = String(municipioFeature.properties?.code_muni || '');
+      
+      // Atualizar estados
+      setSelectedMunicipio(codigoMunicipio);
+      setMunicipioInputValue(nomeMunicipio);
+      setSelectedPolo('ALL');
+      setPoloInputValue('');
+      
+      // Aplicar busca automaticamente (mantém os filtros já aplicados)
+      setAppliedUFs([...appliedUFs]);
+      setAppliedPolo('ALL');
+      setAppliedMunicipio(codigoMunicipio);
+      setAppliedProducts(appliedProducts.length === Object.keys(PRODUTOS_CONFIG).length - 1 ? [] : [...appliedProducts]);
+      
+      // Fechar card flip
+      setIsCardFlipped(false);
+      setCurrentPage(0);
+      
+      // Fechar dropdowns
+      setIsEstadoOpen(false);
+      setIsPoloDropdownOpen(false);
+      setIsMunicipioDropdownOpen(false);
+      setIsProdutosOpen(false);
+    }
+  }, [polosData?.baseMunicipios, appliedUFs, isRadarActive, appliedProducts]);
 
   // Determinar se há município específico selecionado
   const municipioSelecionado = useMemo(() => {
@@ -322,8 +448,8 @@ export default function PolosPage() {
         }
         
         const distance = calculateDistance(
-          JOAO_PESSOA_COORDS[1], // lat
           JOAO_PESSOA_COORDS[0], // lon
+          JOAO_PESSOA_COORDS[1], // lat
           lat,
           lon
         );
@@ -523,6 +649,8 @@ export default function PolosPage() {
                     setIsRelActive={setIsRelActive}
                     isPoloLogisticoActive={isPoloLogisticoActive}
                     setIsPoloLogisticoActive={setIsPoloLogisticoActive}
+                    isPistasActive={isPistasActive}
+                    setIsPistasActive={setIsPistasActive}
                     onOpenRelacionamentoModal={handleOpenRelacionamentoModal}
                   />
                 </div>
@@ -1082,6 +1210,7 @@ export default function PolosPage() {
                                       return municipiosPaginados.map((municipio, idx) => (
                                         <button
                                           key={`${currentPage}-${idx}`}
+                                          onClick={() => handleMunicipioFromCard(municipio)}
                                           className="w-full text-xs text-slate-300 py-0.5 px-1.5 truncate leading-tight bg-slate-800/60 rounded border border-slate-700/30 text-center hover:bg-sky-700/60 hover:text-sky-200 hover:border-sky-500/50 transition-all cursor-pointer font-medium"
                                           title={`Selecionar ${municipio} e pesquisar`}
                                         >
@@ -1229,6 +1358,8 @@ export default function PolosPage() {
                       selectedUFs={appliedUFs}
                       radarFilterActive={isRadarActive}
                       poloLogisticoFilterActive={isPoloLogisticoActive}
+                      pistas={pistas}
+                      pistasFilterActive={isPistasActive}
                       onMunicipioClick={(codigoMunicipio) => {
                         // Atualizar seleção do município ao clicar no polígono
                         setSelectedMunicipio(codigoMunicipio);
@@ -1258,9 +1389,12 @@ export default function PolosPage() {
       {/* Modal de Relacionamento */}
       <RelacionamentoModal
         isOpen={isRelacionamentoModalOpen}
-        onClose={(novosCadastros) => {
+        onClose={async (novosCadastros) => {
           setIsRelacionamentoModalOpen(false);
           if (novosCadastros && novosCadastros > 0) {
+            // Atualizar apenas relacionamentos (sem buscar GeoJSON novamente)
+            await refreshRelacionamentos();
+            
             const plural = novosCadastros === 1 ? 'município' : 'municípios';
             setConfettiMessage(`🎉 Você acabou de desbloquear ${novosCadastros} ${plural}! Parabéns`);
             setShowConfetti(true);

@@ -99,3 +99,14 @@ model municipio_vizinhanca_queen {
 model schema_migrations {
   version String @id @db.VarChar
 }
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model municipios_bloqueados {
+  nome_municipio String?
+  sigla_uf       String?
+  nome_estado    String?
+  block_is       String?
+  code_muni      String?
+
+  @@ignore
+}

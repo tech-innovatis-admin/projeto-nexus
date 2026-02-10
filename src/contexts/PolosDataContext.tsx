@@ -10,10 +10,12 @@ interface PolosData {
   baseMunicipios: MunicipiosGeoJSON;
   municipiosRelacionamento: MunicipioRelacionamento[];
   municipiosSatelites: string[];
+  municipiosBloqueados: string[];
   metadata: {
     totalMunicipios: number;
     totalRelacionamentos: number;
     totalSatelites?: number;
+    totalBloqueados?: number;
     loadedAt: string;
   };
 }
@@ -24,7 +26,7 @@ interface PolosDataContextType {
   loadingProgress: number;
   error: string | null;
   refreshPolosData: () => Promise<void>;
-  refreshRelacionamentos: () => Promise<void>;
+  refreshRelacionamentos: () => Promise<{ totalSatelites: number } | void>;
 }
 
 const PolosDataContext = createContext<PolosDataContextType | undefined>(undefined);
@@ -93,6 +95,7 @@ export function PolosDataProvider({ children }: { children: React.ReactNode }) {
             baseMunicipios: data.baseMunicipios,
             municipiosRelacionamento: data.municipiosRelacionamento,
             municipiosSatelites: Array.isArray(data.municipiosSatelites) ? data.municipiosSatelites : [],
+            municipiosBloqueados: Array.isArray(data.municipiosBloqueados) ? data.municipiosBloqueados : [],
             metadata: data.metadata
           };
           setLoadingProgress(100);
@@ -104,6 +107,7 @@ export function PolosDataProvider({ children }: { children: React.ReactNode }) {
           baseMunicipios: data.baseMunicipios,
           municipiosRelacionamento: data.municipiosRelacionamento,
           municipiosSatelites: Array.isArray(data.municipiosSatelites) ? data.municipiosSatelites : [],
+          municipiosBloqueados: Array.isArray(data.municipiosBloqueados) ? data.municipiosBloqueados : [],
           metadata: data.metadata
         };
         applyResult(organizedData);
@@ -125,8 +129,12 @@ export function PolosDataProvider({ children }: { children: React.ReactNode }) {
             const cached = JSON.parse(raw) as { timestamp: number; data: PolosData };
             const isFresh = Date.now() - cached.timestamp < CACHE_TTL_MS;
             if (cached.data && isFresh) {
-              // Cache ainda é fresco, servir e NÃO revalidar
-              setPolosData(cached.data);
+              // Cache ainda é fresco, servir e NÃO revalidar (com fallback para campos novos)
+              const data = cached.data as PolosData;
+              setPolosData({
+                ...data,
+                municipiosBloqueados: Array.isArray(data.municipiosBloqueados) ? data.municipiosBloqueados : [],
+              });
               setError(null);
               setLoading(false);
               return;
@@ -157,7 +165,7 @@ export function PolosDataProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Função para atualizar apenas os relacionamentos (sem buscar GeoJSON novamente)
-  const refreshRelacionamentos = useCallback(async () => {
+  const refreshRelacionamentos = useCallback(async (): Promise<{ totalSatelites: number } | void> => {
     if (!polosData) {
       // Se não há dados ainda, fazer refresh completo
       await refreshPolosData();
@@ -209,6 +217,9 @@ export function PolosDataProvider({ children }: { children: React.ReactNode }) {
       setPolosData(updatedData);
       setError(null);
 
+      // Retornar total de satélites para uso na mensagem de celebração
+      const result = { totalSatelites: municipiosSatelites.length };
+
       // Atualizar cache também
       if (typeof window !== 'undefined') {
         try {
@@ -222,6 +233,7 @@ export function PolosDataProvider({ children }: { children: React.ReactNode }) {
       }
 
       console.log('[PolosData] Relacionamentos e satélites atualizados:', relacionamentos.length, 'relacionamentos,', municipiosSatelites.length, 'satélites');
+      return result;
     } catch (err) {
       console.error('Erro ao atualizar relacionamentos:', err);
       setError(err instanceof Error ? err.message : 'Erro ao atualizar relacionamentos');

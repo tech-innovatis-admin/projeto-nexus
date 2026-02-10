@@ -1,6 +1,15 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+type MunicipioRelacionamentoRow = {
+  code_muni: string;
+  relacionamento_ativo: boolean | null;
+};
+
+type VizinhancaQueenRow = {
+  code_muni_b: string;
+};
+
 /**
  * GET /api/polos/satelites
  * Retorna apenas os municípios satélites (vizinhos Queen 1ª ordem dos Polos Estratégicos).
@@ -9,9 +18,10 @@ import { prisma } from '@/lib/prisma';
  */
 export async function GET() {
   try {
-    const municipiosRelacionamento = await prisma.municipios_com_relacionamento.findMany({
-      select: { code_muni: true, relacionamento_ativo: true },
-    });
+    const municipiosRelacionamento: MunicipioRelacionamentoRow[] =
+      await prisma.municipios_com_relacionamento.findMany({
+        select: { code_muni: true, relacionamento_ativo: true },
+      });
 
     const strategicCodes = Array.from(
       new Set(
@@ -22,21 +32,23 @@ export async function GET() {
       )
     );
 
+    const vizinhancaRows: VizinhancaQueenRow[] =
+      strategicCodes.length === 0
+        ? []
+        : await prisma.municipio_vizinhanca_queen.findMany({
+            where: {
+              code_muni_a: { in: strategicCodes },
+              ordem: 1,
+            },
+            select: { code_muni_b: true },
+          });
+
     const municipiosSatelites =
       strategicCodes.length === 0
         ? []
         : Array.from(
             new Set(
-              (
-                await prisma.municipio_vizinhanca_queen
-                  .findMany({
-                    where: {
-                      code_muni_a: { in: strategicCodes },
-                      ordem: 1,
-                    },
-                    select: { code_muni_b: true },
-                  })
-              )
+              vizinhancaRows
                 .map((row) => String(row.code_muni_b))
                 .filter(Boolean)
             )

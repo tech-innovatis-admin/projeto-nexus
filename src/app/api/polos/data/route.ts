@@ -11,7 +11,7 @@ import { prisma } from '@/lib/prisma';
 export async function GET() {
   try {
     // Buscar dados em paralelo para melhor performance
-    const [baseMunicipios, municipiosRelacionamento] = await Promise.all([
+    const [baseMunicipios, municipiosRelacionamento, municipiosBloqueadosRows] = await Promise.all([
       // 1. Buscar base_municipios.geojson do S3
       getFileFromS3('base_municipios.geojson').catch((err: unknown) => {
         console.error('Erro ao buscar base_municipios.geojson do S3:', err);
@@ -26,6 +26,15 @@ export async function GET() {
         ]
       }).catch((err: unknown) => {
         console.error('Erro ao buscar municipios_com_relacionamento do banco:', err);
+        return [];
+      }),
+
+      // 3. Buscar municipios_bloqueados (tabela sem id única - raw SQL)
+      prisma.$queryRaw<Array<{ code_muni: string | null }>>`
+        SELECT code_muni FROM municipios_bloqueados
+        WHERE block_is IS NOT NULL AND block_is ILIKE '%Block%'
+      `.catch((err: unknown) => {
+        console.error('Erro ao buscar municipios_bloqueados do banco:', err);
         return [];
       })
     ]);
@@ -67,6 +76,15 @@ export async function GET() {
             )
           );
 
+    type BloqueadoRow = { code_muni: string | null };
+    const municipiosBloqueados = Array.from(
+      new Set(
+        ((municipiosBloqueadosRows || []) as BloqueadoRow[])
+          .map((r) => (r?.code_muni ? String(r.code_muni) : ''))
+          .filter(Boolean)
+      )
+    );
+
     // Validar e estruturar resposta
     const response = {
       baseMunicipios: baseMunicipios || {
@@ -75,10 +93,12 @@ export async function GET() {
       },
       municipiosRelacionamento: municipiosRelacionamento || [],
       municipiosSatelites,
+      municipiosBloqueados,
       metadata: {
         totalMunicipios: baseMunicipios?.features?.length || 0,
         totalRelacionamentos: municipiosRelacionamento?.length || 0,
         totalSatelites: municipiosSatelites.length,
+        totalBloqueados: municipiosBloqueados.length,
         loadedAt: new Date().toISOString()
       }
     };
@@ -92,7 +112,8 @@ export async function GET() {
         detalhes: error instanceof Error ? error.message : 'Erro desconhecido',
         baseMunicipios: { type: 'FeatureCollection', features: [] },
         municipiosRelacionamento: [],
-        metadata: { totalMunicipios: 0, totalRelacionamentos: 0, loadedAt: new Date().toISOString() }
+        municipiosBloqueados: [],
+        metadata: { totalMunicipios: 0, totalRelacionamentos: 0, totalBloqueados: 0, loadedAt: new Date().toISOString() }
       },
       { status: 500 }
     );

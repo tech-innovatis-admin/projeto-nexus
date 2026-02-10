@@ -35,6 +35,7 @@ interface MapaPolosProps {
   baseMunicipios: MunicipiosGeoJSON | null;
   municipiosRelacionamento?: MunicipioRelacionamento[];
   municipiosSatelites?: string[]; // Vizinhos queen (1ª ordem) dos Polos Estratégicos
+  municipiosBloqueados?: string[]; // Municípios bloqueados (sem contato a priori)
   selectedMunicipio?: MunicipioSelecionado | null;
   selectedUFs?: string[]; // Estados selecionados (siglas)
   radarFilterActive?: boolean; // Raio Estratégico ativo
@@ -45,12 +46,13 @@ interface MapaPolosProps {
   onMunicipioClick?: (codigoMunicipio: string) => void; // Callback ao clicar em polígono
 }
 
-export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [], municipiosSatelites = [], selectedMunicipio, selectedUFs = [], radarFilterActive = false, relacionamentoFilterActive = false, poloLogisticoFilterActive = false, pistas = [], pistasFilterActive = false, onMunicipioClick }: MapaPolosProps) {
+export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [], municipiosSatelites = [], municipiosBloqueados = [], selectedMunicipio, selectedUFs = [], radarFilterActive = false, relacionamentoFilterActive = false, poloLogisticoFilterActive = false, pistas = [], pistasFilterActive = false, onMunicipioClick }: MapaPolosProps) {
   const mapRef = useRef<MapLibreMap | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const hoverCleanupRef = useRef<(() => void) | null>(null);
   const pistasHoverCleanupRef = useRef<(() => void) | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const [statsExpanded, setStatsExpanded] = useState(true);
   const prevSelectedRef = useRef<string | null>(null);
   const prevSelectedUFsRef = useRef<string[]>([]);
   
@@ -112,6 +114,11 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
     return cleaned;
   }, [municipiosSatelites, polosEstrategicosSet, polosLogisticosSet]);
 
+  // Set de municípios bloqueados (sem contato a priori)
+  const municipiosBloqueadosSet = useMemo(() => {
+    return new Set<string>((municipiosBloqueados || []).map((c) => String(c)).filter(Boolean));
+  }, [municipiosBloqueados]);
+
   // Ref para acessar polosEstrategicosSet dentro dos handlers
   const polosSetRef = useRef(polosEstrategicosSet);
   useEffect(() => {
@@ -130,9 +137,59 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
     municipiosSatelitesSetRef.current = municipiosSatelitesSet;
   }, [municipiosSatelitesSet]);
 
+  const municipiosBloqueadosSetRef = useRef(municipiosBloqueadosSet);
+  useEffect(() => {
+    municipiosBloqueadosSetRef.current = municipiosBloqueadosSet;
+  }, [municipiosBloqueadosSet]);
+
+  // Estatísticas de alcance (apenas municípios com relacionamento - Polos Estratégicos)
+  const SIGLA_TO_NOME: Record<string, string> = {
+    'AC': 'Acre', 'AL': 'Alagoas', 'AP': 'Amapá', 'AM': 'Amazonas',
+    'BA': 'Bahia', 'CE': 'Ceará', 'DF': 'Distrito Federal',
+    'ES': 'Espírito Santo', 'GO': 'Goiás', 'MA': 'Maranhão',
+    'MT': 'Mato Grosso', 'MS': 'Mato Grosso do Sul', 'MG': 'Minas Gerais',
+    'PA': 'Pará', 'PB': 'Paraíba', 'PR': 'Paraná', 'PE': 'Pernambuco',
+    'PI': 'Piauí', 'RJ': 'Rio de Janeiro', 'RN': 'Rio Grande do Norte',
+    'RS': 'Rio Grande do Sul', 'RO': 'Rondônia', 'RR': 'Roraima',
+    'SC': 'Santa Catarina', 'SP': 'São Paulo', 'SE': 'Sergipe', 'TO': 'Tocantins'
+  };
+
+  const statsAlcance = useMemo(() => {
+    if (!baseMunicipios?.features?.length) return null;
+    let features = [...baseMunicipios.features];
+
+    // Escopo: UF/Região (mesmo filtro do mapa)
+    if (selectedUFs && selectedUFs.length > 0) {
+      const estadosNomes = new Set(selectedUFs.map(uf => SIGLA_TO_NOME[uf] || uf));
+      features = features.filter(f => estadosNomes.has(f.properties?.name_state || ''));
+    }
+
+    // Radar (se ativo)
+    if (radarFilterActive) {
+      const JOAO_PESSOA_COORDS: [number, number] = [-34.95096946933421, -7.14804917856058];
+      const circle = turf.circle(JOAO_PESSOA_COORDS, 1300, { steps: 128, units: 'kilometers' });
+      features = features.filter(f => {
+        try { return turf.booleanIntersects(circle as any, f as any); } catch { return false; }
+      });
+    }
+
+    const totalNoEscopo = features.length;
+    const alcancados = features.filter(f => polosEstrategicosSet.has(String(f.properties?.code_muni || ''))).length;
+    const percentual = totalNoEscopo > 0 ? (alcancados / totalNoEscopo) * 100 : 0;
+
+    const escopoLabel = selectedUFs?.length === 0
+      ? 'Brasil'
+      : selectedUFs?.length === 1
+        ? `UF ${selectedUFs[0]}`
+        : `Região (${selectedUFs?.length} UFs)`;
+
+    return { totalNoEscopo, alcancados, percentual, escopoLabel };
+  }, [baseMunicipios?.features?.length, selectedUFs, radarFilterActive, polosEstrategicosSet]);
+
   // Contagens para legenda (mutuamente exclusivas por prioridade de exibição)
   const legendCounts = useMemo(() => {
     const total = baseMunicipios?.features?.length ?? 0;
+    const countBloqueado = municipiosBloqueadosSet.size;
     const countStrategic = polosEstrategicosSet.size;
     const countSatellite = municipiosSatelitesSet.size;
     const countLogistic = Array.from(polosLogisticosSet).filter(
@@ -140,15 +197,16 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
     ).length;
     const countOportunidade = Math.max(
       0,
-      total - countStrategic - countSatellite - countLogistic
+      total - countBloqueado - countStrategic - countSatellite - countLogistic
     );
     return {
+      bloqueado: countBloqueado,
       strategic: countStrategic,
       satellite: countSatellite,
       logistic: countLogistic,
       oportunidade: countOportunidade
     };
-  }, [baseMunicipios?.features?.length, polosEstrategicosSet, municipiosSatelitesSet, polosLogisticosSet]);
+  }, [baseMunicipios?.features?.length, municipiosBloqueadosSet, polosEstrategicosSet, municipiosSatelitesSet, polosLogisticosSet]);
 
   // Função centralizada para aplicar filtros de municípios em sequência
   // Pipeline: UF → Radar → Relacionamento → (outros filtros futuros)
@@ -248,13 +306,15 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
     const matchedEstrategicos: string[] = [];
     const matchedLogisticos: string[] = [];
 
-    // Aplicar isPolo, isPoloLogistico e isSatellite feature state para cada município
-    // Lógica:
+    // Aplicar isBloqueado, isPolo, isPoloLogistico e isSatellite feature state para cada município
+    // Lógica (prioridade): isBloqueado > isPolo > isPoloLogistico > isSatellite
+    // - isBloqueado (vermelho): município bloqueado (sem contato a priori)
     // - isPolo (verde): tem relacionamento_ativo = true (prioridade sobre polo_logistico)
     // - isPoloLogistico (roxo): tem tipo_polo_satelite = 'polo_logistico' E NÃO tem relacionamento_ativo E filtro está ativo
     // - isSatellite (amarelo #F5DF09, opacidade menor): vizinho queen de 1ª ordem de polo estratégico, mas NÃO é polo estratégico nem logístico
     baseMunicipios.features.forEach(feature => {
       const codeMuni = String(feature.properties?.code_muni || '');
+      const isBloqueado = municipiosBloqueadosSet.has(codeMuni);
       const isPolo = polosEstrategicosSet.has(codeMuni);
       const isPoloLogisticoRaw = polosLogisticosSet.has(codeMuni);
       // Polo Logístico só se NÃO for Polo Estratégico E filtro estiver ativo
@@ -279,7 +339,7 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
         try {
           map.setFeatureState(
             { source: 'municipios-src', id: codeMuni },
-            { isPolo, isPoloLogistico, isSatellite }
+            { isBloqueado, isPolo, isPoloLogistico, isSatellite }
           );
         } catch (err) {
           //
@@ -304,7 +364,7 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
     
     // Forçar re-render do mapa
     map.triggerRepaint();
-  }, [baseMunicipios, polosEstrategicosSet, polosLogisticosSet, mapReady, poloLogisticoFilterActive]);
+  }, [baseMunicipios, municipiosBloqueadosSet, polosEstrategicosSet, polosLogisticosSet, mapReady, poloLogisticoFilterActive]);
 
   // Inicializar o mapa (apenas uma vez)
   useEffect(() => {
@@ -331,7 +391,8 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
       });
 
       // Camada de preenchimento dos municípios
-      // Cores:
+      // Cores (prioridade): Bloqueado > Polo > Polo Logístico > Satélite > Oportunidade
+      // - Vermelho (#EF4444): Município Bloqueado (sem contato a priori)
       // - Verde (#36C244): Polo Estratégico (relacionamento_ativo = true)
       // - Roxo (#9333EA): Polo Logístico (tipo_polo_satelite = 'polo_logistico' sem relacionamento)
       // - Amarelo (#F5DF09, opacidade menor): Município Satélite (queen 1ª ordem de polo estratégico)
@@ -343,6 +404,8 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
         paint: {
           'fill-color': [
             'case',
+            ['boolean', ['feature-state', 'isBloqueado'], false],
+            '#EF4444',
             ['boolean', ['feature-state', 'isPolo'], false],
             '#36C244',
             ['boolean', ['feature-state', 'isPoloLogistico'], false],
@@ -373,6 +436,8 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
             ['boolean', ['feature-state', 'hover'], false],
             [
               'case',
+              ['boolean', ['feature-state', 'isBloqueado'], false],
+              '#DC2626',
               ['boolean', ['feature-state', 'isPolo'], false],
               '#2A9A35',
               ['boolean', ['feature-state', 'isPoloLogistico'], false],
@@ -383,6 +448,8 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
             ],
             [
               'case',
+              ['boolean', ['feature-state', 'isBloqueado'], false],
+              '#B91C1C',
               ['boolean', ['feature-state', 'isPolo'], false],
               '#2A9A35',
               ['boolean', ['feature-state', 'isPoloLogistico'], false],
@@ -452,6 +519,7 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
         () => polosSetRef.current,
         () => polosLogisticosSetRef.current,
         () => municipiosSatelitesSetRef.current,
+        () => municipiosBloqueadosSetRef.current,
         onMunicipioClick
       );
 
@@ -962,10 +1030,61 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
     <div className="w-full h-full relative">
       <div ref={containerRef} className="w-full h-full rounded-xl" />
 
+      {/* Estatísticas de Alcance (retrátil) - canto superior direito */}
+      {mapReady && statsAlcance && (
+        <div className="absolute top-3 right-3 z-10">
+          {statsExpanded ? (
+            <div className="bg-slate-800/95 backdrop-blur-sm rounded-lg shadow-lg p-4 z-10 border border-slate-700/50 max-w-[280px]">
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <h4 className="text-xs text-center font-bold text-white uppercase tracking-wider">Estatísticas</h4>
+                <button
+                  type="button"
+                  onClick={() => setStatsExpanded(false)}
+                  className="p-1 hover:bg-slate-700/50 rounded transition-colors"
+                  aria-label="Retrair estatísticas"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400">
+                    <path d="M18 15l-6-6-6 6" />
+                  </svg>
+                </button>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between gap-4">
+                  <span className="text-slate-400">Total alcançado:</span>
+                  <span className="font-semibold text-slate-200">{statsAlcance.alcancados}</span>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <span className="text-slate-400">Total {statsAlcance.escopoLabel} (%):</span>
+                  <span className="font-semibold text-slate-200">{statsAlcance.percentual.toFixed(1)}%</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setStatsExpanded(true)}
+              className="flex items-center gap-1.5 bg-slate-800/95 backdrop-blur-sm rounded-lg shadow-lg px-2.5 py-1.5 border border-slate-700/50 hover:bg-slate-700/80 transition-colors"
+              aria-label="Expandir estatísticas"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400">
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+              <span className="text-xs font-medium text-slate-300">Estatísticas</span>
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Legenda Estática */}
       <div className="absolute bottom-3 left-3 bg-slate-800/95 backdrop-blur-sm rounded-lg shadow-lg p-4 z-10 border border-slate-700/50 space-y-3 max-w-xs">
-        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Legenda</h4>
+        <h4 className="text-center text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Legenda</h4>
         
+        {/* Municípios Bloqueados */}
+        <div className="flex items-center gap-2">
+          <span className="inline-block w-3 h-3 rounded-full bg-[#EF4444] border border-[#B91C1C]" />
+          <span className="text-sm font-medium text-slate-200">Municípios Bloqueados - {legendCounts.bloqueado}</span>
+        </div>
+
         {/* Polos Estratégicos */}
         <div className="flex items-center gap-2">
           <span className="inline-block w-3 h-3 rounded-full bg-[#36C244] border border-[#2A9A35]" />

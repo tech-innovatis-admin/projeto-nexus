@@ -207,6 +207,7 @@ export default function PolosPage() {
   }, [polosData?.municipiosRelacionamento]);
 
   // Lista de Polos Estratégicos para o dropdown (filtrada por estado se houver seleção)
+  // Nota: Esta lista sempre mostra apenas polos estratégicos, então não precisa filtrar por isRelActive
   const polosEstrategicosList = useMemo(() => {
     if (!polosData?.baseMunicipios?.features) return [];
     
@@ -232,7 +233,7 @@ export default function PolosPage() {
       .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
   }, [polosData?.baseMunicipios, polosEstrategicosSet, selectedUFs]);
 
-  // Lista de todos os municípios para o dropdown (filtrada por estado se houver seleção)
+  // Lista de todos os municípios para o dropdown (filtrada por estado e relacionamento se houver seleção)
   const todosMunicipiosList = useMemo(() => {
     if (!polosData?.baseMunicipios?.features) return [];
     
@@ -246,6 +247,15 @@ export default function PolosPage() {
         return estadosNomes.has(estado);
       });
     }
+
+    // Filtrar por relacionamento se o filtro estiver ativo
+    // Quando isRelActive está ativo, mostrar apenas polos estratégicos no dropdown também
+    if (isRelActive) {
+      features = features.filter(f => {
+        const codeMuni = String(f.properties?.code_muni || '');
+        return polosEstrategicosSet.has(codeMuni);
+      });
+    }
     
     return features
       .map(f => ({
@@ -255,7 +265,7 @@ export default function PolosPage() {
         valor: f.properties?.valor_total_produtos || 0
       }))
       .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-  }, [polosData?.baseMunicipios, selectedUFs]);
+  }, [polosData?.baseMunicipios, selectedUFs, isRelActive, polosEstrategicosSet]);
 
   // Polos filtrados pelo input de busca
   const polosFiltrados = useMemo(() => {
@@ -290,6 +300,27 @@ export default function PolosPage() {
     setIsMunicipioDropdownOpen(false);
     setIsProdutosOpen(false);
   }, [selectedUFs, selectedPolo, selectedMunicipio, selectedProducts]);
+
+  const handleLimpar = useCallback(() => {
+    setSelectedUFs([]);
+    setAppliedUFs([]);
+    setSelectedPolo('ALL');
+    setPoloInputValue('');
+    setAppliedPolo('ALL');
+    setSelectedMunicipio('ALL');
+    setMunicipioInputValue('');
+    setAppliedMunicipio('ALL');
+    setSelectedProducts(Object.keys(PRODUTOS_CONFIG).filter(k => k !== 'valor_total'));
+    setAppliedProducts([]);
+    setIsRadarActive(false);
+    setIsRelActive(false);
+    setIsPoloLogisticoActive(false);
+    setIsPistasActive(false);
+    setIsEstadoOpen(false);
+    setIsPoloDropdownOpen(false);
+    setIsMunicipioDropdownOpen(false);
+    setIsProdutosOpen(false);
+  }, []);
 
   // Handler para selecionar município do card flip
   const handleMunicipioFromCard = useCallback((nomeMunicipio: string) => {
@@ -343,6 +374,14 @@ export default function PolosPage() {
       });
     }
 
+    // Aplicar filtro de Relacionamento se ativo (mesmos filtros aplicados)
+    if (isRelActive) {
+      features = features.filter(f => {
+        const codeMuni = String(f.properties?.code_muni || '');
+        return polosEstrategicosSet.has(codeMuni);
+      });
+    }
+
     // Encontrar o município pelo nome
     const municipioFeature = features.find(
       f => f.properties?.nome_municipio === nomeMunicipio
@@ -373,7 +412,7 @@ export default function PolosPage() {
       setIsMunicipioDropdownOpen(false);
       setIsProdutosOpen(false);
     }
-  }, [polosData?.baseMunicipios, appliedUFs, isRadarActive, appliedProducts]);
+  }, [polosData?.baseMunicipios, appliedUFs, isRadarActive, isRelActive, appliedProducts, polosEstrategicosSet]);
 
   // Determinar se há município específico selecionado
   const municipioSelecionado = useMemo(() => {
@@ -393,6 +432,27 @@ export default function PolosPage() {
       properties: feature.properties as unknown as { valor_total_produtos?: number | null; [key: string]: unknown }
     };
   }, [appliedMunicipio, appliedPolo, polosData?.baseMunicipios]);
+
+  // Função auxiliar para calcular valor de um município baseado nos produtos selecionados
+  const calcularValorMunicipio = useCallback((feature: any, produtosSelecionados: string[]): number => {
+    const props = feature.properties;
+    
+    // Se não há produtos selecionados (ou todos estão selecionados), usar valor_total_produtos
+    const todosProdutos = Object.keys(PRODUTOS_CONFIG).filter(k => k !== 'valor_total');
+    if (produtosSelecionados.length === 0 || produtosSelecionados.length === todosProdutos.length) {
+      return typeof props?.valor_total_produtos === 'number' ? props.valor_total_produtos : 0;
+    }
+
+    // Somar apenas os valores dos produtos selecionados
+    return produtosSelecionados.reduce((acc, produtoKey) => {
+      const config = PRODUTOS_CONFIG[produtoKey as keyof typeof PRODUTOS_CONFIG];
+      if (!config) return acc;
+      
+      const campo = config.campo as keyof typeof props;
+      const valor = props?.[campo];
+      return acc + (typeof valor === 'number' ? valor : 0);
+    }, 0);
+  }, []);
 
   // Calcular métricas baseadas nos dados reais e filtros aplicados
   const computedData = useMemo(() => {
@@ -457,24 +517,42 @@ export default function PolosPage() {
         return distance <= JOAO_PESSOA_RADIUS_KM;
       });
     }
+
+    // Aplicar filtro de Relacionamento (apenas Polos Estratégicos) se ativo
+    if (isRelActive) {
+      features = features.filter(f => {
+        const codeMuni = String(f.properties?.code_muni || '');
+        return polosEstrategicosSet.has(codeMuni);
+      });
+    }
     
-    // Calcular valor total
+    // Determinar quais produtos usar no cálculo
+    const todosProdutos = Object.keys(PRODUTOS_CONFIG).filter(k => k !== 'valor_total');
+    const produtosParaCalcular = appliedProducts.length === 0 || appliedProducts.length === todosProdutos.length
+      ? [] // Vazio = usar valor_total_produtos
+      : appliedProducts;
+
+    // Calcular valor total baseado nos produtos selecionados
     const valorTotal = features.reduce((acc, f) => {
-      const valor = f.properties?.valor_total_produtos;
-      return acc + (typeof valor === 'number' ? valor : 0);
+      const valor = calcularValorMunicipio(f, produtosParaCalcular);
+      return acc + valor;
     }, 0);
 
     // Total de municípios
     const totalMunicipios = features.length;
 
-    // Top 3 municípios por valor total
+    // Top 3 municípios por valor (baseado nos produtos selecionados)
     const sortedByValue = [...features]
-      .filter(f => typeof f.properties?.valor_total_produtos === 'number')
-      .sort((a, b) => (b.properties?.valor_total_produtos || 0) - (a.properties?.valor_total_produtos || 0))
-      .slice(0, 3)
       .map(f => ({
-        nome: f.properties?.nome_municipio || 'N/A',
-        valor: f.properties?.valor_total_produtos || 0
+        feature: f,
+        valor: calcularValorMunicipio(f, produtosParaCalcular)
+      }))
+      .filter(item => item.valor > 0)
+      .sort((a, b) => b.valor - a.valor)
+      .slice(0, 3)
+      .map(item => ({
+        nome: item.feature.properties?.nome_municipio || 'N/A',
+        valor: item.valor
       }));
 
     // Lista de municípios para o card flip
@@ -486,8 +564,12 @@ export default function PolosPage() {
     let produtosMunicipio: Array<{ key: string; nome: string; valor: number; category: string; shortLabel: string }> = [];
     if (municipioSelecionado?.properties) {
       const props = municipioSelecionado.properties;
+      const produtosParaMostrar = produtosParaCalcular.length === 0
+        ? todosProdutos // Se nenhum produto específico, mostrar todos
+        : produtosParaCalcular;
+
       produtosMunicipio = Object.entries(PRODUTOS_CONFIG)
-        .filter(([key]) => key !== 'valor_total')
+        .filter(([key]) => key !== 'valor_total' && produtosParaMostrar.includes(key))
         .map(([key, config]) => ({
           key,
           nome: config.nome,
@@ -506,7 +588,7 @@ export default function PolosPage() {
       municipiosList,
       produtosMunicipio
     };
-  }, [polosData, appliedUFs, municipioSelecionado, isRadarActive]);
+  }, [polosData, appliedUFs, municipioSelecionado, isRadarActive, isRelActive, appliedProducts, calcularValorMunicipio, polosEstrategicosSet]);
 
   // Click outside para fechar dropdowns
   useEffect(() => {
@@ -637,7 +719,7 @@ export default function PolosPage() {
                 className="flex flex-col md:flex-row md:justify-between md:items-center gap-2 md:gap-0"
               >
                 <h1 className="text-3xl font-bold text-white">
-                  Analise Estrategica de <span className="text-sky-400">Produtos</span>
+                  Análise Estratégica de <span className="text-sky-400">Polos</span>
                 </h1>
                 
                 {/* Area para botoes/filtros */}
@@ -754,7 +836,11 @@ export default function PolosPage() {
                             
                             {/* Estados */}
                             <p className="text-[10px] tracking-wider text-slate-400 font-semibold mb-1">ESTADOS</p>
-                            {TODAS_UFS.map(uf => (
+                            {[...TODAS_UFS]
+                              .sort((a, b) =>
+                                (UF_NAMES[a] || a).localeCompare((UF_NAMES[b] || b), 'pt-BR')
+                              )
+                              .map(uf => (
                               <label key={uf} className="flex items-center gap-2 py-1 px-1 hover:bg-slate-600 rounded cursor-pointer transition-colors">
                                 <input
                                   type="checkbox"
@@ -984,7 +1070,7 @@ export default function PolosPage() {
                       ), document.body)}
                     </div>
 
-                    {/* Botao de Buscar */}
+                    {/* Botões Buscar e Limpar */}
                     <div className="flex flex-col justify-end">
                       <label className="text-slate-300 text-sm mb-0.5 text-center font-bold opacity-0">Buscar</label>
                       <div className="flex items-center gap-2">
@@ -998,13 +1084,25 @@ export default function PolosPage() {
                           <span className="text-sm font-semibold">Buscar</span>
                         </button>
                         <button
-                          className="bg-slate-600/70 hover:bg-slate-500/80 text-white px-3 py-1.5 rounded-md font-medium transition-colors duration-200 flex items-center justify-center gap-1.5 min-h-[40px] flex-1"
-                          title="Exportar dados"
+                          onClick={handleLimpar}
+                          className="bg-slate-600 hover:bg-slate-500 text-white px-3 py-1.5 rounded-md font-medium transition-colors duration-200 flex items-center justify-center gap-1.5 min-h-[40px] flex-1"
                         >
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M8 12l4 4m0 0l4-4m-4 4V4" />
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="h-4 w-4"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="m16 22-1-4" />
+                            <path d="M19 14a1 1 0 0 0 1-1v-1a2 2 0 0 0-2-2h-3a1 1 0 0 1-1-1V4a2 2 0 0 0-4 0v5a1 1 0 0 1-1 1H6a2 2 0 0 0-2 2v1a1 1 0 0 0 1 1" />
+                            <path d="M19 14H5l-1.973 6.767A1 1 0 0 0 4 22h16a1 1 0 0 0 .973-1.233z" />
+                            <path d="m8 22 1-4" />
                           </svg>
-                          <span className="text-sm font-semibold">Exportar</span>
+                          <span className="text-sm font-semibold">Limpar</span>
                         </button>
                       </div>
                     </div>
@@ -1354,9 +1452,11 @@ export default function PolosPage() {
                     <MapaPolos 
                       baseMunicipios={polosData?.baseMunicipios || null}
                       municipiosRelacionamento={polosData?.municipiosRelacionamento || []}
+                      municipiosSatelites={polosData?.municipiosSatelites || []}
                       selectedMunicipio={municipioSelecionado}
                       selectedUFs={appliedUFs}
                       radarFilterActive={isRadarActive}
+                      relacionamentoFilterActive={isRelActive}
                       poloLogisticoFilterActive={isPoloLogisticoActive}
                       pistas={pistas}
                       pistasFilterActive={isPistasActive}
@@ -1389,15 +1489,17 @@ export default function PolosPage() {
       {/* Modal de Relacionamento */}
       <RelacionamentoModal
         isOpen={isRelacionamentoModalOpen}
-        onClose={async (novosCadastros) => {
+        onClose={async (novosCadastros, mudou) => {
           setIsRelacionamentoModalOpen(false);
-          if (novosCadastros && novosCadastros > 0) {
-            // Atualizar apenas relacionamentos (sem buscar GeoJSON novamente)
+          if (mudou) {
+            // Atualizar relacionamentos e satélites (rotas leves, sem S3)
             await refreshRelacionamentos();
-            
-            const plural = novosCadastros === 1 ? 'município' : 'municípios';
-            setConfettiMessage(`🎉 Você acabou de desbloquear ${novosCadastros} ${plural}! Parabéns`);
-            setShowConfetti(true);
+            // Mensagem de celebração apenas quando cadastrou novos
+            if (novosCadastros && novosCadastros > 0) {
+              const plural = novosCadastros === 1 ? 'município' : 'municípios';
+              setConfettiMessage(`🎉 Você acabou de desbloquear ${novosCadastros} ${plural}!`);
+              setShowConfetti(true);
+            }
           }
         }}
         municipiosDisponiveis={

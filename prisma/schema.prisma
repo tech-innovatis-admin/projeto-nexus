@@ -9,26 +9,24 @@ datasource db {
 }
 
 model municipio_acessos {
-  id           Int         @id(map: "MunicipioAcesso_pkey") @default(autoincrement())
-  user_id      Int?
+  id           Int       @id @default(autoincrement())
+  user_id      Int
   municipio_id Int?
-  exclusive    Boolean     @default(false)
-  granted_at   DateTime?   @default(now()) @db.Timestamptz(6)
-  valid_until  DateTime?   @db.Timestamptz(6)
-  created_at   DateTime    @default(now()) @db.Timestamptz(6)
-  updated_at   DateTime    @default(now()) @db.Timestamptz(6)
-  uf           String?
-  municipios   municipios? @relation(fields: [municipio_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "MunicipioAcesso_municipio_id_fkey")
-  users        users?      @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "MunicipioAcesso_user_id_fkey")
+  uf           String?   @db.VarChar(2)
+  exclusive    Boolean   @default(false)
+  granted_at   DateTime? @default(now()) @db.Timestamptz(6)
+  valid_until  DateTime? @db.Timestamptz(6)
+  created_at   DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at   DateTime  @default(now()) @db.Timestamptz(6)
+  uf_name      String?   @db.VarChar(50)
 }
 
 model municipios {
-  id                Int                 @id(map: "Municipio_pkey") @default(autoincrement())
-  municipio         String
-  name_state        String
-  created_at        DateTime            @default(now()) @db.Timestamptz(6)
-  updated_at        DateTime            @default(now()) @db.Timestamptz(6)
-  municipio_acessos municipio_acessos[]
+  id         Int      @id(map: "Municipio_pkey") @default(autoincrement())
+  municipio  String
+  name_state String
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
 
   @@unique([municipio, name_state], map: "Municipio_municipio_name_state_key")
 }
@@ -44,29 +42,60 @@ model spatial_ref_sys {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model users {
-  id                Int                 @id(map: "User_pkey") @default(autoincrement())
-  email             String?             @unique(map: "User_email_key")
-  hash              String
-  role              String?
-  username          String?             @unique(map: "User_username_key")
-  name              String?
-  cargo             String?
-  photo             String?             @db.Text
-  created_at        DateTime            @default(now()) @db.Timestamptz(6)
-  updated_at        DateTime            @default(now()) @db.Timestamptz(6)
-  municipio_acessos municipio_acessos[]
+  id         BigInt   @id(map: "User_pkey") @default(autoincrement())
+  email      String?  @unique(map: "User_email_key") @db.VarChar(100)
+  hash       String   @db.VarChar(255)
+  role       String?  @db.VarChar(255)
+  username   String?  @unique(map: "User_username_key") @db.VarChar(255)
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+  updated_at DateTime @default(now()) @db.Timestamptz(6)
+  name       String   @default("") @db.VarChar(255)
+  photo      String?
+  platforms  String[] @default([])
+  cargo      String?  @default("Visitante")
 }
 
 /// Tabela para gerenciar relacionamentos com municípios
 model municipios_com_relacionamento {
-  row_index              Int       @id @default(autoincrement())
-  name_state             String    @db.VarChar(2)
-  code_muni              String    @db.VarChar(10)
-  name_muni              String    @db.VarChar(255)
-  relacionamento_ativo   Boolean   @default(true)
-  relacionamento_criado  DateTime? @db.Timestamptz(6)
-  relacionamento_editado DateTime? @db.Timestamptz(6)
+  row_index              Int?
+  name_state             String?   @db.VarChar(255)
+  code_muni              String    @id @db.VarChar(10)
+  name_muni              String?   @db.VarChar(255)
+  relacionamento_ativo   Boolean?
+  relacionamento_criado  DateTime? @db.Timestamp(6)
+  relacionamento_editado DateTime? @db.Timestamp(6)
 
-  @@unique([code_muni], map: "municipios_com_relacionamento_code_muni_key")
   @@map("municipios_com_relacionamento")
+}
+
+model ar_internal_metadata {
+  key        String   @id @db.VarChar
+  value      String?  @db.VarChar
+  created_at DateTime @db.Timestamp(6)
+  updated_at DateTime @db.Timestamp(6)
+}
+
+model municipio_acessos_audit {
+  id           Int       @id @default(autoincrement())
+  acesso_id    Int
+  action       String    @db.VarChar(20)
+  performed_by Int
+  details      Json?
+  created_at   DateTime? @default(now()) @db.Timestamptz(6)
+
+  @@index([acesso_id])
+  @@index([performed_by])
+}
+
+model municipio_vizinhanca_queen {
+  code_muni_a String   @db.VarChar(10)
+  code_muni_b String   @db.VarChar(10)
+  ordem       Int      @default(1) @db.SmallInt
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  @@id([code_muni_a, code_muni_b, ordem])
+}
+
+model schema_migrations {
+  version String @id @db.VarChar
 }

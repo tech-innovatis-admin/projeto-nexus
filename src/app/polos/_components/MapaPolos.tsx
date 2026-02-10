@@ -34,16 +34,18 @@ interface PistaVoo {
 interface MapaPolosProps {
   baseMunicipios: MunicipiosGeoJSON | null;
   municipiosRelacionamento?: MunicipioRelacionamento[];
+  municipiosSatelites?: string[]; // Vizinhos queen (1ª ordem) dos Polos Estratégicos
   selectedMunicipio?: MunicipioSelecionado | null;
   selectedUFs?: string[]; // Estados selecionados (siglas)
   radarFilterActive?: boolean; // Raio Estratégico ativo
+  relacionamentoFilterActive?: boolean; // Filtro de Relacionamento ativo (apenas Polos Estratégicos)
   poloLogisticoFilterActive?: boolean; // Filtro de Polos Logísticos ativo
   pistas?: PistaVoo[]; // Pistas de voo
   pistasFilterActive?: boolean; // Filtro de Pistas de Voo ativo
   onMunicipioClick?: (codigoMunicipio: string) => void; // Callback ao clicar em polígono
 }
 
-export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [], selectedMunicipio, selectedUFs = [], radarFilterActive = false, poloLogisticoFilterActive = false, pistas = [], pistasFilterActive = false, onMunicipioClick }: MapaPolosProps) {
+export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [], municipiosSatelites = [], selectedMunicipio, selectedUFs = [], radarFilterActive = false, relacionamentoFilterActive = false, poloLogisticoFilterActive = false, pistas = [], pistasFilterActive = false, onMunicipioClick }: MapaPolosProps) {
   const mapRef = useRef<MapLibreMap | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const hoverCleanupRef = useRef<(() => void) | null>(null);
@@ -92,6 +94,24 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
     return set;
   }, [baseMunicipios]);
 
+  // Set de municípios satélites (vizinhos queen 1ª ordem dos Polos Estratégicos)
+  // IMPORTANTE: satélite NÃO pode ser Polo Estratégico nem Polo Logístico (independente de filtro)
+  const municipiosSatelitesSet = useMemo(() => {
+    const raw = new Set<string>((municipiosSatelites || []).map((c) => String(c)).filter(Boolean));
+    const cleaned = new Set<string>();
+    raw.forEach((code) => {
+      if (!polosEstrategicosSet.has(code) && !polosLogisticosSet.has(code)) {
+        cleaned.add(code);
+      }
+    });
+
+    if (raw.size > 0) {
+      console.log('[MapaPolos] Municípios Satélites (queen, limpos):', cleaned.size, '(raw:', raw.size, ')');
+    }
+
+    return cleaned;
+  }, [municipiosSatelites, polosEstrategicosSet, polosLogisticosSet]);
+
   // Ref para acessar polosEstrategicosSet dentro dos handlers
   const polosSetRef = useRef(polosEstrategicosSet);
   useEffect(() => {
@@ -104,8 +124,34 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
     polosLogisticosSetRef.current = polosLogisticosSet;
   }, [polosLogisticosSet]);
 
+  // Ref para acessar municipiosSatelitesSet dentro dos handlers
+  const municipiosSatelitesSetRef = useRef(municipiosSatelitesSet);
+  useEffect(() => {
+    municipiosSatelitesSetRef.current = municipiosSatelitesSet;
+  }, [municipiosSatelitesSet]);
+
+  // Contagens para legenda (mutuamente exclusivas por prioridade de exibição)
+  const legendCounts = useMemo(() => {
+    const total = baseMunicipios?.features?.length ?? 0;
+    const countStrategic = polosEstrategicosSet.size;
+    const countSatellite = municipiosSatelitesSet.size;
+    const countLogistic = Array.from(polosLogisticosSet).filter(
+      (code) => !polosEstrategicosSet.has(code)
+    ).length;
+    const countOportunidade = Math.max(
+      0,
+      total - countStrategic - countSatellite - countLogistic
+    );
+    return {
+      strategic: countStrategic,
+      satellite: countSatellite,
+      logistic: countLogistic,
+      oportunidade: countOportunidade
+    };
+  }, [baseMunicipios?.features?.length, polosEstrategicosSet, municipiosSatelitesSet, polosLogisticosSet]);
+
   // Função centralizada para aplicar filtros de municípios em sequência
-  // Pipeline: UF → Radar → (outros filtros futuros)
+  // Pipeline: UF → Radar → Relacionamento → (outros filtros futuros)
   const applyMunicipiosFilters = useCallback((): GeoJSON.FeatureCollection => {
     if (!baseMunicipios?.features?.length) {
       return { type: 'FeatureCollection', features: [] };
@@ -152,11 +198,37 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
       });
     }
 
+    // PASSO 3: Filtrar por Relacionamento (apenas Polos Estratégicos) se ativo
+    if (relacionamentoFilterActive) {
+      filteredFeatures = filteredFeatures.filter(f => {
+        const codeMuni = String(f.properties?.code_muni || '');
+        return polosEstrategicosSet.has(codeMuni) || municipiosSatelitesSet.has(codeMuni);
+      });
+    }
+
+    // PASSO 4: Garantir que o município selecionado sempre apareça (se existir)
+    // Isso permite que o usuário veja o município destacado mesmo que ele não passe pelos filtros
+    if (selectedMunicipio?.codigo) {
+      const municipioSelecionado = baseMunicipios.features.find(
+        f => String(f.properties?.code_muni) === selectedMunicipio.codigo
+      );
+      if (municipioSelecionado) {
+        // Verificar se já não está na lista filtrada
+        const jaEstaNaLista = filteredFeatures.some(
+          f => String(f.properties?.code_muni) === selectedMunicipio.codigo
+        );
+        if (!jaEstaNaLista) {
+          // Adicionar o município selecionado à lista filtrada
+          filteredFeatures.push(municipioSelecionado as any);
+        }
+      }
+    }
+
     return {
       type: 'FeatureCollection',
       features: filteredFeatures as any[]
     };
-  }, [baseMunicipios, selectedUFs, radarFilterActive]);
+  }, [baseMunicipios, selectedUFs, radarFilterActive, relacionamentoFilterActive, polosEstrategicosSet, municipiosSatelitesSet, selectedMunicipio]);
 
   // Função para aplicar feature state nos municípios
   const applyFeatureStates = useCallback(() => {
@@ -176,16 +248,18 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
     const matchedEstrategicos: string[] = [];
     const matchedLogisticos: string[] = [];
 
-    // Aplicar isPolo e isPoloLogistico feature state para cada município
+    // Aplicar isPolo, isPoloLogistico e isSatellite feature state para cada município
     // Lógica:
     // - isPolo (verde): tem relacionamento_ativo = true (prioridade sobre polo_logistico)
     // - isPoloLogistico (roxo): tem tipo_polo_satelite = 'polo_logistico' E NÃO tem relacionamento_ativo E filtro está ativo
+    // - isSatellite (amarelo #F5DF09, opacidade menor): vizinho queen de 1ª ordem de polo estratégico, mas NÃO é polo estratégico nem logístico
     baseMunicipios.features.forEach(feature => {
       const codeMuni = String(feature.properties?.code_muni || '');
       const isPolo = polosEstrategicosSet.has(codeMuni);
       const isPoloLogisticoRaw = polosLogisticosSet.has(codeMuni);
       // Polo Logístico só se NÃO for Polo Estratégico E filtro estiver ativo
       const isPoloLogistico = isPoloLogisticoRaw && !isPolo && poloLogisticoFilterActive;
+      const isSatellite = municipiosSatelitesSet.has(codeMuni);
       
       if (isPolo) {
         matchCountEstrategico++;
@@ -205,10 +279,10 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
         try {
           map.setFeatureState(
             { source: 'municipios-src', id: codeMuni },
-            { isPolo, isPoloLogistico }
+            { isPolo, isPoloLogistico, isSatellite }
           );
         } catch (err) {
-          // Ignora erros silenciosamente
+          //
         }
       }
     });
@@ -260,6 +334,7 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
       // Cores:
       // - Verde (#36C244): Polo Estratégico (relacionamento_ativo = true)
       // - Roxo (#9333EA): Polo Logístico (tipo_polo_satelite = 'polo_logistico' sem relacionamento)
+      // - Amarelo (#F5DF09, opacidade menor): Município Satélite (queen 1ª ordem de polo estratégico)
       // - Amarelo (#F5DF09): Município Oportunidade (demais)
       map.addLayer({
         id: 'municipios-fill',
@@ -272,13 +347,17 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
             '#36C244',
             ['boolean', ['feature-state', 'isPoloLogistico'], false],
             '#9333EA',
+            ['boolean', ['feature-state', 'isSatellite'], false],
+            '#F5DF09',
             '#F5DF09'
           ],
           'fill-opacity': [
             'case',
             ['boolean', ['feature-state', 'hover'], false],
             0.5,
-            0.7
+            ['boolean', ['feature-state', 'isSatellite'], false],
+            0.35,
+            0.6
           ],
         },
       });
@@ -298,6 +377,8 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
               '#2A9A35',
               ['boolean', ['feature-state', 'isPoloLogistico'], false],
               '#7E22CE',
+              ['boolean', ['feature-state', 'isSatellite'], false],
+              '#C4A800',
               '#D4B800'
             ],
             [
@@ -306,6 +387,8 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
               '#2A9A35',
               ['boolean', ['feature-state', 'isPoloLogistico'], false],
               '#6B21A8',
+              ['boolean', ['feature-state', 'isSatellite'], false],
+              '#C4A800',
               '#C4A800'
             ]
           ],
@@ -368,6 +451,7 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
         'municipios-src',
         () => polosSetRef.current,
         () => polosLogisticosSetRef.current,
+        () => municipiosSatelitesSetRef.current,
         onMunicipioClick
       );
 
@@ -533,22 +617,10 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
     if (source) {
       console.log('[MapaPolos] 📥 Atualizando dados do mapa...');
       
-      // Se há município selecionado, mostrar apenas ele
-      if (selectedMunicipio?.codigo) {
-        const municipioFeature = baseMunicipios.features.find(
-          f => String(f.properties?.code_muni) === selectedMunicipio.codigo
-        );
-        if (municipioFeature) {
-          source.setData({
-            type: 'FeatureCollection',
-            features: [municipioFeature as any]
-          });
-        }
-      } else {
-        // Usar pipeline centralizado que respeita UF + Radar
-        const filteredFC = applyMunicipiosFilters();
-        source.setData(filteredFC);
-      }
+      // Sempre usar pipeline centralizado que respeita UF + Radar + Relacionamento
+      // Quando há município selecionado, ele será destacado visualmente, mas todos os polígonos filtrados permanecem visíveis
+      const filteredFC = applyMunicipiosFilters();
+      source.setData(filteredFC);
       
       // Aplicar feature states após atualizar os dados
       // Pequeno delay para garantir que os dados foram processados
@@ -556,7 +628,7 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
         applyFeatureStates();
       }, 100);
     }
-  }, [baseMunicipios, mapReady, applyFeatureStates, applyMunicipiosFilters, selectedMunicipio]);
+  }, [baseMunicipios, mapReady, applyFeatureStates, applyMunicipiosFilters]);
 
   // Aplicar feature states quando polosEstrategicosSet mudar
   useEffect(() => {
@@ -605,13 +677,8 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
       radarSource.setData(emptyFC);
     }
 
-    // IMPORTANTE: Usar função centralizada que respeita UF + Radar
-    // Se há município selecionado, não aplicar filtros (prioridade do município)
-    if (selectedMunicipio?.codigo) {
-      map.triggerRepaint();
-      return;
-    }
-
+    // IMPORTANTE: Usar função centralizada que respeita UF + Radar + Relacionamento
+    // Aplicar filtros normalmente mesmo quando há município selecionado
     const municipiosSrc = map.getSource('municipios-src') as maplibregl.GeoJSONSource | undefined;
     if (municipiosSrc) {
       const filteredFC = applyMunicipiosFilters();
@@ -620,7 +687,7 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
     }
 
     map.triggerRepaint();
-  }, [radarFilterActive, baseMunicipios, mapReady, applyMunicipiosFilters, selectedMunicipio]);
+  }, [radarFilterActive, relacionamentoFilterActive, baseMunicipios, mapReady, applyMunicipiosFilters]);
 
   // Aplicar destaque no município selecionado e fazer flyTo
   useEffect(() => {
@@ -712,19 +779,18 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
     const map = mapRef.current;
     if (!map || !mapReady || !baseMunicipios?.features?.length) return;
     
-    // Se há município selecionado, o efeito de município tem prioridade
-    if (selectedMunicipio?.codigo) return;
-    
     const municipiosSrc = map.getSource('municipios-src') as maplibregl.GeoJSONSource | undefined;
     if (!municipiosSrc) return;
     
-    // Usar função centralizada que respeita UF + Radar
+    // Usar função centralizada que respeita UF + Radar + Relacionamento
+    // Aplicar filtros normalmente mesmo quando há município selecionado
     const filteredFC = applyMunicipiosFilters();
     municipiosSrc.setData(filteredFC);
     
-    // Calcular bounds para fazer flyTo (apenas se houver UF selecionada)
+    // Calcular bounds para fazer flyTo (apenas se houver UF selecionada E não houver município selecionado)
+    // Quando há município selecionado, o flyTo é feito pelo useEffect específico do município
     const currentUFs = selectedUFs || [];
-    if (currentUFs.length > 0 && filteredFC.features.length > 0) {
+    if (currentUFs.length > 0 && filteredFC.features.length > 0 && !selectedMunicipio?.codigo) {
       let minLng = Infinity, maxLng = -Infinity;
       let minLat = Infinity, maxLat = -Infinity;
       
@@ -771,9 +837,9 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
     
     // Forçar re-render
     map.triggerRepaint();
-  }, [selectedUFs, selectedMunicipio, mapReady, baseMunicipios, applyMunicipiosFilters]);
+  }, [selectedUFs, selectedMunicipio, mapReady, baseMunicipios, applyMunicipiosFilters, relacionamentoFilterActive]);
 
-  // Atualizar pistas de voo no mapa (respeitando filtro de UF e Raio Estratégico)
+  // Atualizar pistas de voo no mapa (respeitando filtros de UF, Raio Estratégico e Relacionamento)
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapReady || !pistas.length) return;
@@ -825,6 +891,14 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
       });
     }
 
+    // Filtrar pistas por Relacionamento (apenas Polos Estratégicos) se ativo
+    if (relacionamentoFilterActive) {
+      pistasFiltradas = pistasFiltradas.filter(p => {
+        const codigoMuni = String(p.codigo || '');
+        return polosEstrategicosSet.has(codigoMuni);
+      });
+    }
+
     // Converter pistas filtradas para GeoJSON FeatureCollection
     const pistasFeatures: GeoJSON.Feature[] = pistasFiltradas
       .map(p => {
@@ -857,8 +931,9 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
     const filtrosAplicados = [];
     if (selectedUFs?.length) filtrosAplicados.push(`UF: ${selectedUFs.join(', ')}`);
     if (radarFilterActive) filtrosAplicados.push('Raio Estratégico');
+    if (relacionamentoFilterActive) filtrosAplicados.push('Relacionamento');
     console.log('[MapaPolos] ✈️ Pistas de voo atualizadas:', pistasFeatures.length, filtrosAplicados.length ? `(filtros: ${filtrosAplicados.join(', ')})` : '');
-  }, [pistas, mapReady, selectedUFs, radarFilterActive]);
+  }, [pistas, mapReady, selectedUFs, radarFilterActive, relacionamentoFilterActive, polosEstrategicosSet]);
 
   // Controlar visibilidade da camada de pistas baseado no filtro
   useEffect(() => {
@@ -894,19 +969,25 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
         {/* Polos Estratégicos */}
         <div className="flex items-center gap-2">
           <span className="inline-block w-3 h-3 rounded-full bg-[#36C244] border border-[#2A9A35]" />
-          <span className="text-sm font-medium text-slate-200">Polos Estratégicos</span>
+          <span className="text-sm font-medium text-slate-200">Polos Estratégicos - {legendCounts.strategic}</span>
+        </div>
+
+        {/* Municípios Satélites */}
+        <div className="flex items-center gap-2">
+          <span className="inline-block w-3 h-3 rounded-full bg-[#F5DF09] border border-[#C4A800] opacity-90" />
+          <span className="text-sm font-medium text-slate-200">Municípios Satélites - {legendCounts.satellite}</span>
         </div>
 
         {/* Polos Logísticos */}
         <div className="flex items-center gap-2">
           <span className="inline-block w-3 h-3 rounded-full bg-[#9333EA] border border-[#7E22CE]" />
-          <span className="text-sm font-medium text-slate-200">Polos Logísticos</span>
+          <span className="text-sm font-medium text-slate-200">Polos Logísticos - {legendCounts.logistic}</span>
         </div>
 
         {/* Municípios Oportunidade */}
         <div className="flex items-center gap-2">
           <span className="inline-block w-3 h-3 rounded-full bg-[#F5DF09] border border-[#D4B800]" />
-          <span className="text-sm font-medium text-slate-200">Municípios Oportunidade</span>
+          <span className="text-sm font-medium text-slate-200">Municípios Oportunidade - {legendCounts.oportunidade}</span>
         </div>
       </div>
 

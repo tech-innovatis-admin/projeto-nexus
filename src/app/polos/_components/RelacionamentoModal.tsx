@@ -23,7 +23,7 @@ export interface MunicipioDisponivel {
 
 export interface RelacionamentoModalProps {
   isOpen: boolean;
-  onClose: (novosCadastros?: number) => void;
+  onClose: (novosCadastros?: number, mudou?: boolean) => void;
   municipiosDisponiveis?: MunicipioDisponivel[];
 }
 
@@ -54,11 +54,13 @@ const RelacionamentoModal = memo(function RelacionamentoModal({
   const dropdownRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const novosCadastrosRef = useRef<number>(0);
+  const relacionamentosMudaramRef = useRef<boolean>(false);
 
-  // Carregar relacionamentos ao abrir e resetar contador
+  // Carregar relacionamentos ao abrir e resetar contadores
   useEffect(() => {
     if (isOpen) {
       novosCadastrosRef.current = 0;
+      relacionamentosMudaramRef.current = false;
       fetchRelacionamentos();
     }
   }, [isOpen]);
@@ -113,27 +115,30 @@ const RelacionamentoModal = memo(function RelacionamentoModal({
   // Removido: recarregar quando filtro de ativos mudar
   // Agora showOnlyActive é apenas um filtro de visualização, não recarrega dados
 
-  // Municípios filtrados por UF selecionada
+  // Municípios filtrados por UF (opcional) e/ou busca (pode buscar sem UF)
+  // Observação: quando NÃO há UF selecionada e a busca está vazia, não lista nada (evita dropdown gigante).
   const municipiosFiltrados = municipiosDisponiveis
     .filter(m => {
-      if (!selectedUF) return false;
-      
-      const ufData = m.UF?.toUpperCase();
-      const ufSelected = selectedUF.toUpperCase();
-      const ufFullName = UF_NAMES[ufSelected]?.toUpperCase();
+      // Se há UF selecionada, filtra por UF (comparando sigla e nome completo)
+      if (selectedUF) {
+        const ufData = m.UF?.toUpperCase();
+        const ufSelected = selectedUF.toUpperCase();
+        const ufFullName = UF_NAMES[ufSelected]?.toUpperCase();
+        if (ufData !== ufSelected && ufData !== ufFullName) return false;
+      }
 
-      // Compara tanto com a sigla quanto com o nome completo
-      if (ufData !== ufSelected && ufData !== ufFullName) return false;
-
-      // Filtrar por busca
+      // Se há termo de busca, filtra pelo nome do município (sempre)
       if (searchMunicipio) {
         const searchLower = searchMunicipio.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         const nomeLower = m.nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         return nomeLower.includes(searchLower);
       }
-      return true;
+
+      // Sem UF e sem busca: não listar nada
+      return Boolean(selectedUF);
     })
-    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+    .slice(0, selectedUF ? 2000 : 200);
 
   // Verificar se município já tem relacionamento
   const jaTemRelacionamento = (codigo: string) => {
@@ -142,8 +147,8 @@ const RelacionamentoModal = memo(function RelacionamentoModal({
 
   // Adicionar novo relacionamento
   const handleAddRelacionamento = async () => {
-    if (!selectedUF || !selectedMunicipio) {
-      setError('Selecione o estado e o município');
+    if (!selectedMunicipio) {
+      setError('Selecione o município');
       return;
     }
 
@@ -172,9 +177,10 @@ const RelacionamentoModal = memo(function RelacionamentoModal({
             })
           });
           const data = await res.json();
-          if (data.success) {
-            novosCadastrosRef.current += 1;
-            setSuccessMessage('Relacionamento reativado com sucesso!');
+      if (data.success) {
+        novosCadastrosRef.current += 1;
+        relacionamentosMudaramRef.current = true;
+        setSuccessMessage('Relacionamento reativado com sucesso!');
             await fetchRelacionamentos();
             resetForm();
           } else {
@@ -198,6 +204,7 @@ const RelacionamentoModal = memo(function RelacionamentoModal({
         const data = await res.json();
         if (data.success) {
           novosCadastrosRef.current += 1;
+          relacionamentosMudaramRef.current = true;
           setSuccessMessage('Relacionamento cadastrado com sucesso!');
           await fetchRelacionamentos();
           resetForm();
@@ -220,6 +227,7 @@ const RelacionamentoModal = memo(function RelacionamentoModal({
       });
       const data = await res.json();
       if (data.success) {
+        relacionamentosMudaramRef.current = true;
         setSuccessMessage('Relacionamento desativado');
         await fetchRelacionamentos();
       } else {
@@ -296,7 +304,7 @@ const RelacionamentoModal = memo(function RelacionamentoModal({
       {/* Overlay */}
       <div 
         className="absolute inset-0 bg-black/50 backdrop-blur-sm" 
-        onClick={() => onClose(novosCadastrosRef.current)}
+        onClick={() => onClose(novosCadastrosRef.current, relacionamentosMudaramRef.current)}
       />
       
       {/* Modal */}
@@ -315,7 +323,7 @@ const RelacionamentoModal = memo(function RelacionamentoModal({
             </div>
           </div>
           <button
-            onClick={() => onClose(novosCadastrosRef.current)}
+            onClick={() => onClose(novosCadastrosRef.current, relacionamentosMudaramRef.current)}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             aria-label="Fechar modal"
           >
@@ -384,8 +392,7 @@ const RelacionamentoModal = memo(function RelacionamentoModal({
                     setIsDropdownOpen(true);
                   }}
                   onFocus={() => setIsDropdownOpen(true)}
-                  placeholder={selectedUF ? 'Buscar município...' : 'Selecione o estado primeiro'}
-                  disabled={!selectedUF}
+                  placeholder={selectedUF ? 'Buscar município...' : 'Buscar município (sem UF também funciona)'}
                   className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:opacity-50 disabled:cursor-not-allowed pr-8"
                 />
                 {selectedMunicipio && (
@@ -404,11 +411,13 @@ const RelacionamentoModal = memo(function RelacionamentoModal({
               </div>
               
               {/* Dropdown de municípios */}
-              {isDropdownOpen && selectedUF && (
+              {isDropdownOpen && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-300 rounded-lg shadow-xl z-50 max-h-[200px] overflow-y-auto">
                   {municipiosFiltrados.length === 0 ? (
                     <div className="px-3 py-2 text-sm text-gray-500">
-                      {searchMunicipio ? 'Nenhum município encontrado' : 'Nenhum município disponível'}
+                      {searchMunicipio
+                        ? 'Nenhum município encontrado'
+                        : (selectedUF ? 'Nenhum município disponível' : 'Digite para buscar um município')}
                     </div>
                   ) : (
                     municipiosFiltrados.map(m => {
@@ -419,6 +428,14 @@ const RelacionamentoModal = memo(function RelacionamentoModal({
                           onClick={() => {
                             if (!temRelacionamento) {
                               setSelectedMunicipio(m.codigo);
+                              // Se UF ainda não foi selecionada, inferir UF do município escolhido
+                              if (!selectedUF && m.UF) {
+                                const ufRaw = String(m.UF).toUpperCase();
+                                const ufSigla = (TODAS_UFS as readonly string[]).includes(ufRaw)
+                                  ? ufRaw
+                                  : (Object.entries(UF_NAMES).find(([, nome]) => nome.toUpperCase() === ufRaw)?.[0] || '');
+                                if (ufSigla) setSelectedUF(ufSigla);
+                              }
                               setSearchMunicipio('');
                               setIsDropdownOpen(false);
                             }
@@ -453,7 +470,7 @@ const RelacionamentoModal = memo(function RelacionamentoModal({
             <div className="flex items-end">
               <button
                 onClick={handleAddRelacionamento}
-                disabled={!selectedUF || !selectedMunicipio || saving}
+                disabled={!selectedMunicipio || saving}
                 className="px-4 py-2 bg-sky-600 hover:bg-sky-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
               >
                 {saving ? (
@@ -606,7 +623,7 @@ const RelacionamentoModal = memo(function RelacionamentoModal({
             Total: {relacionamentos.filter(r => r.relacionamento_ativo).length} ativos de {relacionamentos.length} cadastrados
           </span>
           <button
-            onClick={() => onClose(novosCadastrosRef.current)}
+            onClick={() => onClose(novosCadastrosRef.current, relacionamentosMudaramRef.current)}
             className="px-4 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded transition-colors"
           >
             Fechar

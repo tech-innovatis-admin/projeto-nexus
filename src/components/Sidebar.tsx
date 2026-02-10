@@ -55,7 +55,6 @@ export default function Sidebar({ className = '' }: SidebarProps) {
   // Itens base do menu
   const baseMenuItems = [
     { id: 'home', label: 'Dashboard', icon: 'fa-solid fa-chart-line', path: '/mapa' },
-    { id: 'estrategia', label: 'Estratégia', icon: 'fa-solid fa-chess', path: '/estrategia' },
     { id: 'polos', label: 'Polos', icon: 'fa-solid fa-map-pin', path: '/polos' },
     { id: 'rotas', label: 'Roteamento', icon: 'fa-solid fa-route', path: '/rotas' },
     { id: 'logout', label: 'Logout', icon: 'fa-solid fa-right-from-bracket', path: '#' }

@@ -9,9 +9,11 @@ export type { MunicipiosGeoJSON, MunicipioRelacionamento, MunicipioFeature };
 interface PolosData {
   baseMunicipios: MunicipiosGeoJSON;
   municipiosRelacionamento: MunicipioRelacionamento[];
+  municipiosSatelites: string[];
   metadata: {
     totalMunicipios: number;
     totalRelacionamentos: number;
+    totalSatelites?: number;
     loadedAt: string;
   };
 }
@@ -28,7 +30,7 @@ interface PolosDataContextType {
 const PolosDataContext = createContext<PolosDataContextType | undefined>(undefined);
 
 // Cache local com TTL (30 dias) + SWR em background
-const CACHE_KEY = 'polos_data_cache_v1';
+const CACHE_KEY = 'polos_data_cache_v2';
 const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dias
 
 export function PolosDataProvider({ children }: { children: React.ReactNode }) {
@@ -90,6 +92,7 @@ export function PolosDataProvider({ children }: { children: React.ReactNode }) {
           const organizedData: PolosData = {
             baseMunicipios: data.baseMunicipios,
             municipiosRelacionamento: data.municipiosRelacionamento,
+            municipiosSatelites: Array.isArray(data.municipiosSatelites) ? data.municipiosSatelites : [],
             metadata: data.metadata
           };
           setLoadingProgress(100);
@@ -100,6 +103,7 @@ export function PolosDataProvider({ children }: { children: React.ReactNode }) {
         const organizedData: PolosData = {
           baseMunicipios: data.baseMunicipios,
           municipiosRelacionamento: data.municipiosRelacionamento,
+          municipiosSatelites: Array.isArray(data.municipiosSatelites) ? data.municipiosSatelites : [],
           metadata: data.metadata
         };
         applyResult(organizedData);
@@ -177,13 +181,27 @@ export function PolosDataProvider({ children }: { children: React.ReactNode }) {
 
       const relacionamentos = json.data;
 
-      // Atualizar apenas a parte de relacionamentos, mantendo baseMunicipios
+      // Buscar satélites atualizados (rota leve, sem S3)
+      let municipiosSatelites: string[] = polosData.municipiosSatelites || [];
+      try {
+        const satRes = await fetch('/api/polos/satelites');
+        const satData = await satRes.json();
+        if (Array.isArray(satData.municipiosSatelites)) {
+          municipiosSatelites = satData.municipiosSatelites;
+        }
+      } catch (satErr) {
+        console.warn('[PolosData] Erro ao buscar satélites, mantendo lista anterior:', satErr);
+      }
+
+      // Atualizar relacionamentos e satélites, mantendo baseMunicipios
       const updatedData: PolosData = {
         ...polosData,
         municipiosRelacionamento: relacionamentos,
+        municipiosSatelites,
         metadata: {
           ...polosData.metadata,
           totalRelacionamentos: relacionamentos.length,
+          totalSatelites: municipiosSatelites.length,
           loadedAt: new Date().toISOString()
         }
       };
@@ -203,7 +221,7 @@ export function PolosDataProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      console.log('[PolosData] Relacionamentos atualizados:', relacionamentos.length);
+      console.log('[PolosData] Relacionamentos e satélites atualizados:', relacionamentos.length, 'relacionamentos,', municipiosSatelites.length, 'satélites');
     } catch (err) {
       console.error('Erro ao atualizar relacionamentos:', err);
       setError(err instanceof Error ? err.message : 'Erro ao atualizar relacionamentos');

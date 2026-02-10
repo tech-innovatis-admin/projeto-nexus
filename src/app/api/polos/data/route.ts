@@ -30,6 +30,43 @@ export async function GET() {
       })
     ]);
 
+    // 3. Derivar municípios satélites (vizinhança Queen, 1ª ordem) a partir dos Polos Estratégicos (relacionamento_ativo=true)
+    type RelacionamentoRow = { code_muni: string; relacionamento_ativo?: boolean | null };
+    const municipiosRelacionamentoRows = (municipiosRelacionamento || []) as RelacionamentoRow[];
+
+    const strategicCodes = Array.from(
+      new Set(
+        municipiosRelacionamentoRows
+          .filter((m: RelacionamentoRow) => Boolean(m?.relacionamento_ativo))
+          .map((m: RelacionamentoRow) => String(m.code_muni))
+          .filter(Boolean)
+      )
+    );
+
+    const municipiosSatelites =
+      strategicCodes.length === 0
+        ? []
+        : Array.from(
+            new Set(
+              (
+                await prisma.municipio_vizinhanca_queen
+                  .findMany({
+                    where: {
+                      code_muni_a: { in: strategicCodes },
+                      ordem: 1,
+                    },
+                    select: { code_muni_b: true },
+                  })
+                  .catch((err: unknown) => {
+                    console.error('Erro ao buscar vizinhança queen do banco:', err);
+                    return [];
+                  })
+              )
+                .map((row: { code_muni_b: string }) => String(row.code_muni_b))
+                .filter(Boolean)
+            )
+          );
+
     // Validar e estruturar resposta
     const response = {
       baseMunicipios: baseMunicipios || {
@@ -37,9 +74,11 @@ export async function GET() {
         features: []
       },
       municipiosRelacionamento: municipiosRelacionamento || [],
+      municipiosSatelites,
       metadata: {
         totalMunicipios: baseMunicipios?.features?.length || 0,
         totalRelacionamentos: municipiosRelacionamento?.length || 0,
+        totalSatelites: municipiosSatelites.length,
         loadedAt: new Date().toISOString()
       }
     };

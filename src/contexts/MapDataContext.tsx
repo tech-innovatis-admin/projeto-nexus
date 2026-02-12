@@ -81,7 +81,7 @@ export function MapDataProvider({ children }: { children: React.ReactNode }) {
           const organizedData: MapData = {
             dados: files.find((f: any) => f.name === 'base_municipios.geojson')?.data || null,
             produtos: null,
-            parceiros: files.find((f: any) => f.name === 'parceiros1.json')?.data || null,
+            parceiros: null,
             pistas: files.find((f: any) => f.name === 'pistas_s3_lat_log.json')?.data || null,
             sedesMunicipais: files.find((f: any) => f.name === 'sedes_municipais_lat_long.json')?.data || null,
           };
@@ -93,7 +93,7 @@ export function MapDataProvider({ children }: { children: React.ReactNode }) {
         const organizedData: MapData = {
           dados: files.find((f: any) => f.name === 'base_municipios.geojson')?.data || null,
           produtos: null,
-          parceiros: files.find((f: any) => f.name === 'parceiros1.json')?.data || null,
+          parceiros: null,
           pistas: files.find((f: any) => f.name === 'pistas_s3_lat_log.json')?.data || null,
           sedesMunicipais: files.find((f: any) => f.name === 'sedes_municipais_lat_long.json')?.data || null,
         };

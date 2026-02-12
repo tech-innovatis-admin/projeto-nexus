@@ -186,19 +186,59 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
     return { totalNoEscopo, alcancados, percentual, escopoLabel };
   }, [baseMunicipios?.features?.length, selectedUFs, radarFilterActive, polosEstrategicosSet]);
 
-  // Contagens para legenda (mutuamente exclusivas por prioridade de exibição)
+  // Contagens para legenda (dinâmicas por recorte UF/Região/Radar)
   const legendCounts = useMemo(() => {
-    const total = baseMunicipios?.features?.length ?? 0;
-    const countBloqueado = municipiosBloqueadosSet.size;
-    const countStrategic = polosEstrategicosSet.size;
-    const countSatellite = municipiosSatelitesSet.size;
-    const countLogistic = Array.from(polosLogisticosSet).filter(
-      (code) => !polosEstrategicosSet.has(code)
-    ).length;
-    const countOportunidade = Math.max(
-      0,
-      total - countBloqueado - countStrategic - countSatellite - countLogistic
-    );
+    if (!baseMunicipios?.features?.length) {
+      return { bloqueado: 0, strategic: 0, satellite: 0, logistic: 0, oportunidade: 0 };
+    }
+    let features = [...baseMunicipios.features];
+
+    // Filtrar por UF/Região (mesmo filtro do mapa)
+    if (selectedUFs && selectedUFs.length > 0) {
+      const siglaToNome: Record<string, string> = {
+        'AC': 'Acre', 'AL': 'Alagoas', 'AP': 'Amapá', 'AM': 'Amazonas',
+        'BA': 'Bahia', 'CE': 'Ceará', 'DF': 'Distrito Federal',
+        'ES': 'Espírito Santo', 'GO': 'Goiás', 'MA': 'Maranhão',
+        'MT': 'Mato Grosso', 'MS': 'Mato Grosso do Sul', 'MG': 'Minas Gerais',
+        'PA': 'Pará', 'PB': 'Paraíba', 'PR': 'Paraná', 'PE': 'Pernambuco',
+        'PI': 'Piauí', 'RJ': 'Rio de Janeiro', 'RN': 'Rio Grande do Norte',
+        'RS': 'Rio Grande do Sul', 'RO': 'Rondônia', 'RR': 'Roraima',
+        'SC': 'Santa Catarina', 'SP': 'São Paulo', 'SE': 'Sergipe', 'TO': 'Tocantins'
+      };
+      const estadosNomes = new Set(selectedUFs.map(uf => siglaToNome[uf] || uf));
+      features = features.filter(f => estadosNomes.has(f.properties?.name_state || ''));
+    }
+
+    // Filtrar por Radar Estratégico (se ativo)
+    if (radarFilterActive) {
+      const JOAO_PESSOA_COORDS: [number, number] = [-34.95096946933421, -7.14804917856058];
+      const circle = turf.circle(JOAO_PESSOA_COORDS, 1300, { steps: 128, units: 'kilometers' });
+      features = features.filter(f => {
+        try { return turf.booleanIntersects(circle as any, f as any); } catch { return false; }
+      });
+    }
+
+    // Classificar cada município no escopo (prioridade: bloqueado > strategic > logistic > satellite > oportunidade)
+    let countBloqueado = 0;
+    let countStrategic = 0;
+    let countLogistic = 0;
+    let countSatellite = 0;
+    let countOportunidade = 0;
+
+    features.forEach(f => {
+      const codeMuni = String(f.properties?.code_muni || '');
+      const isBloqueado = municipiosBloqueadosSet.has(codeMuni);
+      const isPolo = polosEstrategicosSet.has(codeMuni);
+      const isPoloLogistico = polosLogisticosSet.has(codeMuni) && !isPolo;
+      const isSatellite = municipiosSatelitesSet.has(codeMuni) && !isPolo && !isPoloLogistico;
+
+      if (isBloqueado) countBloqueado++;
+      else if (isPolo) countStrategic++;
+      else if (isPoloLogistico) countLogistic++;
+      else if (isSatellite) countSatellite++;
+      else countOportunidade++;
+    });
+
     return {
       bloqueado: countBloqueado,
       strategic: countStrategic,
@@ -206,7 +246,7 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
       logistic: countLogistic,
       oportunidade: countOportunidade
     };
-  }, [baseMunicipios?.features?.length, municipiosBloqueadosSet, polosEstrategicosSet, municipiosSatelitesSet, polosLogisticosSet]);
+  }, [baseMunicipios?.features?.length, selectedUFs, radarFilterActive, municipiosBloqueadosSet, polosEstrategicosSet, municipiosSatelitesSet, polosLogisticosSet]);
 
   // Função centralizada para aplicar filtros de municípios em sequência
   // Pipeline: UF → Radar → Relacionamento → (outros filtros futuros)

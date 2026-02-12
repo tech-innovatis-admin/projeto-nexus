@@ -6,6 +6,5 @@ if (process.env.NODE_ENV === 'production') {
   console.info = noop;
   console.debug = noop;
   console.trace = noop;
+  console.warn = noop;  
 }
-
-

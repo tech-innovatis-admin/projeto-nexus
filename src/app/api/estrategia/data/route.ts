@@ -49,7 +49,7 @@ export async function GET() {
     const result = {
       poloValores: files.find(f => f.name === 'base_polo_valores.geojson')?.data || mockPoloValores,
       poloPeriferia: files.find(f => f.name === 'base_polo_periferia.geojson')?.data || mockPoloPeriferia,
-      municipiosRelacionamento: files.find(f => f.name === 'municipios_relacionamento.json')?.data || []
+      municipiosRelacionamento: [] // Relacionamentos vêm do banco (tabela municipios_com_relacionamento)
     };
 
     return NextResponse.json(result);

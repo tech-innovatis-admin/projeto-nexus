@@ -10,7 +10,6 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { parse } from 'dotenv';
 
 
-// --- Configuration ---
 const REGION = process.env.AWS_REGION || 'us-east-1';
 const BUCKET_NAME = process.env.AWS_S3_BUCKET || 'projeto-nexus-aws';
 
@@ -163,11 +162,9 @@ export async function getFileFromS3(filename: string): Promise<any> {
 export async function fetchAllGeoJSONFiles() {
   const fileNames = [
     'base_municipios.geojson',
-    'parceiros1.json',
     'pistas_s3_lat_log.json',
     'sedes_municipais_lat_long.json',
-    'municipios_sem_tag.json',
-    'municipios_relacionamento.json'
+    'municipios_sem_tag.json'
   ];
 
   console.log(`📥 S3: Batch loading ${fileNames.length} GeoJSON files...`);
@@ -184,18 +181,13 @@ export async function fetchAllGeoJSONFiles() {
 export async function fetchEstrategiaData() {
   const fileNames = [
     'base_polo_valores.geojson',
-    'base_polo_periferia.geojson',
-    'municipios_relacionamento.json'
+    'base_polo_periferia.geojson'
   ];
 
   return Promise.all(fileNames.map(async (name) => ({
     name,
     data: await getFileFromS3(name)
   })));
-}
-
-export async function fetchEnvConfig() {
-  return getFileFromS3('senhas_s3.json').catch(() => null);
 }
 
 // --- Error Handling ---

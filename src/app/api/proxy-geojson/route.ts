@@ -15,13 +15,11 @@ export async function GET(request: NextRequest) {
     // Lista de arquivos permitidos
     const allowedFiles = [
       "base_municipios.geojson",
-      "parceiros1.json",
       "pistas_s3_lat_log.json",
       "sedes_municipais_lat_long.json",
       "municipios_sem_tag.json",
       "base_polo_valores.geojson",
-      "base_polo_periferia.geojson",
-      "municipios_relacionamento.json"
+      "base_polo_periferia.geojson"
     ];
 
     // Extrai apenas o nome do arquivo, sem qualquer caminho

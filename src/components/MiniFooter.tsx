@@ -2,7 +2,7 @@ const MiniFooter = () => {
   const currentYear = new Date().getFullYear();
   
   return (
-    <footer className="w-full bg-[#0f172a] border-t border-slate-700/30 relative z-10">
+    <footer className="sticky bottom-0 w-full bg-[#0f172a] border-t border-slate-700/30 relative z-10">
       <div className="max-w-screen-xl mx-auto px-4 py-5 text-sm">
         <div className="flex flex-col md:flex-row md:justify-between md:items-center">
           {/* Links à esquerda */}

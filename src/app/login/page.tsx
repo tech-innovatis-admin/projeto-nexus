@@ -13,6 +13,7 @@ import Image from "next/image"; // Importação do componente Image
 import { FaEye, FaEyeSlash } from 'react-icons/fa'; // Ícones para mostrar/ocultar senha
 import { useUser } from "@/contexts/UserContext"; // Hook para dados do usuário
 import MiniFooter from "@/components/MiniFooter"; // Componente de rodapé
+import { preloadPolosDataOnLogin } from "@/contexts/PolosDataContext";
 
 export default function LoginPage() {
   // Estados para controle do formulário
@@ -61,6 +62,9 @@ export default function LoginPage() {
           setUser(data.user);
         }
 
+        // 🚀 Pré-carregar dados de polos em background
+        preloadPolosDataOnLogin();
+
         // Espera um momento para o cookie ser definido
         console.log('⏳ [LoginPage] Aguardando cookie ser definido...');
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -100,7 +104,7 @@ export default function LoginPage() {
 
   return (
     // Container principal com gradiente de fundo
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-slate-700 p-4">
+    <div className="h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-slate-700 p-4">
       {/* Card de login com efeito de vidro e animação de entrada */}
       <motion.div
         className="w-full max-w-sm bg-white/10 backdrop-blur-md shadow-xl shadow-black/20 rounded-xl p-6"

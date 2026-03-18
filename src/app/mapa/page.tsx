@@ -2,6 +2,7 @@
 import dynamic from "next/dynamic";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
+import { motion } from "framer-motion";
 import type { Feature, FeatureCollection } from "geojson";
 import "leaflet/dist/leaflet.css";
 import Image from "next/image";
@@ -173,6 +174,7 @@ function MapaPageContent() {
   const planeIconRef = useRef<HTMLDivElement>(null);
   const estadosDropdownRef = useRef<HTMLDivElement>(null);
   const municipiosDropdownRef = useRef<HTMLDivElement>(null);
+  const initialLoadDoneRef = useRef(false);
 
   // Controle de permissões para viewers
   const [fullAccess, setFullAccess] = useState<boolean | null>(null);
@@ -340,6 +342,36 @@ function MapaPageContent() {
     }
   }, [mapData, userInfo, user?.role, fullAccess]);
   
+    // Estado pré-selecionado como padrão
+  // Estado pré-selecionado como padrão (apenas uma vez)
+  useEffect(() => {
+    if (estados.length > 0 && !initialLoadDoneRef.current) {
+      const estadoPadrao = "Paraíba";
+      const estadoExiste = estados.find(e => e === estadoPadrao);
+      
+      if (estadoExiste) {
+        setEstadoSelecionado(estadoPadrao);
+        setEstadoInputValue(estadoPadrao);
+        console.log(`📍 [MapaPage] ${userInfo} - Estado padrão carregado: ${estadoPadrao}`);
+      }
+    }
+  }, [estados, userInfo]);
+
+  // Município pré-selecionado como padrão (apenas uma vez)
+  useEffect(() => {
+    if (municipios.length > 0 && estadoSelecionado === "Paraíba" && !initialLoadDoneRef.current) {
+      const municipioPadrao = "João Pessoa";
+      const municipioExiste = municipios.find(m => m === municipioPadrao);
+      
+      if (municipioExiste) {
+        setMunicipioSelecionadoDropdown(municipioPadrao);
+        setMunicipioInputValue(municipioPadrao);
+        initialLoadDoneRef.current = true; // Marca como feito
+        console.log(`🏛️ [MapaPage] ${userInfo} - Município padrão carregado: ${municipioPadrao}`);
+      }
+    }
+  }, [municipios, estadoSelecionado, userInfo]);
+
   // Atualizar municípios quando um estado for selecionado
   useEffect(() => {
     if (!estadoSelecionado || !mapData?.dados) {
@@ -625,7 +657,7 @@ function MapaPageContent() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#0f172a] to-[#1e293b] text-white">
+    <div className="h-screen flex flex-col bg-gradient-to-br from-[#0f172a] to-[#1e293b] text-white">
       {/* Navbar componentizado - apenas com logo e título */}
       <Navbar />
 
@@ -635,7 +667,25 @@ function MapaPageContent() {
         {/* Conteúdo principal */}
         <div className="flex-1 flex flex-col overflow-hidden">
       
-      {/* Área de busca e título */}
+      {/* Header da página */}
+      <div className="p-4 border-b border-slate-700/50">
+        <div className="w-full max-w-[1400px] mx-auto px-4">
+          <div className="w-full md:max-w-[1200px] mx-auto">
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="flex flex-col md:flex-row md:justify-between md:items-center gap-2 md:gap-0"
+            >
+              <h1 className="text-3xl font-bold text-white">
+                <span className="text-sky-400">Dashboard</span>
+              </h1>
+            </motion.div>
+          </div>
+        </div>
+      </div>
+
+      {/* Área de filtros e busca */}
       <div className="w-full py-3 border-b border-slate-700/50">
         <div className="w-full max-w-[1400px] mx-auto px-4">
           <div className="w-full md:max-w-[1200px] mx-auto">
@@ -657,16 +707,16 @@ function MapaPageContent() {
                       setEstadosSubmenuOpen(true);
                       // Não modificar estadosExpanded automaticamente - deixar o usuário controlar
                     }}
-                    onFocus={() => {
-                      // Limpeza automática: ao clicar, apagar o conteúdo anterior
-                      setEstadoInputValue("");
-                      setEstadoSelecionado("");
-                      setEstadosSubmenuOpen(true);
-                      // Também limpar o município quando mudar de estado
-                      setMunicipioInputValue("");
-                      setMunicipioSelecionadoDropdown("");
-                      console.log(`🧹 [MapaPage] ${userInfo} - Campo de Estado limpo automaticamente ao focar`);
-                    }}
+                  onFocus={() => {
+                    // Limpeza automática: ao clicar, apagar o conteúdo anterior
+                    setEstadoInputValue("");
+                    setEstadoSelecionado("");
+                    setEstadosSubmenuOpen(true);
+                    // Também limpar o município quando mudar de estado
+                    setMunicipioInputValue("");
+                    setMunicipioSelecionadoDropdown("");
+                    console.log(`🧹 [MapaPage] ${userInfo} - Campo de Estado limpo automaticamente ao focar`);
+                  }}
                     placeholder="Digite o estado..."
                     className="appearance-none w-full rounded-md bg-[#1e293b] text-white placeholder-slate-400 border border-slate-600 px-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-left"
                   />
@@ -822,6 +872,7 @@ function MapaPageContent() {
                 </div>
               </div>
               
+              {/*
                 <button
                   className="w-full md:w-auto bg-sky-700 hover:bg-sky-800 text-white font-semibold py-1.5 px-4 rounded-md flex items-center justify-center gap-2 transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-[#0f172a]"
                   type="submit"
@@ -832,6 +883,7 @@ function MapaPageContent() {
                   </svg>
                   Buscar
                 </button>
+              */}
 
               <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
                 {/* Botão de Exportar com menu e opção avançada */}

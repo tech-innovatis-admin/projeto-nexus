@@ -27,6 +27,36 @@ const REGIOES_BRASIL: Record<string, string[]> = {
 
 const TODAS_UFS = Object.values(REGIOES_BRASIL).flat();
 
+function LoadingProgressBar({ progress }: { progress: number }) {
+  const getProgressColor = (progress: number) => {
+    if (progress < 33) {
+      return `linear-gradient(to right, #38bdf8, #0ea5e9, #0284c7)`;
+    } else if (progress < 66) {
+      return `linear-gradient(to right,rgb(31, 152, 207),rgb(34, 138, 190),rgb(30, 69, 175))`;
+    } else {
+      return `linear-gradient(to right,rgb(29, 85, 170),rgb(28, 59, 160),rgb(27, 54, 128))`;
+    }
+  };
+
+  return (
+    <div className="w-full max-w-3xl mx-auto mb-3 px-4">
+      <div className="w-full bg-gray-700 h-2 rounded-full overflow-hidden shadow-inner">
+        <div 
+          className="h-full rounded-full transition-all duration-300 ease-out shadow-lg progress-bar-shine"
+          style={{ 
+            width: `${progress}%`,
+            background: getProgressColor(progress)
+          }}
+        />
+      </div>
+      <div className="flex justify-between text-sm text-slate-400 mt-1 px-0.5">
+        <span>Carregando dados...</span>
+        <span>{progress}%</span>
+      </div>
+    </div>
+  );
+}
+
 // Constantes do Raio Estratégico (João Pessoa)
 const JOAO_PESSOA_COORDS: [number, number] = [-7.14804917856058, -34.95096946933421]; // [lat, lng]
 const JOAO_PESSOA_RADIUS_KM = 1300;
@@ -1109,6 +1139,21 @@ export default function PolosPage() {
                   </div>
                 </div>
               </motion.section>
+
+              {/* Barra de progresso - com margens adequadas */}
+              {loading && <div className="mt-4 px-2">
+                <LoadingProgressBar progress={loadingProgress} />
+              </div>}
+
+              {/* Título centralizado (visível apenas durante o carregamento) */}
+              {loading && (
+                <div className="flex justify-center mt-8 mb-6">
+                  <div className="text-center">
+                    <h2 className="text-lg font-bold text-gray-300">Análise Estratégica de Polos</h2>
+                    <p className="text-xs text-slate-300 mt-1">Carregando dados dos polos...</p>
+                  </div>
+                </div>
+              )}
 
               {/* Secao de Cards */}
               <motion.section

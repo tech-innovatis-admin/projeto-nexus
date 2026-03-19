@@ -677,8 +677,8 @@ function MapaPageContent() {
               transition={{ duration: 0.5 }}
               className="flex flex-col md:flex-row md:justify-between md:items-center gap-2 md:gap-0"
             >
-              <h1 className="text-3xl font-bold text-white">
-                <span className="text-sky-400">Dashboard</span>
+              <h1 className="text-2xl sm:text-3xl font-bold text-white">
+                  Perfil e Diagnóstico <span className="text-blue-400">Municipal</span>
               </h1>
             </motion.div>
           </div>

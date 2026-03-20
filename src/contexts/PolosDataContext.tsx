@@ -34,6 +34,9 @@ const PolosDataContext = createContext<PolosDataContextType | undefined>(undefin
 // Cache local com TTL (30 dias) + SWR em background
 const CACHE_KEY = 'polos_data_cache_v2';
 const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dias
+const DB_NAME = 'NexusDB';
+const DB_VERSION = 3;
+const STORE_NAME = 'polos_cache';
 
 export function PolosDataProvider({ children }: { children: React.ReactNode }) {
   const [polosData, setPolosData] = useState<PolosData | null>(null);
@@ -125,10 +128,16 @@ const loadPolosData = async () => {
     if (typeof window !== 'undefined') {
       try {
         const cached = await new Promise<{ timestamp: number; data: PolosData } | null>((resolve, reject) => {
-          const request = indexedDB.open('NexusDB', 1);
+          const request = indexedDB.open(DB_NAME, DB_VERSION);
           request.onsuccess = (e: any) => {
             const db = e.target.result;
-            const transaction = db.transaction(['polos_cache'], 'readonly');
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+              console.warn('[PolosData] Store não existe, ignorando cache IndexedDB');
+              resolve(null);
+              return;
+            }
+
+            const transaction = db.transaction([STORE_NAME], 'readonly');
             const store = transaction.objectStore('polos_cache');
             const getRequest = store.get('polos_data_v2');
             
@@ -297,28 +306,37 @@ export function usePolosData() {
   return context;
 }
 
-// Função para salvar no IndexedDB (muito mais espaço que localStorage)
+// Função para salvar no IndexedDB
 async function saveToIndexedDB(data: any) {
   return new Promise((resolve, reject) => {
-    const request = indexedDB.open('NexusDB', 1);
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
     
     request.onupgradeneeded = (e: any) => {
       const db = e.target.result;
-      if (!db.objectStoreNames.contains('polos_cache')) {
-        db.createObjectStore('polos_cache');
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
       }
     };
     
     request.onsuccess = (e: any) => {
       const db = e.target.result;
-      const transaction = db.transaction(['polos_cache'], 'readwrite');
-      const store = transaction.objectStore('polos_cache');
+
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        console.warn('[PreloadPolos] Store não existe, abortando save');
+        reject('Store não existe');
+        return;
+      }
+
+      // ✅ CRIAR TRANSACTION
+      const transaction = db.transaction([STORE_NAME], 'readwrite');
+      const store = transaction.objectStore(STORE_NAME);
       const putRequest = store.put(data, 'polos_data_v2');
       
       putRequest.onsuccess = () => {
         console.log('✅ [PreloadPolos] Dados salvos em IndexedDB com sucesso!');
         resolve(true);
       };
+
       putRequest.onerror = () => reject(putRequest.error);
     };
     
@@ -348,7 +366,7 @@ export function preloadPolosDataOnLogin() {
         };
         
         try {
-          // Tenta salvar em IndexedDB (melhor para dados grandes)
+          // Tenta salvar em IndexedDB
           await saveToIndexedDB(cacheData);
         } catch (err) {
           console.warn('⚠️ [PreloadPolos] IndexedDB não disponível, usando localStorage:', err);

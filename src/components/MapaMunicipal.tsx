@@ -221,7 +221,7 @@ export default function MapaMunicipal({ municipioSelecionado }: MapaMunicipalPro
         
         // Parceiros (marcadores customizados)
         const parceirosGroup = L.layerGroup();
-        const parceiros = mapData.parceiros;
+        const parceiros = mapData.parceiros || [];
         parceiros.forEach((p: any) => {
           const corMarcador = p.categoria === "funda" ? "#7DD3FC" : "#1E40AF";
           const buildingIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="${corMarcador}">

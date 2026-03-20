@@ -1101,19 +1101,19 @@ export default function PolosPage() {
                     {/* Botões Buscar e Limpar */}
                     <div className="flex flex-col justify-end">
                       <label className="text-slate-300 text-sm mb-0.5 text-center font-bold opacity-0">Buscar</label>
-                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full">
+                      <div className="flex flex-col xl:flex-row items-stretch xl:items-center gap-2 w-full max-w-full">
                         <button
                           onClick={handleBuscar}
-                          className="bg-sky-600 hover:bg-sky-700 active:bg-sky-800 active:scale-[0.98] text-white px-4 py-2.5 sm:px-5 sm:py-2 rounded-md font-medium transition-all duration-200 flex items-center justify-center gap-2 min-h-[44px] sm:min-h-[40px] flex-1 min-w-0 touch-manipulation"
+                          className="w-full xl:flex-1 bg-sky-600 hover:bg-sky-700 active:bg-sky-800 active:scale-[0.98] text-white px-4 py-2.5 sm:px-5 sm:py-2 rounded-md font-medium transition-all duration-200 flex items-center justify-center gap-2 min-h-[44px] sm:min-h-[40px] xl:min-w-[96px] touch-manipulation whitespace-nowrap"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 104.5 4.5a7.5 7.5 0 0012.15 12.15z" />
                           </svg>
-                          <span className="text-sm font-semibold truncate">Buscar</span>
+                          <span className="text-sm font-semibold whitespace-nowrap">Buscar</span>
                         </button>
                         <button
                           onClick={handleLimpar}
-                          className="bg-slate-600 hover:bg-slate-500 active:bg-slate-600 active:scale-[0.98] text-white px-4 py-2.5 sm:px-5 sm:py-2 rounded-md font-medium transition-all duration-200 flex items-center justify-center gap-2 min-h-[44px] sm:min-h-[40px] flex-1 min-w-0 touch-manipulation"
+                          className="w-full xl:flex-1 bg-slate-600 hover:bg-slate-500 active:bg-slate-600 active:scale-[0.98] text-white px-4 py-2.5 sm:px-5 sm:py-2 rounded-md font-medium transition-all duration-200 flex items-center justify-center gap-2 min-h-[44px] sm:min-h-[40px] xl:min-w-[96px] touch-manipulation whitespace-nowrap"
                         >
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
@@ -1130,7 +1130,7 @@ export default function PolosPage() {
                             <path d="M19 14H5l-1.973 6.767A1 1 0 0 0 4 22h16a1 1 0 0 0 .973-1.233z" />
                             <path d="m8 22 1-4" />
                           </svg>
-                          <span className="text-sm font-semibold truncate">Limpar</span>
+                          <span className="text-sm font-semibold whitespace-nowrap">Limpar</span>
                         </button>
                       </div>
                     </div>

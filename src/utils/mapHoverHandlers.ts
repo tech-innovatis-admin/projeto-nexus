@@ -214,20 +214,6 @@ export function attachMuniHoverHandlers(
 
     const props = (feature && (feature as any).properties) || {};
 
-    // --- Tooltip pegajoso (segue o mouse) ---
-    // sticky: true faz o tooltip seguir o cursor
-    // direction: "top" prefere posicionar acima do polígono
-    // offset: desloca verticamente para evitar conflito com cursor
-    // className: permite styling customizado via CSS
-    // opacity: opacidade suave (legibilidade mantida)
-    (layer as L.Path).bindTooltip(muniTooltipHtml(props), {
-      sticky: true,
-      direction: 'top',
-      offset: L.point(0, -12),
-      className: 'muni-tooltip',
-      opacity: 0.96,
-    });
-
     // --- Hover highlight (mouseover) ---
     layer.on('mouseover', function () {
       (layer as L.Path).setStyle(getHoverStyle());
@@ -246,10 +232,11 @@ export function attachMuniHoverHandlers(
       parentGeo.resetStyle(layer as any);
     });
 
-    // --- Fallback para touch/tap (click) ---
-    // Em dispositivos touch, não há "hover" nativo, então abrimos o tooltip no tap
+    // --- Click ---
+    // O clique é usado pela página para trocar o município selecionado.
+    // Não abrimos tooltip aqui para não cobrir os cards acima do mapa.
     layer.on('click', function () {
-      (layer as any).openTooltip();
+      parentGeo.resetStyle(layer as any);
     });
 
     // Nota: Não usamos setInterval ou setTimeout para hover

@@ -15,6 +15,7 @@ import DisableLogsClient from "@/components/DisableLogsClient";
 import { UserProvider } from "../contexts/UserContext";
 import { MapDataProvider } from "../contexts/MapDataContext";
 import { EstrategiaDataProvider } from "../contexts/EstrategiaDataContext";
+import AppShell from '@/components/AppShell';
 
 // Metadados da aplicação (SEO e configurações da página)
 export const metadata: Metadata = {
@@ -49,7 +50,9 @@ export default function RootLayout({
         <UserProvider>
           <MapDataProvider>
             <EstrategiaDataProvider>
-              {children}
+              <AppShell>
+                {children}
+              </AppShell>
             </EstrategiaDataProvider>
           </MapDataProvider>
         </UserProvider>

@@ -712,7 +712,6 @@ export default function PolosPage() {
   if (error) {
     return (
       <div className="h-screen flex flex-col bg-gradient-to-br from-[#0f172a] to-[#1e293b] text-white">
-        <Navbar />
         <div className="flex flex-1">
           <Sidebar />
           <main className="flex-1 flex items-center justify-center">
@@ -730,7 +729,6 @@ export default function PolosPage() {
   return (
     <div className="h-screen flex flex-col bg-gradient-to-br from-[#0f172a] to-[#1e293b] text-white">
       {/* Navbar */}
-      <Navbar />
       
       {/* Layout principal com Sidebar */}
       <div className="flex flex-1">

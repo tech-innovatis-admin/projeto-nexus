@@ -476,7 +476,6 @@ export default function RotasPage() {
   return (
     <div className="h-screen flex flex-col bg-gradient-to-br from-[#0f172a] to-[#1e293b] text-white">
       {/* Navbar */}
-      <Navbar />
       
       {/* Layout principal com Sidebar */}
       <div className="flex flex-1">

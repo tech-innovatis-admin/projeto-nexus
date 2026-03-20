@@ -58,9 +58,6 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
           </div>
         </div>
       </header>
-
-      {/* Divisor */}
-      <div className="mx-auto border-t border-slate-700 opacity-50 my-0.5 w-full"></div>
     </>
   );
 }

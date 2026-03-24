@@ -27,6 +27,36 @@ const REGIOES_BRASIL: Record<string, string[]> = {
 
 const TODAS_UFS = Object.values(REGIOES_BRASIL).flat();
 
+function LoadingProgressBar({ progress }: { progress: number }) {
+  const getProgressColor = (progress: number) => {
+    if (progress < 33) {
+      return `linear-gradient(to right, #38bdf8, #0ea5e9, #0284c7)`;
+    } else if (progress < 66) {
+      return `linear-gradient(to right,rgb(31, 152, 207),rgb(34, 138, 190),rgb(30, 69, 175))`;
+    } else {
+      return `linear-gradient(to right,rgb(29, 85, 170),rgb(28, 59, 160),rgb(27, 54, 128))`;
+    }
+  };
+
+  return (
+    <div className="w-full max-w-3xl mx-auto mb-3 px-4">
+      <div className="w-full bg-gray-700 h-2 rounded-full overflow-hidden shadow-inner">
+        <div 
+          className="h-full rounded-full transition-all duration-300 ease-out shadow-lg progress-bar-shine"
+          style={{ 
+            width: `${progress}%`,
+            background: getProgressColor(progress)
+          }}
+        />
+      </div>
+      <div className="flex justify-between text-sm text-slate-400 mt-1 px-0.5">
+        <span>Carregando dados...</span>
+        <span>{progress}%</span>
+      </div>
+    </div>
+  );
+}
+
 // Constantes do Raio Estratégico (João Pessoa)
 const JOAO_PESSOA_COORDS: [number, number] = [-7.14804917856058, -34.95096946933421]; // [lat, lng]
 const JOAO_PESSOA_RADIUS_KM = 1300;
@@ -681,8 +711,7 @@ export default function PolosPage() {
   // Error state
   if (error) {
     return (
-      <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#0f172a] to-[#1e293b] text-white">
-        <Navbar />
+      <div className="h-screen flex flex-col bg-gradient-to-br from-[#0f172a] to-[#1e293b] text-white">
         <div className="flex flex-1">
           <Sidebar />
           <main className="flex-1 flex items-center justify-center">
@@ -698,9 +727,8 @@ export default function PolosPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#0f172a] to-[#1e293b] text-white">
+    <div className="h-screen flex flex-col bg-gradient-to-br from-[#0f172a] to-[#1e293b] text-white">
       {/* Navbar */}
-      <Navbar />
       
       {/* Layout principal com Sidebar */}
       <div className="flex flex-1">
@@ -1073,19 +1101,19 @@ export default function PolosPage() {
                     {/* Botões Buscar e Limpar */}
                     <div className="flex flex-col justify-end">
                       <label className="text-slate-300 text-sm mb-0.5 text-center font-bold opacity-0">Buscar</label>
-                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full">
+                      <div className="flex flex-col xl:flex-row items-stretch xl:items-center gap-2 w-full max-w-full">
                         <button
                           onClick={handleBuscar}
-                          className="bg-sky-600 hover:bg-sky-700 active:bg-sky-800 active:scale-[0.98] text-white px-4 py-2.5 sm:px-5 sm:py-2 rounded-md font-medium transition-all duration-200 flex items-center justify-center gap-2 min-h-[44px] sm:min-h-[40px] flex-1 min-w-0 touch-manipulation"
+                          className="w-full xl:flex-1 bg-sky-600 hover:bg-sky-700 active:bg-sky-800 active:scale-[0.98] text-white px-4 py-2.5 sm:px-5 sm:py-2 rounded-md font-medium transition-all duration-200 flex items-center justify-center gap-2 min-h-[44px] sm:min-h-[40px] xl:min-w-[96px] touch-manipulation whitespace-nowrap"
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35m0 0A7.5 7.5 0 104.5 4.5a7.5 7.5 0 0012.15 12.15z" />
                           </svg>
-                          <span className="text-sm font-semibold truncate">Buscar</span>
+                          <span className="text-sm font-semibold whitespace-nowrap">Buscar</span>
                         </button>
                         <button
                           onClick={handleLimpar}
-                          className="bg-slate-600 hover:bg-slate-500 active:bg-slate-600 active:scale-[0.98] text-white px-4 py-2.5 sm:px-5 sm:py-2 rounded-md font-medium transition-all duration-200 flex items-center justify-center gap-2 min-h-[44px] sm:min-h-[40px] flex-1 min-w-0 touch-manipulation"
+                          className="w-full xl:flex-1 bg-slate-600 hover:bg-slate-500 active:bg-slate-600 active:scale-[0.98] text-white px-4 py-2.5 sm:px-5 sm:py-2 rounded-md font-medium transition-all duration-200 flex items-center justify-center gap-2 min-h-[44px] sm:min-h-[40px] xl:min-w-[96px] touch-manipulation whitespace-nowrap"
                         >
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
@@ -1102,13 +1130,28 @@ export default function PolosPage() {
                             <path d="M19 14H5l-1.973 6.767A1 1 0 0 0 4 22h16a1 1 0 0 0 .973-1.233z" />
                             <path d="m8 22 1-4" />
                           </svg>
-                          <span className="text-sm font-semibold truncate">Limpar</span>
+                          <span className="text-sm font-semibold whitespace-nowrap">Limpar</span>
                         </button>
                       </div>
                     </div>
                   </div>
                 </div>
               </motion.section>
+
+              {/* Barra de progresso - com margens adequadas */}
+              {loading && <div className="mt-4 px-2">
+                <LoadingProgressBar progress={loadingProgress} />
+              </div>}
+
+              {/* Título centralizado (visível apenas durante o carregamento) */}
+              {loading && (
+                <div className="flex justify-center mt-8 mb-6">
+                  <div className="text-center">
+                    <h2 className="text-lg font-bold text-gray-300">Análise Estratégica de Polos</h2>
+                    <p className="text-xs text-slate-300 mt-1">Carregando dados dos polos...</p>
+                  </div>
+                </div>
+              )}
 
               {/* Secao de Cards */}
               <motion.section

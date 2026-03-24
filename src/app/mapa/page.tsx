@@ -2,6 +2,7 @@
 import dynamic from "next/dynamic";
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
+import { motion } from "framer-motion";
 import type { Feature, FeatureCollection } from "geojson";
 import "leaflet/dist/leaflet.css";
 import Image from "next/image";
@@ -173,6 +174,9 @@ function MapaPageContent() {
   const planeIconRef = useRef<HTMLDivElement>(null);
   const estadosDropdownRef = useRef<HTMLDivElement>(null);
   const municipiosDropdownRef = useRef<HTMLDivElement>(null);
+  const initialLoadDoneRef = useRef(false);
+  const skipAutoSearchRef = useRef(false);
+  const pendingMapSelectionRef = useRef<{ estado: string; municipio: string } | null>(null);
 
   // Controle de permissões para viewers
   const [fullAccess, setFullAccess] = useState<boolean | null>(null);
@@ -340,6 +344,36 @@ function MapaPageContent() {
     }
   }, [mapData, userInfo, user?.role, fullAccess]);
   
+    // Estado pré-selecionado como padrão
+  // Estado pré-selecionado como padrão (apenas uma vez)
+  useEffect(() => {
+    if (estados.length > 0 && !initialLoadDoneRef.current) {
+      const estadoPadrao = "Paraíba";
+      const estadoExiste = estados.find(e => e === estadoPadrao);
+      
+      if (estadoExiste) {
+        setEstadoSelecionado(estadoPadrao);
+        setEstadoInputValue(estadoPadrao);
+        console.log(`📍 [MapaPage] ${userInfo} - Estado padrão carregado: ${estadoPadrao}`);
+      }
+    }
+  }, [estados, userInfo]);
+
+  // Município pré-selecionado como padrão (apenas uma vez)
+  useEffect(() => {
+    if (municipios.length > 0 && estadoSelecionado === "Paraíba" && !initialLoadDoneRef.current) {
+      const municipioPadrao = "João Pessoa";
+      const municipioExiste = municipios.find(m => m === municipioPadrao);
+      
+      if (municipioExiste) {
+        setMunicipioSelecionadoDropdown(municipioPadrao);
+        setMunicipioInputValue(municipioPadrao);
+        initialLoadDoneRef.current = true; // Marca como feito
+        console.log(`🏛️ [MapaPage] ${userInfo} - Município padrão carregado: ${municipioPadrao}`);
+      }
+    }
+  }, [municipios, estadoSelecionado, userInfo]);
+
   // Atualizar municípios quando um estado for selecionado
   useEffect(() => {
     if (!estadoSelecionado || !mapData?.dados) {
@@ -367,6 +401,15 @@ function MapaPageContent() {
 
     console.log(`🏛️ [MapaPage] ${userInfo} - Municípios encontrados para ${estadoSelecionado}: ${municipiosDoEstado.length}`);
     setMunicipios([...new Set(municipiosDoEstado)] as string[]);
+
+    const pendingSelection = pendingMapSelectionRef.current;
+    if (pendingSelection?.estado === estadoSelecionado) {
+      setMunicipioSelecionadoDropdown(pendingSelection.municipio);
+      setMunicipioInputValue(pendingSelection.municipio);
+      pendingMapSelectionRef.current = null;
+      console.log(`🗺️ [MapaPage] ${userInfo} - Município preservado após seleção pelo mapa`);
+      return;
+    }
     
     // Limpar município selecionado quando trocar de estado
     setMunicipioSelecionadoDropdown('');
@@ -393,6 +436,11 @@ function MapaPageContent() {
 
   // Busca automática APENAS quando município é selecionado no dropdown
   useEffect(() => {
+    if (skipAutoSearchRef.current) {
+      skipAutoSearchRef.current = false;
+      return;
+    }
+
     if (estadoSelecionado && municipioSelecionadoDropdown && mapData?.dados) {
       console.log(`🔍 [MapaPage] ${userInfo} - Busca automática iniciada para: ${municipioSelecionadoDropdown} - ${estadoSelecionado}`);
 
@@ -418,6 +466,85 @@ function MapaPageContent() {
   function removerAcentos(str: string) {
     return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   }
+
+  const mergeMunicipioWithProducts = useCallback((feature: Feature) => {
+    if (!mapData?.produtos?.features) return feature;
+
+    const municipioNome = feature.properties?.nome_municipio || feature.properties?.municipio;
+    const municipioEstado = feature.properties?.name_state;
+    const prodMatch = mapData.produtos.features.find((produtoFeature: Feature) => {
+      const nome = produtoFeature.properties?.nome_municipio || produtoFeature.properties?.municipio;
+      const uf = produtoFeature.properties?.name_state;
+      return nome === municipioNome && uf === municipioEstado;
+    });
+
+    if (!prodMatch) return feature;
+
+    return {
+      ...feature,
+      properties: {
+        ...feature.properties,
+        ...prodMatch.properties,
+      },
+    } as Feature;
+  }, [mapData]);
+
+  const isMunicipioPermitido = useCallback((feature: Feature) => {
+    if (!(user?.role && String(user.role).toLowerCase() === 'viewer' && fullAccess === false)) {
+      return true;
+    }
+
+    const nome = feature.properties?.nome_municipio || feature.properties?.municipio;
+    const ufName = feature.properties?.name_state;
+    const allowedStates = allowedUFStatesSetRef.current;
+    const allowedMunicipios = allowedMunicipiosKeySetRef.current;
+
+    return Boolean(
+      (ufName && allowedStates.has(ufName)) ||
+      (nome && ufName && allowedMunicipios.has(`${nome}|${ufName}`))
+    );
+  }, [fullAccess, user?.role]);
+
+  const selectMunicipio = useCallback((feature: Feature, source: 'busca' | 'mapa') => {
+    const municipioNome = feature.properties?.nome_municipio || feature.properties?.municipio || '';
+    const municipioEstado = feature.properties?.name_state || '';
+
+    if (!isMunicipioPermitido(feature)) {
+      console.warn(`🚫 [MapaPage] ${userInfo} - Acesso negado a ${municipioNome} - ${municipioEstado}`);
+      setErroBusca('Você não possui acesso ao município ou estado selecionado.');
+      return;
+    }
+
+    const municipioFinal = mergeMunicipioWithProducts(feature);
+    setErroBusca(null);
+    setMunicipioSelecionado(municipioFinal);
+
+    if (source === 'mapa') {
+      skipAutoSearchRef.current = true;
+      pendingMapSelectionRef.current = {
+        estado: municipioEstado,
+        municipio: municipioNome,
+      };
+
+      setEstadoSelecionado(municipioEstado);
+      setEstadoInputValue(municipioEstado);
+      setEstado(municipioEstado);
+      setSelectValue(municipioEstado);
+      setMunicipioSelecionadoDropdown(municipioNome);
+      setMunicipioInputValue(municipioNome);
+      setMunicipio(municipioNome);
+      setEstadosSubmenuOpen(false);
+      setMunicipiosSubmenuOpen(false);
+
+      console.log(`🗺️ [MapaPage] ${userInfo} - Município selecionado pelo mapa: ${municipioNome} - ${municipioEstado}`);
+
+      setTimeout(() => {
+        if (window.innerWidth < 768 && dadosRef.current) {
+          dadosRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 200);
+    }
+  }, [isMunicipioPermitido, mergeMunicipioWithProducts, setMunicipioSelecionado, userInfo]);
 
   // Buscar permissões do usuário viewer e preparar filtros da UI
   useEffect(() => {
@@ -549,8 +676,7 @@ function MapaPageContent() {
             } as Feature;
           }
         }
-        setMunicipioSelecionado(municipioFinal);
-        console.log(`🗺️ [MapaPage] ${userInfo} - Município selecionado no mapa`);
+        selectMunicipio(municipioFinal, 'busca');
 
         // Scroll para os dados no mobile
         setTimeout(() => {
@@ -616,8 +742,7 @@ function MapaPageContent() {
           } as Feature;
         }
       }
-      setMunicipioSelecionado(municipioFinal);
-      console.log(`🗺️ [MapaPage] ${userInfo} - Município selecionado no mapa (busca por texto)`);
+      selectMunicipio(municipioFinal, 'busca');
     } else {
       console.error(`❌ [MapaPage] ${userInfo} - Município não encontrado por texto: "${municipio}" em "${estado}"`);
       setErroBusca(`Município "${municipio}" não encontrado no estado "${estado}".`);
@@ -625,9 +750,9 @@ function MapaPageContent() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#0f172a] to-[#1e293b] text-white">
+    <div className="h-screen flex flex-col bg-gradient-to-br from-[#0f172a] to-[#1e293b] text-white">
       {/* Navbar componentizado - apenas com logo e título */}
-      <Navbar />
+      
 
       {/* sidebar */}
       <div className="flex flex-1">
@@ -635,7 +760,25 @@ function MapaPageContent() {
         {/* Conteúdo principal */}
         <div className="flex-1 flex flex-col overflow-hidden">
       
-      {/* Área de busca e título */}
+      {/* Header da página */}
+      <div className="p-4 border-b border-slate-700/50">
+        <div className="w-full max-w-[1400px] mx-auto px-4">
+          <div className="w-full md:max-w-[1200px] mx-auto">
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              className="flex flex-col md:flex-row md:justify-between md:items-center gap-2 md:gap-0"
+            >
+              <h1 className="text-2xl sm:text-3xl font-bold text-white">
+                  Perfil e Diagnóstico <span className="text-blue-400">Municipal</span>
+              </h1>
+            </motion.div>
+          </div>
+        </div>
+      </div>
+
+      {/* Área de filtros e busca */}
       <div className="w-full py-3 border-b border-slate-700/50">
         <div className="w-full max-w-[1400px] mx-auto px-4">
           <div className="w-full md:max-w-[1200px] mx-auto">
@@ -657,16 +800,16 @@ function MapaPageContent() {
                       setEstadosSubmenuOpen(true);
                       // Não modificar estadosExpanded automaticamente - deixar o usuário controlar
                     }}
-                    onFocus={() => {
-                      // Limpeza automática: ao clicar, apagar o conteúdo anterior
-                      setEstadoInputValue("");
-                      setEstadoSelecionado("");
-                      setEstadosSubmenuOpen(true);
-                      // Também limpar o município quando mudar de estado
-                      setMunicipioInputValue("");
-                      setMunicipioSelecionadoDropdown("");
-                      console.log(`🧹 [MapaPage] ${userInfo} - Campo de Estado limpo automaticamente ao focar`);
-                    }}
+                  onFocus={() => {
+                    // Limpeza automática: ao clicar, apagar o conteúdo anterior
+                    setEstadoInputValue("");
+                    setEstadoSelecionado("");
+                    setEstadosSubmenuOpen(true);
+                    // Também limpar o município quando mudar de estado
+                    setMunicipioInputValue("");
+                    setMunicipioSelecionadoDropdown("");
+                    console.log(`🧹 [MapaPage] ${userInfo} - Campo de Estado limpo automaticamente ao focar`);
+                  }}
                     placeholder="Digite o estado..."
                     className="appearance-none w-full rounded-md bg-[#1e293b] text-white placeholder-slate-400 border border-slate-600 px-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 text-left"
                   />
@@ -822,6 +965,7 @@ function MapaPageContent() {
                 </div>
               </div>
               
+              {/*
                 <button
                   className="w-full md:w-auto bg-sky-700 hover:bg-sky-800 text-white font-semibold py-1.5 px-4 rounded-md flex items-center justify-center gap-2 transition-colors duration-150 ease-in-out focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 focus:ring-offset-[#0f172a]"
                   type="submit"
@@ -832,6 +976,7 @@ function MapaPageContent() {
                   </svg>
                   Buscar
                 </button>
+              */}
 
               <div className="flex flex-col md:flex-row gap-3 w-full md:w-auto">
                 {/* Botão de Exportar com menu e opção avançada */}
@@ -964,7 +1109,7 @@ function MapaPageContent() {
                 gridTemplateRows: windowWidth < 1024 ? 'auto 1fr' : `${alturaMunicipioGestao}px ${alturaMapa}vh`
               }}>
                 {/* Container 1: Município e Gestão (linha 1, coluna 1) */}
-                <div className="bg-[#1e293b] rounded-lg shadow-lg p-0.5 border border-slate-600 animate-fade-in lg:col-start-1 lg:row-start-1" style={{
+                <div className="relative z-20 bg-[#1e293b] rounded-lg shadow-lg p-0.5 border border-slate-600 animate-fade-in lg:col-start-1 lg:row-start-1" style={{
                   height: windowWidth < 1024 ? 'auto' : `${alturaMunicipioGestao}px`,
                   minHeight: windowWidth < 1024 ? '250px' : `${alturaMunicipioGestao}px`
                 }}>
@@ -1174,7 +1319,7 @@ function MapaPageContent() {
                   </div>
                   
                 {/* Container 2: Produtos Municipais (ocupa toda a coluna direita) */}
-                <div className="bg-[#1e293b] rounded-lg shadow-lg p-0.5 border border-slate-600 animate-fade-in lg:col-start-2 lg:row-span-2 w-full" style={{
+                <div className="relative z-20 bg-[#1e293b] rounded-lg shadow-lg p-0.5 border border-slate-600 animate-fade-in lg:col-start-2 lg:row-span-2 w-full" style={{
                   height: windowWidth < 1024 ? '400px' : alturaTotalContainersEsquerda,
                   maxHeight: windowWidth < 1024 ? '50vh' : 'none'
                 }}>
@@ -1193,7 +1338,7 @@ function MapaPageContent() {
                 </div>
                 
                 {/* Container 3: Mapa interativo (abaixo do painel de município) */}
-                <div className="rounded-lg overflow-hidden shadow-lg bg-[#0f172a] border border-slate-600 animate-fade-in lg:col-start-1 lg:row-start-2" style={{
+                <div className="relative z-0 rounded-lg overflow-hidden shadow-lg bg-[#0f172a] border border-slate-600 animate-fade-in lg:col-start-1 lg:row-start-2" style={{
                   height: `${alturaMapa}vh`,
                   minHeight: windowWidth < 1024 ? '250px' : '300px',
                   maxHeight: windowWidth < 1024 ? '40vh' : 'none'
@@ -1212,6 +1357,7 @@ function MapaPageContent() {
               ) : (
                 <MapaMunicipal
                   municipioSelecionado={municipioSelecionado}
+                  onMunicipioClick={(feature) => selectMunicipio(feature, 'mapa')}
                 />
               )}
             </div>

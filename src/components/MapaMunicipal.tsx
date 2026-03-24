@@ -18,6 +18,7 @@ interface GeoJSONFile {
 // Tipos para as props do componente
 interface MapaMunicipalProps {
   municipioSelecionado: any;
+  onMunicipioClick?: (feature: any) => void;
 }
 
 // Função utilitária para remover acentos
@@ -97,7 +98,7 @@ function popupProdutos(p: any) {
   `;
 }
 
-export default function MapaMunicipal({ municipioSelecionado }: MapaMunicipalProps) {
+export default function MapaMunicipal({ municipioSelecionado, onMunicipioClick }: MapaMunicipalProps) {
   const mapRef = useRef<LeafletMap | null>(null);
   const layersRef = useRef<{ [key: string]: GeoJSON | LayerGroup | null }>({});
   const popupRef = useRef<L.Popup | null>(null);
@@ -195,6 +196,14 @@ export default function MapaMunicipal({ municipioSelecionado }: MapaMunicipalPro
 
         // Aplica handlers de hover a todos os layers da camada "Dados Gerais"
         applyMuniHoverToLayer(layersRef.current.dados as L.GeoJSON);
+        (layersRef.current.dados as L.GeoJSON).eachLayer((layer: any) => {
+          layer.on?.('click', () => {
+            const feature = layer.feature;
+            if (feature) {
+              onMunicipioClick?.(feature);
+            }
+          });
+        });
 
         // Adiciona a camada de dados gerais por padrão
         layersRef.current.dados.addTo(mapRef.current);
@@ -218,10 +227,18 @@ export default function MapaMunicipal({ municipioSelecionado }: MapaMunicipalPro
 
         // Aplica handlers de hover a todos os layers da camada "Produtos"
         applyMuniHoverToLayer(layersRef.current.produtos as L.GeoJSON);
+        (layersRef.current.produtos as L.GeoJSON).eachLayer((layer: any) => {
+          layer.on?.('click', () => {
+            const feature = layer.feature;
+            if (feature) {
+              onMunicipioClick?.(feature);
+            }
+          });
+        });
         
         // Parceiros (marcadores customizados)
         const parceirosGroup = L.layerGroup();
-        const parceiros = mapData.parceiros;
+        const parceiros = mapData.parceiros || [];
         parceiros.forEach((p: any) => {
           const corMarcador = p.categoria === "funda" ? "#7DD3FC" : "#1E40AF";
           const buildingIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="${corMarcador}">
@@ -269,7 +286,7 @@ export default function MapaMunicipal({ municipioSelecionado }: MapaMunicipalPro
       // Marca que o mapa está pronto para receber destaques
       setMapReady(true);
     }, 100);
-  }, [mapData, loading, layerState]);
+  }, [mapData, loading, layerState, onMunicipioClick]);
 
   // Atualiza visibilidade das camadas ao mudar o estado
   useEffect(() => {

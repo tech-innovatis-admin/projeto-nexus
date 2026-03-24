@@ -34,6 +34,9 @@ const PolosDataContext = createContext<PolosDataContextType | undefined>(undefin
 // Cache local com TTL (30 dias) + SWR em background
 const CACHE_KEY = 'polos_data_cache_v2';
 const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 dias
+const DB_NAME = 'NexusDB';
+const DB_VERSION = 3;
+const STORE_NAME = 'polos_cache';
 
 export function PolosDataProvider({ children }: { children: React.ReactNode }) {
   const [polosData, setPolosData] = useState<PolosData | null>(null);
@@ -119,40 +122,78 @@ export function PolosDataProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const loadPolosData = async () => {
-    try {
-      // 1) Tenta servir do cache (sem revalidação em background)
-      if (typeof window !== 'undefined') {
-        try {
-          const raw = localStorage.getItem(CACHE_KEY);
-          if (raw) {
-            const cached = JSON.parse(raw) as { timestamp: number; data: PolosData };
-            const isFresh = Date.now() - cached.timestamp < CACHE_TTL_MS;
-            if (cached.data && isFresh) {
-              // Cache ainda é fresco, servir e NÃO revalidar (com fallback para campos novos)
-              const data = cached.data as PolosData;
-              setPolosData({
-                ...data,
-                municipiosBloqueados: Array.isArray(data.municipiosBloqueados) ? data.municipiosBloqueados : [],
-              });
-              setError(null);
-              setLoading(false);
+const loadPolosData = async () => {
+  try {
+    // 1) Tenta ler do IndexedDB primeiro (dados são maiores)
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = await new Promise<{ timestamp: number; data: PolosData } | null>((resolve, reject) => {
+          const request = indexedDB.open(DB_NAME, DB_VERSION);
+          request.onsuccess = (e: any) => {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+              console.warn('[PolosData] Store não existe, ignorando cache IndexedDB');
+              resolve(null);
               return;
             }
-          }
-        } catch (e) {
-          console.warn('Erro ao ler cache de polos:', e);
-        }
-      }
 
-      // 2) Sem cache válido → carregamento completo com barra de progresso
-      await fetchAndStore(true);
-    } catch (err) {
-      console.error('Erro ao carregar dados de polos:', err);
-      setError(err instanceof Error ? err.message : 'Erro ao carregar dados de polos');
-      setLoading(false);
+            const transaction = db.transaction([STORE_NAME], 'readonly');
+            const store = transaction.objectStore('polos_cache');
+            const getRequest = store.get('polos_data_v2');
+            
+            getRequest.onsuccess = () => resolve(getRequest.result || null);
+            getRequest.onerror = () => reject(getRequest.error);
+          };
+          request.onerror = () => reject(request.error);
+        });
+        
+        if (cached && cached.timestamp && cached.data) {
+          const isFresh = Date.now() - cached.timestamp < CACHE_TTL_MS;
+          if (isFresh) {
+            console.log('📦 [PolosData] Servindo dados do IndexedDB (cache fresco)');
+            setPolosData({
+              ...cached.data,
+              municipiosBloqueados: Array.isArray(cached.data.municipiosBloqueados) ? cached.data.municipiosBloqueados : [],
+            });
+            setError(null);
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('Erro ao ler IndexedDB, tentando localStorage:', e);
+      }
+      
+      // 2) Fallback para localStorage
+      try {
+        const raw = localStorage.getItem(CACHE_KEY);
+        if (raw) {
+          const cached = JSON.parse(raw) as { timestamp: number; data: PolosData };
+          const isFresh = Date.now() - cached.timestamp < CACHE_TTL_MS;
+          if (cached.data && isFresh) {
+            console.log('📦 [PolosData] Servindo dados do localStorage (cache fresco)');
+            setPolosData({
+              ...cached.data,
+              municipiosBloqueados: Array.isArray(cached.data.municipiosBloqueados) ? cached.data.municipiosBloqueados : [],
+            });
+            setError(null);
+            setLoading(false);
+            return;
+          }
+        }
+      } catch (e) {
+        console.warn('Erro ao ler cache localStorage:', e);
+      }
     }
-  };
+
+    // 3) Sem cache válido → carregamento completo com barra de progresso
+    await fetchAndStore(true);
+  } catch (err) {
+    console.error('Erro ao carregar dados de polos:', err);
+    setError(err instanceof Error ? err.message : 'Erro ao carregar dados de polos');
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
     // Executa apenas uma vez quando o provider monta
@@ -263,4 +304,83 @@ export function usePolosData() {
     throw new Error('usePolosData must be used within a PolosDataProvider');
   }
   return context;
+}
+
+// Função para salvar no IndexedDB
+async function saveToIndexedDB(data: any) {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    
+    request.onupgradeneeded = (e: any) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
+    };
+    
+    request.onsuccess = (e: any) => {
+      const db = e.target.result;
+
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        console.warn('[PreloadPolos] Store não existe, abortando save');
+        reject('Store não existe');
+        return;
+      }
+
+      // ✅ CRIAR TRANSACTION
+      const transaction = db.transaction([STORE_NAME], 'readwrite');
+      const store = transaction.objectStore(STORE_NAME);
+      const putRequest = store.put(data, 'polos_data_v2');
+      
+      putRequest.onsuccess = () => {
+        console.log('✅ [PreloadPolos] Dados salvos em IndexedDB com sucesso!');
+        resolve(true);
+      };
+
+      putRequest.onerror = () => reject(putRequest.error);
+    };
+    
+    request.onerror = () => reject(request.error);
+  });
+}
+
+// Função para pré-carregar dados de polos com IndexedDB
+export function preloadPolosDataOnLogin() {
+  if (typeof window === 'undefined') return;
+  
+  console.log('🚀 [PreloadPolos] Iniciando pré-carregamento em background...');
+  
+  fetch('/api/polos/data', { priority: 'low' })
+    .then(res => res.json())
+    .then(async (data) => {
+      if (data?.baseMunicipios) {
+        const cacheData = {
+          timestamp: Date.now(),
+          data: {
+            baseMunicipios: data.baseMunicipios,
+            municipiosRelacionamento: data.municipiosRelacionamento || [],
+            municipiosSatelites: data.municipiosSatelites || [],
+            municipiosBloqueados: data.municipiosBloqueados || [],
+            metadata: data.metadata || {}
+          }
+        };
+        
+        try {
+          // Tenta salvar em IndexedDB
+          await saveToIndexedDB(cacheData);
+        } catch (err) {
+          console.warn('⚠️ [PreloadPolos] IndexedDB não disponível, usando localStorage:', err);
+          try {
+            // Fallback para localStorage se IndexedDB falhar
+            localStorage.setItem('polos_data_cache_v2', JSON.stringify(cacheData));
+            console.log('✅ [PreloadPolos] Dados salvos em localStorage');
+          } catch (e) {
+            console.warn('⚠️ [PreloadPolos] localStorage também cheio, dados não foram cacheados');
+          }
+        }
+      }
+    })
+    .catch(err => {
+      console.warn('⚠️ [PreloadPolos] Erro ao pré-carregar:', err.message);
+    });
 }

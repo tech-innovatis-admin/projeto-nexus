@@ -517,5 +517,30 @@ button {
 }
 
 /* ============================================================ */
+/* Hierarquia visual do Leaflet                                 */
+/* Mantém tooltips/popups do mapa abaixo dos cards superiores   */
+/* ============================================================ */
+.leaflet-container {
+  z-index: 0 !important;
+}
+
+.leaflet-pane,
+.leaflet-top,
+.leaflet-bottom,
+.leaflet-control {
+  z-index: 1 !important;
+}
+
+.leaflet-tooltip-pane,
+.leaflet-popup-pane {
+  z-index: 2 !important;
+}
+
+.leaflet-tooltip.muni-tooltip,
+.leaflet-popup {
+  z-index: 2 !important;
+}
+
+/* ============================================================ */
 /* Fim de estilos de hover de municípios                        */
 /* ============================================================ */

@@ -108,6 +108,7 @@ export const config = {
     '/rotas/:path*',
     '/login',
     '/data/:path*',
-    '/perfil/:path*'
+    '/perfil/:path*',
+    '/polos/:path*'
   ]
 };

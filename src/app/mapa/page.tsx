@@ -750,7 +750,7 @@ function MapaPageContent() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-gradient-to-br from-[#0f172a] to-[#1e293b] text-white">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-[#0f172a] to-[#1e293b] text-white">
       {/* Navbar componentizado - apenas com logo e título */}
       
 

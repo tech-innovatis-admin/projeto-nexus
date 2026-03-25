@@ -26,6 +26,80 @@ const CONFIGURACAO_PADRAO: ConfiguracaoRota = {
   poloToPoloOverrides: {}
 };
 
+function normalizarPapeisPolos(polos: MunicipioPolo[]): MunicipioPolo[] {
+  if (polos.length === 0) return polos;
+
+  let origemCodigo = polos.find(p => p.papelNaRota === 'origem')?.codigo;
+  let destinoCodigo = polos.find(p => p.papelNaRota === 'destino')?.codigo;
+
+  if (!origemCodigo) {
+    origemCodigo = polos[0]?.codigo;
+  }
+
+  if (destinoCodigo === origemCodigo) {
+    destinoCodigo = undefined;
+  }
+
+  if (!destinoCodigo && polos.length > 1) {
+    destinoCodigo = polos.find(p => p.codigo !== origemCodigo)?.codigo;
+  }
+
+  return polos.map((polo) => ({
+    ...polo,
+    papelNaRota:
+      polo.codigo === origemCodigo
+        ? 'origem'
+        : polo.codigo === destinoCodigo
+          ? 'destino'
+          : undefined
+  }));
+}
+
+function ordenarPolosComPapeis(
+  polos: MunicipioPolo[],
+  otimizarOrdemPolos: boolean
+): MunicipioPolo[] {
+  if (polos.length <= 1) return polos;
+
+  const polosNormalizados = normalizarPapeisPolos(polos);
+  const poloOrigem = polosNormalizados.find(p => p.papelNaRota === 'origem');
+  const poloDestino = polosNormalizados.find(p => p.papelNaRota === 'destino');
+
+  if (!otimizarOrdemPolos) {
+    const polosIntermediarios = polosNormalizados.filter(
+      p => p.codigo !== poloOrigem?.codigo && p.codigo !== poloDestino?.codigo
+    );
+
+    return [
+      ...(poloOrigem ? [poloOrigem] : []),
+      ...polosIntermediarios,
+      ...(poloDestino ? [poloDestino] : [])
+    ];
+  }
+
+  if (poloOrigem && poloDestino && polosNormalizados.length > 2) {
+    const polosIntermediarios = polosNormalizados.filter(
+      p => p.codigo !== poloOrigem.codigo && p.codigo !== poloDestino.codigo
+    );
+    const intermediariosOrdenados = polosIntermediarios.length > 1
+      ? resolverTSP(polosIntermediarios, polosIntermediarios[0])
+      : polosIntermediarios;
+
+    return [poloOrigem, ...intermediariosOrdenados, poloDestino];
+  }
+
+  if (poloOrigem) {
+    return resolverTSP(polosNormalizados, poloOrigem);
+  }
+
+  if (poloDestino) {
+    const invertida = resolverTSP([...polosNormalizados].reverse(), poloDestino);
+    return invertida.reverse();
+  }
+
+  return resolverTSP(polosNormalizados);
+}
+
 export function useRotas() {
   const [estado, setEstado] = useState<EstadoRotas>({
     polosSelecionados: [],
@@ -44,7 +118,9 @@ export function useRotas() {
 
       // Se está desmarcando, permitir
       if (jaEstaSeleccionado) {
-        const novosPolos = prev.polosSelecionados.filter(p => p.codigo !== polo.codigo);
+        const novosPolos = normalizarPapeisPolos(
+          prev.polosSelecionados.filter(p => p.codigo !== polo.codigo)
+        );
         return {
           ...prev,
           polosSelecionados: novosPolos,
@@ -61,12 +137,50 @@ export function useRotas() {
         };
       }
 
-      const novosPolos = [...prev.polosSelecionados, polo];
+      const novosPolos = normalizarPapeisPolos([...prev.polosSelecionados, polo]);
       return {
         ...prev,
         polosSelecionados: novosPolos,
         rotaAtual: null, // Invalidar rota atual
         erro: null // Limpar erro anterior
+      };
+    });
+  }, []);
+
+  const atualizarPoloSelecionado = useCallback((codigo: string, atualizacoes: Partial<MunicipioPolo>) => {
+    setEstado(prev => {
+      const polosAtualizados = prev.polosSelecionados.map((polo) =>
+        polo.codigo === codigo ? { ...polo, ...atualizacoes } : polo
+      );
+
+      return {
+        ...prev,
+        polosSelecionados: normalizarPapeisPolos(polosAtualizados),
+        rotaAtual: null,
+        erro: null
+      };
+    });
+  }, []);
+
+  const definirPapelPolo = useCallback((codigo: string, papel: 'origem' | 'destino') => {
+    setEstado(prev => {
+      const polosAtualizados = prev.polosSelecionados.map((polo) => {
+        if (polo.codigo === codigo) {
+          return { ...polo, papelNaRota: papel };
+        }
+
+        if (polo.papelNaRota === papel) {
+          return { ...polo, papelNaRota: undefined };
+        }
+
+        return polo;
+      });
+
+      return {
+        ...prev,
+        polosSelecionados: normalizarPapeisPolos(polosAtualizados),
+        rotaAtual: null,
+        erro: null
       };
     });
   }, []);
@@ -174,7 +288,13 @@ export function useRotas() {
 
     // Verificar cache
     const chaveCache = JSON.stringify({
-      polos: polosSelecionados.map(p => p.codigo).sort(),
+      polos: polosSelecionados
+        .map(p => ({
+          codigo: p.codigo,
+          papelNaRota: p.papelNaRota || null,
+          pistaSelecionada: p.pistaSelecionada?.codigo_pista || null
+        }))
+        .sort((a, b) => a.codigo.localeCompare(b.codigo)),
       periferias: periferiasSelecionadas.map(p => p.codigo).sort(),
       configuracao
     });
@@ -219,9 +339,10 @@ export function useRotas() {
         const polosComPeriferias = vincularPeriferias(polosSelecionados, periferiasSelecionadas);
 
         // 2. Otimizar ordem dos polos (TSP)
-        const polosOrdenados = configuracao.otimizarOrdemPolos
-          ? resolverTSP(polosComPeriferias)
-          : polosComPeriferias;
+        const polosOrdenados = ordenarPolosComPapeis(
+          polosComPeriferias,
+          configuracao.otimizarOrdemPolos
+        );
 
         // 3. Construir rota intercalando polos e periferias na sequência correta
         for (let i = 0; i < polosOrdenados.length; i++) {
@@ -510,6 +631,8 @@ export function useRotas() {
     // Ações
     togglePolo,
     togglePeriferia,
+    atualizarPoloSelecionado,
+    definirPapelPolo,
     atualizarConfiguracao,
     calcularRota,
     limparSelecoes

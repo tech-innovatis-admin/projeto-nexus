@@ -24,6 +24,7 @@ export interface MunicipioBase {
   tipo: 'polo' | 'periferia' | 'sem_tag';
   pistas?: PistaVoo[]; // Pistas de voo disponíveis no município
   pistaSelecionada?: PistaVoo; // Pista escolhida pelo usuário para cálculos
+  papelNaRota?: 'origem' | 'destino'; // Papel explícito do município na rota
 }
 
 export interface MunicipioPolo extends MunicipioBase {

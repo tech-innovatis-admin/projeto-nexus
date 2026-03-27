@@ -38,6 +38,8 @@ export default function RotasComponent({
     podeCalcularRota,
     togglePolo,
     togglePeriferia,
+    atualizarPoloSelecionado,
+    definirPapelPolo,
     atualizarConfiguracao,
     calcularRota,
     limparSelecoes
@@ -273,6 +275,34 @@ export default function RotasComponent({
     });
   }, [periferiasDisponiveis, filtroPeriferias, estadoSelecionadoPeriferias]);
 
+  const poloOrigemSelecionado = useMemo(
+    () => polosSelecionados.find((polo) => polo.papelNaRota === 'origem') || null,
+    [polosSelecionados]
+  );
+
+  const poloDestinoSelecionado = useMemo(
+    () => polosSelecionados.find((polo) => polo.papelNaRota === 'destino') || null,
+    [polosSelecionados]
+  );
+
+  const mensagemSelecaoPolos = useMemo(() => {
+    if (!poloOrigemSelecionado) {
+      return {
+        texto: 'Selecione o local de partida',
+        className: 'border-blue-200 bg-blue-50 text-blue-800'
+      };
+    }
+
+    if (!poloDestinoSelecionado) {
+      return {
+        texto: 'Selecione o local de destino',
+        className: 'border-emerald-200 bg-emerald-50 text-emerald-800'
+      };
+    }
+
+    return null;
+  }, [poloOrigemSelecionado, poloDestinoSelecionado]);
+
   // Notificar mudanças de rota para o mapa
   useEffect(() => {
     if (onRotaChange) {
@@ -343,6 +373,57 @@ export default function RotasComponent({
         {/* Aba de Seleção */}
         {abaSelecionada === 'selecao' && (
           <div className="space-y-6">
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-blue-700">Origem</div>
+                    <div className="mt-1 text-sm font-medium text-gray-800">
+                      {poloOrigemSelecionado ? `${poloOrigemSelecionado.nome} (${poloOrigemSelecionado.uf})` : 'Nenhum polo definido'}
+                    </div>
+                  </div>
+                  {poloOrigemSelecionado && (
+                    <button
+                      type="button"
+                      onClick={() => togglePolo(poloOrigemSelecionado)}
+                      className="rounded-md bg-white px-2 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-100"
+                    >
+                      Excluir
+                    </button>
+                  )}
+                </div>
+                <div className="mt-1 text-xs text-gray-600">
+                  {poloOrigemSelecionado
+                    ? 'A rota começa por este polo.'
+                    : 'Selecione um polo para iniciar a rota.'}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Destino</div>
+                    <div className="mt-1 text-sm font-medium text-gray-800">
+                      {poloDestinoSelecionado ? `${poloDestinoSelecionado.nome} (${poloDestinoSelecionado.uf})` : 'Nenhum polo definido'}
+                    </div>
+                  </div>
+                  {poloDestinoSelecionado && (
+                    <button
+                      type="button"
+                      onClick={() => togglePolo(poloDestinoSelecionado)}
+                      className="rounded-md bg-white px-2 py-1 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
+                    >
+                      Excluir
+                    </button>
+                  )}
+                </div>
+                <div className="mt-1 text-xs text-gray-600">
+                  {poloDestinoSelecionado
+                    ? 'A rota termina por este polo.'
+                    : 'Selecione um segundo polo para finalizar a rota.'}
+                </div>
+              </div>
+            </div>
 
             {/* Polos */}
             <div>
@@ -387,6 +468,11 @@ export default function RotasComponent({
               </button>
               {secaoPolosAberta && (
                 <div>
+                  {mensagemSelecaoPolos && (
+                    <div className={`mb-3 rounded-lg border px-3 py-2 text-sm font-medium ${mensagemSelecaoPolos.className}`}>
+                      {mensagemSelecaoPolos.texto}
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 gap-2 mb-3">
                     <select
                       value={estadoSelecionadoPolos}
@@ -411,6 +497,7 @@ export default function RotasComponent({
                       polosFiltrados.map(polo => {
                         const poloSelecionado = polosSelecionados.find(p => p.codigo === polo.codigo);
                         const estaSelecionado = !!poloSelecionado;
+                        const papelNaRota = poloSelecionado?.papelNaRota;
                         
                         return (
                           <div
@@ -425,7 +512,19 @@ export default function RotasComponent({
                               onClick={() => togglePolo(polo)}
                               className="cursor-pointer"
                             >
-                              <div className="font-medium text-gray-800">{polo.nome}</div>
+                              <div className="flex items-center gap-2">
+                                <div className="font-medium text-gray-800">{polo.nome}</div>
+                                {papelNaRota === 'origem' && (
+                                  <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                                    Origem
+                                  </span>
+                                )}
+                                {papelNaRota === 'destino' && (
+                                  <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                                    Destino
+                                  </span>
+                                )}
+                              </div>
                               <div className="text-sm text-gray-600">
                                 {polo.estado}
                                 {polo.pistas && polo.pistas.length > 0 && (
@@ -452,16 +551,40 @@ export default function RotasComponent({
                             </div>
                             
                             {/* Seletor de pistas (só aparece se o polo estiver selecionado) */}
+                            {estaSelecionado && poloSelecionado && (
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => definirPapelPolo(polo.codigo, 'origem')}
+                                  className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                                    papelNaRota === 'origem'
+                                      ? 'bg-blue-600 text-white'
+                                      : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                                  }`}
+                                >
+                                  Definir como origem
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => definirPapelPolo(polo.codigo, 'destino')}
+                                  className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                                    papelNaRota === 'destino'
+                                      ? 'bg-emerald-600 text-white'
+                                      : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                                  }`}
+                                >
+                                  Definir como destino
+                                </button>
+                              </div>
+                            )}
+
                             {estaSelecionado && polo.pistas && polo.pistas.length > 0 && (
                               <SeletorPistas
                                 municipio={polo}
                                 pistaSelecionada={poloSelecionado?.pistaSelecionada}
+                                label={`Pista de ${papelNaRota === 'destino' ? 'Destino' : 'Origem'}`}
                                 onSelecionarPista={(pista) => {
-                                  // Atualizar a pista selecionada do polo
-                                  const poloAtualizado = { ...polo, pistaSelecionada: pista };
-                                  // Remover o polo antigo e adicionar o atualizado
-                                  togglePolo(polo); // Remove
-                                  setTimeout(() => togglePolo(poloAtualizado), 0); // Adiciona atualizado
+                                  atualizarPoloSelecionado(polo.codigo, { pistaSelecionada: pista });
                                 }}
                               />
                             )}

@@ -22,6 +22,8 @@ export interface MunicipioProperties {
   PVA_minimo: number | null;               // Procon Vai às Aulas
   LIVRO_FUND_1_2: number | null;           // Saber+
   valor_start_iniciais_finais_: number | null; // Start Lab
+  /** Valor numérico do Kit Basta Violência Contra Mulher (já compõe valor_total_produtos na base). */
+  kit_violencia_mulher_alunos_iniciais_finais?: number | null;
   PLHIS: number | null;                    // PLHIS
 
   // Classificação de polo
@@ -121,6 +123,12 @@ export const PRODUTOS_CONFIG = {
     campo: 'valor_start_iniciais_finais_',
     nome: 'Start Lab',
     descricao: 'Laboratórios de Tecnologia',
+    category: 'educacao'
+  },
+  kit_basta_violencia_mulher: {
+    campo: 'kit_violencia_mulher_alunos_iniciais_finais',
+    nome: 'Kit Basta Violência Contra Mulher',
+    descricao: 'Kit Basta Violência Contra Mulher',
     category: 'educacao'
   },
   plhis: {

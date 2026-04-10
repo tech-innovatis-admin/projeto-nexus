@@ -18,6 +18,8 @@ export default function InformacoesMunicipio({ municipioSelecionado, modoVendas 
   const [mostrarTotalStartLab, setMostrarTotalStartLab] = useState(true);
   // Controle de exibição do total do Saber+ (alternar entre detalhado e total)
   const [mostrarTotalSaberPlus, setMostrarTotalSaberPlus] = useState(true);
+  // Kit Basta Violência Contra Mulher: total (iniciais+finais) vs detalhe por segmento
+  const [mostrarTotalKitViolenciaMulher, setMostrarTotalKitViolenciaMulher] = useState(true);
   
   // Função para mostrar o popover e configurar o timer para escondê-lo após 5 segundos
   const handleShowStatusPopover = () => {
@@ -54,7 +56,10 @@ export default function InformacoesMunicipio({ municipioSelecionado, modoVendas 
     'educagame_fmt',
     'PVA_fmt',
     'LIVRO_FUND_COMBINADO',
-    'VALOR_START_INICIAIS_FINAIS'
+    'VALOR_START_INICIAIS_FINAIS',
+    'KIT_BASTA_VIOLENCIA_MULHER',
+    'LABORATORIO_MAKER',
+    'SERVICOS_PROTECAO_DADOS'
     // valor_vaat_mensal_fmt foi movido para o Container "Município e Gestão"
   ];
 
@@ -92,7 +97,10 @@ export default function InformacoesMunicipio({ municipioSelecionado, modoVendas 
     VALOR_DESERT: "Plano de Desertificação",
     educagame_fmt: "Educa Game",
     PVA_fmt: "Procon Vai Às Aulas",
-    LIVRO_FUND_COMBINADO: "Programa Saber+"
+    LIVRO_FUND_COMBINADO: "Programa Saber+",
+    KIT_BASTA_VIOLENCIA_MULHER: "Kit Basta Violência Contra Mulher",
+    LABORATORIO_MAKER: "Laboratório Maker",
+    SERVICOS_PROTECAO_DADOS: "Serviços de Proteção de Dados"
   };
 
 
@@ -211,6 +219,28 @@ export default function InformacoesMunicipio({ municipioSelecionado, modoVendas 
       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
         <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
       </svg>
+    ),
+    KIT_BASTA_VIOLENCIA_MULHER: (
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 21a9 9 0 0 0 9-9H3a9 9 0 0 0 9 9Z" />
+        <path d="M7 12h10" />
+        <path d="M12 3v3" />
+      </svg>
+    ),
+    LABORATORIO_MAKER: (
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 3h6v2H9V3z" />
+        <path d="M10 5v4l-2 8h8l-2-8V5" />
+        <path d="M8 17h8" />
+        <path d="M12 9v2" />
+      </svg>
+    ),
+    SERVICOS_PROTECAO_DADOS: (
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        <path d="M12 11v3" />
+        <circle cx="12" cy="9" r="1" fill="currentColor" stroke="none" />
+      </svg>
     )
   };
 
@@ -261,6 +291,17 @@ export default function InformacoesMunicipio({ municipioSelecionado, modoVendas 
       const total = municipioSelecionado.properties?.LIVRO_FUND_1_2_fmt;
       return [k, { fund1: valorFund1, fund2: valorFund2, total }];
     }
+    if (k === 'KIT_BASTA_VIOLENCIA_MULHER') {
+      const props = municipioSelecionado.properties as Record<string, unknown> | undefined;
+      const valorIniciais = props?.kit_violencia_mulher_alunos_iniciais_fmt;
+      const valorFinais = props?.kit_violencia_mulher_alunos_finais_fmt;
+      const total = props?.kit_violencia_mulher_alunos_iniciais_finais_fmt;
+      return [k, { fund1: valorIniciais, fund2: valorFinais, total }];
+    }
+    // Precificação em ata (apenas quantidade mínima no front)
+    if (k === 'LABORATORIO_MAKER' || k === 'SERVICOS_PROTECAO_DADOS') {
+      return [k, null];
+    }
     // Para os demais produtos, usamos o valor presente nas propriedades
     const valor = municipioSelecionado.properties?.[k];
     return [k, valor];
@@ -310,7 +351,7 @@ export default function InformacoesMunicipio({ municipioSelecionado, modoVendas 
     const chavesVendaveis = new Set(classificacao.vender.map(item => item.chave));
     
     // Produtos que sempre aparecem no modo vendas (não têm regras de elegibilidade específicas)
-    const produtosSempreVendaveis = ['VALOR_CTM', 'VALOR_REURB', 'VALOR_START_INICIAIS_FINAIS', 'VALOR_DEC_AMBIENTAL', 'VALOR_PLHIS', 'VALOR_DESERT', 'PVA_fmt', 'LIVRO_FUND_COMBINADO'];
+    const produtosSempreVendaveis = ['VALOR_CTM', 'VALOR_REURB', 'VALOR_START_INICIAIS_FINAIS', 'VALOR_DEC_AMBIENTAL', 'VALOR_PLHIS', 'VALOR_DESERT', 'PVA_fmt', 'LIVRO_FUND_COMBINADO', 'KIT_BASTA_VIOLENCIA_MULHER', 'LABORATORIO_MAKER', 'SERVICOS_PROTECAO_DADOS'];
 
     // Filtrar: Educagame e produtos com regras só se podemos vender, outros sempre aparecem
     const produtosFiltrados = valoresFiltrados.filter(([chave]) => {
@@ -514,7 +555,11 @@ export default function InformacoesMunicipio({ municipioSelecionado, modoVendas 
                         </a>
                       ) : (
                         <>
-                          {nomesCustomizados[k] || k}
+                          {k === 'LABORATORIO_MAKER' || k === 'SERVICOS_PROTECAO_DADOS' || k === 'KIT_BASTA_VIOLENCIA_MULHER' ? (
+                            <span className="text-sky-400">{nomesCustomizados[k] || k}</span>
+                          ) : (
+                            nomesCustomizados[k] || k
+                          )}
                           {/* Ícones de status atrás do nome */}
                           {k === 'VALOR_PD' && temPlanoDiretor && !planoDiretorVencido && (
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline ml-1" viewBox="0 0 200 200" fill="none">
@@ -584,6 +629,9 @@ export default function InformacoesMunicipio({ municipioSelecionado, modoVendas 
                       {k === 'VALOR_REURB' && (
                         <div className="text-xs text-slate-400 font-medium mt-1">Mín. 200 unid.</div>
                       )}
+                      {(k === 'LABORATORIO_MAKER' || k === 'SERVICOS_PROTECAO_DADOS') && (
+                        <div className="text-xs text-slate-400 font-medium mt-1">Mín. 200 unid.</div>
+                      )}
                     </span>
                   </div>
                 </td>
@@ -609,7 +657,11 @@ export default function InformacoesMunicipio({ municipioSelecionado, modoVendas 
                         </div>
                       </div>
                     );
-                  })() : k === 'educagame_fmt' ? (() => {
+                  })() : k === 'LABORATORIO_MAKER' || k === 'SERVICOS_PROTECAO_DADOS' ? (
+                    <span className={`text-base font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>
+                      Valor em Ata
+                    </span>
+                  ) : k === 'educagame_fmt' ? (() => {
                     const valorPrincipal = formatarValor(valor?.toString());
                     return (
                       <div className="flex flex-col items-center">
@@ -677,6 +729,55 @@ export default function InformacoesMunicipio({ municipioSelecionado, modoVendas 
                         <div className="flex items-center gap-2 mt-1 cursor-pointer" onClick={() => setMostrarTotalSaberPlus(true)} title="Clique para ver o total">
                           <span className="text-xs text-slate-400 min-w-[3rem]">Fund. 2</span>
                           <span className={`text-sm font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>{valorFund2 ? formatarValor(valorFund2) : '—'}</span>
+                        </div>
+                      </div>
+                    );
+                  })() : k === 'KIT_BASTA_VIOLENCIA_MULHER' ? (() => {
+                    const valores = valor as { fund1?: unknown; fund2?: unknown; total?: unknown };
+                    const valorIniciais = valores?.fund1;
+                    const valorFinais = valores?.fund2;
+                    const props = municipioSelecionado.properties as Record<string, unknown> | undefined;
+                    const total = valores?.total ?? props?.kit_violencia_mulher_alunos_iniciais_finais_fmt;
+                    if (mostrarTotalKitViolenciaMulher) {
+                      const totalFmt = total != null && total !== '' ? formatarValor(String(total)) : '—';
+                      return (
+                        <div className="flex flex-col items-center select-none">
+                          <div
+                            className="flex items-center gap-1 cursor-pointer"
+                            title="Clique para ver iniciais e finais"
+                            onClick={() => setMostrarTotalKitViolenciaMulher(false)}
+                          >
+                            <span className={`text-base font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>{totalFmt}</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-400 cursor-help" viewBox="0 0 24 24" fill="currentColor" aria-label="Alternar entre total e detalhado">
+                              <path fillRule="evenodd" d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2Zm0 14a1 1 0 1 1 0-2h.01a1 1 0 1 1 0 2H12Zm-1-8a1 1 0 1 1 2 0v5a1 1 0 1 1-2 0V8Z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                          <span
+                            className="text-xs text-slate-400 font-medium mt-1 cursor-pointer"
+                            title="Clique para ver iniciais e finais"
+                            onClick={() => setMostrarTotalKitViolenciaMulher(false)}
+                          >
+                            Total (Iniciais + Finais)
+                          </span>
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="flex flex-col w-full items-center">
+                        <div className="flex items-center gap-2 cursor-pointer" onClick={() => setMostrarTotalKitViolenciaMulher(true)} title="Clique para ver o total">
+                          <span className="text-xs text-slate-400 min-w-[3.5rem]">Iniciais</span>
+                          <span className={`text-sm font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>
+                            {valorIniciais != null && valorIniciais !== '' ? formatarValor(String(valorIniciais)) : '—'}
+                          </span>
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-slate-400 cursor-help" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <path fillRule="evenodd" d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2Zm0 14a1 1 0 1 1 0-2h.01a1 1 0 1 1 0 2H12Zm-1-8a1 1 0 1 1 2 0v5a1 1 0 1 1-2 0V8Z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1 cursor-pointer" onClick={() => setMostrarTotalKitViolenciaMulher(true)} title="Clique para ver o total">
+                          <span className="text-xs text-slate-400 min-w-[3.5rem]">Finais</span>
+                          <span className={`text-sm font-bold ${index % 2 === 0 ? 'text-sky-400' : 'text-white'}`}>
+                            {valorFinais != null && valorFinais !== '' ? formatarValor(String(valorFinais)) : '—'}
+                          </span>
                         </div>
                       </div>
                     );

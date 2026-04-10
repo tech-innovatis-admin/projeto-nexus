@@ -85,6 +85,33 @@ const UF_NAMES: Record<string, string> = {
   'SC': 'Santa Catarina', 'SP': 'São Paulo', 'SE': 'Sergipe', 'TO': 'Tocantins'
 };
 
+/** Produtos exibidos só no card "Produtos Detalhados" (sem campo no GeoJSON / sem precificação). */
+type ProdutoMunicipioDetalhe = {
+  key: string;
+  nome: string;
+  shortLabel: string;
+  category: string;
+  valor: number;
+  valorLabel?: string;
+};
+
+const PROD_ATAS_DETALHE: Omit<ProdutoMunicipioDetalhe, 'valor'>[] = [
+  {
+    key: 'laboratorio_maker',
+    nome: 'Laboratório Maker',
+    shortLabel: 'Laboratório Maker',
+    category: 'educacao',
+    valorLabel: 'Valor em Ata',
+  },
+  {
+    key: 'servicos_protecao_dados',
+    nome: 'Serviços de Proteção de Dados',
+    shortLabel: 'Serviços de Proteção de Dados',
+    category: 'regularizacao',
+    valorLabel: 'Valor em Ata',
+  },
+];
+
 // Importar MapaPolos dinamicamente (sem SSR)
 const MapaPolos = dynamic(() => import('./_components/MapaPolos'), {
   ssr: false,
@@ -591,14 +618,14 @@ export default function PolosPage() {
       .sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
     // Produtos do município selecionado (quando há município específico)
-    let produtosMunicipio: Array<{ key: string; nome: string; valor: number; category: string; shortLabel: string }> = [];
+    let produtosMunicipio: ProdutoMunicipioDetalhe[] = [];
     if (municipioSelecionado?.properties) {
       const props = municipioSelecionado.properties;
       const produtosParaMostrar = produtosParaCalcular.length === 0
         ? todosProdutos // Se nenhum produto específico, mostrar todos
         : produtosParaCalcular;
 
-      produtosMunicipio = Object.entries(PRODUTOS_CONFIG)
+      const numericos = Object.entries(PRODUTOS_CONFIG)
         .filter(([key]) => key !== 'valor_total' && produtosParaMostrar.includes(key))
         .map(([key, config]) => ({
           key,
@@ -609,6 +636,13 @@ export default function PolosPage() {
         }))
         .filter(p => p.valor > 0)
         .sort((a, b) => b.valor - a.valor);
+
+      const extrasSemPreco: ProdutoMunicipioDetalhe[] = PROD_ATAS_DETALHE.map((p) => ({
+        ...p,
+        valor: 0,
+      }));
+
+      produtosMunicipio = [...numericos, ...extrasSemPreco];
     }
 
     return {
@@ -1204,46 +1238,39 @@ export default function PolosPage() {
                           <h3 className="text-lg font-semibold text-white">Produtos Detalhados</h3>
                           <p className="text-xs text-slate-400">Valores individuais por produto no município</p>
                         </div>
-                        <div className="flex-1">
-                          {/* Grid de 5 linhas x 2 colunas para produtos */}
-                          <div className="grid grid-cols-2 grid-rows-5 gap-1 h-full">
-                            {Array.from({ length: 10 }, (_, idx) => {
-                              const produto = computedData.produtosMunicipio[idx];
-                              return (
-                                <div
-                                  key={idx}
-                                  className={`flex items-center justify-between py-1.5 px-2 rounded-md border transition-colors ${
-                                    produto
-                                      ? 'bg-slate-800/30 border-slate-700/20 hover:bg-slate-700/40'
-                                      : 'bg-slate-800/10 border-slate-700/10'
-                                  }`}
-                                >
-                                  {produto ? (
-                                    <>
-                                      <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                                        <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                                          produto.category === 'educacao' ? 'bg-blue-500' :
-                                          produto.category === 'planejamento' ? 'bg-green-500' :
-                                          produto.category === 'ambiental' ? 'bg-emerald-500' :
-                                          produto.category === 'tributario' ? 'bg-yellow-500' :
-                                          produto.category === 'habitacional' ? 'bg-purple-500' :
-                                          produto.category === 'regularizacao' ? 'bg-indigo-500' :
-                                          'bg-gray-500'
-                                        }`} />
-                                        <span className="text-xs font-medium text-slate-200 truncate" title={produto.nome}>
-                                          {produto.shortLabel}
-                                        </span>
-                                      </div>
-                                      <span className="text-xs font-semibold text-emerald-400 tabular-nums flex-shrink-0">
-                                        R$ {new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(produto.valor)}
-                                      </span>
-                                    </>
-                                  ) : (
-                                    <span className="text-xs text-slate-500 italic">-</span>
-                                  )}
+                        <div className="flex-1 relative min-h-0">
+                          {/* Lista dinâmica: produtos do GeoJSON + extras sem precificação (sempre no fim) */}
+                          <div className="grid grid-cols-2 gap-1 h-full min-h-0 content-start max-h-[320px] overflow-y-auto sm:max-h-[380px] pr-0.5">
+                            {computedData.produtosMunicipio.map((produto) => (
+                              <div
+                                key={produto.key}
+                                className="flex items-center justify-between py-1.5 px-2 rounded-md border transition-colors bg-slate-800/30 border-slate-700/20 hover:bg-slate-700/40 gap-1"
+                              >
+                                <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                                    produto.category === 'educacao' ? 'bg-blue-500' :
+                                    produto.category === 'planejamento' ? 'bg-green-500' :
+                                    produto.category === 'ambiental' ? 'bg-emerald-500' :
+                                    produto.category === 'tributario' ? 'bg-yellow-500' :
+                                    produto.category === 'habitacional' ? 'bg-purple-500' :
+                                    produto.category === 'regularizacao' ? 'bg-indigo-500' :
+                                    'bg-gray-500'
+                                  }`} />
+                                  <span className="text-xs font-medium text-slate-200 truncate" title={produto.nome}>
+                                    {produto.shortLabel}
+                                  </span>
                                 </div>
-                              );
-                            })}
+                                {produto.valorLabel ? (
+                                  <span className="text-[10px] sm:text-xs font-semibold text-sky-300 text-right leading-tight flex-shrink-0 max-w-[48%]">
+                                    {produto.valorLabel}
+                                  </span>
+                                ) : (
+                                  <span className="text-xs font-semibold text-emerald-400 tabular-nums flex-shrink-0">
+                                    R$ {new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 0 }).format(produto.valor)}
+                                  </span>
+                                )}
+                              </div>
+                            ))}
                           </div>
                           {computedData.produtosMunicipio.length === 0 && (
                             <div className="absolute inset-0 flex items-center justify-center text-slate-500 text-sm">

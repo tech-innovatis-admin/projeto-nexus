@@ -82,7 +82,8 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // 4. Se o usuário já estiver logado (token válido) e tentar acessar /login, manda para o mapa
+  // 4. Se o usuário já estiver logado (token válido) e tentar acessar /login, manda para o mapa.
+  // Rotas SSO (/auth/login, /auth/callback) ficam fora do matcher — não redirecionar autenticados nelas.
   if (pathname === '/login') {
     const token = request.cookies.get('auth_token')?.value;
     if (token) {

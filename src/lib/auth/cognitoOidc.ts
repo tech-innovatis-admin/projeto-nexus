@@ -27,8 +27,12 @@ export type CognitoIdentity = {
   emailVerified: boolean;
 };
 
+function env(name: string): string | undefined {
+  return process.env[name]?.trim();
+}
+
 function required(name: string) {
-  const value = process.env[name]?.trim();
+  const value = env(name);
   if (!value) {
     throw new CognitoConfigError(`Missing env: ${name}`);
   }
@@ -36,20 +40,20 @@ function required(name: string) {
 }
 
 export function getCognitoConfig(): CognitoConfig {
-  const region = process.env.AWS_REGION?.trim() || "us-east-1";
+  const region = env("AWS_REGION") || "us-east-1";
   const userPoolId = required("COGNITO_USER_POOL_ID");
   const clientId = required("COGNITO_CLIENT_ID");
-  const clientSecret = process.env.COGNITO_CLIENT_SECRET?.trim() || null;
+  const clientSecret = env("COGNITO_CLIENT_SECRET") || null;
   const domain = required("COGNITO_DOMAIN").replace(/\/$/, "");
   const redirectUri = required("COGNITO_REDIRECT_URI");
   const logoutUri =
-    process.env.COGNITO_LOGOUT_URI?.trim() ||
-    process.env.APP_URL?.trim() ||
-    "http://localhost:3005/login";
+    env("COGNITO_LOGOUT_URI") ||
+    env("APP_URL") ||
+    "https://nexus.innovatismc.com/login";
   const issuer =
-    process.env.COGNITO_ISSUER?.trim() ||
+    env("COGNITO_ISSUER") ||
     `https://cognito-idp.${region}.amazonaws.com/${userPoolId}`;
-  const scopes = (process.env.COGNITO_SCOPES || "openid email profile")
+  const scopes = (env("COGNITO_SCOPES") || "openid email profile")
     .split(/\s+/)
     .filter(Boolean);
 
@@ -88,10 +92,31 @@ export function createNonce() {
   return toBase64Url(randomBytes(24));
 }
 
+export type AuthorizePrompt = "none" | "login";
+
+export const REAUTH_COOKIE = "sso_reauth";
+
+const SILENT_AUTH_ERRORS = new Set(["login_required", "interaction_required"]);
+
+export function isSilentAuthError(error: string | null | undefined) {
+  return Boolean(error && SILENT_AUTH_ERRORS.has(error));
+}
+
+export function reauthCookieOptions(maxAgeSeconds: number) {
+  return {
+    httpOnly: true,
+    sameSite: "lax" as const,
+    secure: cookieSecure(),
+    path: "/",
+    maxAge: maxAgeSeconds,
+  };
+}
+
 export function buildAuthorizeUrl(input: {
   state: string;
   nonce: string;
   codeChallenge: string;
+  prompt?: AuthorizePrompt;
 }) {
   const cfg = getCognitoConfig();
   const params = new URLSearchParams({
@@ -104,14 +129,17 @@ export function buildAuthorizeUrl(input: {
     code_challenge: input.codeChallenge,
     code_challenge_method: "S256",
   });
+  if (input.prompt) {
+    params.set("prompt", input.prompt);
+  }
   return `${cfg.domain}/oauth2/authorize?${params.toString()}`;
 }
 
-export function buildLogoutUrl() {
+export function buildLogoutUrl(logoutUri?: string) {
   const cfg = getCognitoConfig();
   const params = new URLSearchParams({
     client_id: cfg.clientId,
-    logout_uri: cfg.logoutUri,
+    logout_uri: logoutUri || cfg.logoutUri,
   });
   return `${cfg.domain}/logout?${params.toString()}`;
 }
@@ -185,4 +213,60 @@ export async function verifyIdToken(
     name: typeof payload.name === "string" ? payload.name : null,
     emailVerified: payload.email_verified === true,
   };
+}
+
+export function encodeOAuthCookie(payload: {
+  state: string;
+  nonce: string;
+  code_verifier: string;
+}) {
+  return Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+}
+
+export function decodeOAuthCookie(value: string): {
+  state?: string;
+  nonce?: string;
+  code_verifier?: string;
+} {
+  return JSON.parse(Buffer.from(value, "base64url").toString("utf8")) as {
+    state?: string;
+    nonce?: string;
+    code_verifier?: string;
+  };
+}
+
+export function cookieSecure() {
+  const flag = env("AUTH_COOKIE_SECURE")?.toLowerCase();
+  if (flag === "true") return true;
+  if (flag === "false") return false;
+  const origin = env("APP_URL") || env("NEXT_PUBLIC_APP_URL") || "";
+  if (origin.startsWith("https://")) return true;
+  return env("NODE_ENV") === "production";
+}
+
+const BIND_HOSTS = new Set(["0.0.0.0", "::", "[::]"]);
+
+export function publicAppOrigin(request: { headers: Headers; nextUrl: URL }) {
+  for (const raw of [env("APP_URL"), env("APP_ORIGIN"), env("NEXT_PUBLIC_APP_URL")]) {
+    const origin = raw?.replace(/\/$/, "") || "";
+    if (origin && !origin.includes("0.0.0.0")) {
+      return origin;
+    }
+  }
+
+  const host =
+    request.headers.get("x-forwarded-host")?.split(",")[0]?.trim() ||
+    request.headers.get("host")?.trim() ||
+    request.nextUrl.host ||
+    "";
+  const hostname = host.replace(/:\d+$/, "");
+  if (hostname && !BIND_HOSTS.has(hostname)) {
+    const proto =
+      request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() ||
+      request.nextUrl.protocol.replace(":", "") ||
+      "https";
+    return `${proto}://${host}`;
+  }
+
+  return "https://nexus.innovatismc.com";
 }

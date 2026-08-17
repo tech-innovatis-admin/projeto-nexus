@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
+import { unauthenticatedLoginPath } from '@/lib/auth/authMode';
 
 // Chave secreta convertida para o formato esperado pelo jose (Uint8Array)
 // Usamos o segredo do ambiente ou o fallback padrão
 const secret = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'nexus_jwt_secret_2025_production'
+  process.env['JWT_SECRET'] || 'nexus_jwt_secret_2025_production'
 );
 
 /**
@@ -32,7 +33,7 @@ export async function middleware(request: NextRequest) {
 
     if (!token) {
       console.warn(`[Middleware] Redirecionando para login: Token ausente em ${pathname}`);
-      const loginUrl = new URL('/login', request.url);
+      const loginUrl = new URL(unauthenticatedLoginPath(), request.url);
       return NextResponse.redirect(loginUrl);
     }
 
@@ -75,7 +76,7 @@ export async function middleware(request: NextRequest) {
 
     } catch (error) {
       console.error(`[Middleware] Token inválido para ${pathname}:`, error instanceof Error ? error.message : 'Erro');
-      const response = NextResponse.redirect(new URL('/login', request.url));
+      const response = NextResponse.redirect(new URL(unauthenticatedLoginPath(), request.url));
       // Limpa o cookie em caso de erro
       response.cookies.set('auth_token', '', { path: '/', maxAge: 0, sameSite: 'lax' });
       return response;

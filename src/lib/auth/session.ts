@@ -1,6 +1,7 @@
 import { sign } from "jsonwebtoken";
 import { prisma } from "@/lib/prisma";
 import { NEXUS_PLATFORM_TAG } from "@/lib/auth/authMode";
+import { cookieSecure } from "@/lib/auth/cognitoOidc";
 
 export const AUTH_COOKIE_NAME = "auth_token";
 export const AUTH_COOKIE_MAX_AGE = 3600;
@@ -170,7 +171,7 @@ export async function createNexusSession(
 export function authCookieOptions(maxAge = AUTH_COOKIE_MAX_AGE) {
   return {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: cookieSecure(),
     sameSite: "lax" as const,
     path: "/",
     maxAge,

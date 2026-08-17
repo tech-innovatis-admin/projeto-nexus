@@ -36,6 +36,10 @@ npm run dev
 
 Abrir `http://localhost:3005/login` → **Entrar com SSO**.
 
+Produção: `https://nexus.innovatismc.com`. Callback Cognito: `/auth/callback`. Logout: `/login`. Após SSO: `/mapa`.
+
+`GET /auth/login` redireciona direto ao Cognito quando `AUTH_MODE=hybrid`. Rotas protegidas sem sessão vão para `/auth/login`. Formulário legado permanece em `/login`.
+
 ## Rollback
 
 `AUTH_MODE=legacy` no `.env` / `.env.local` e reiniciar.

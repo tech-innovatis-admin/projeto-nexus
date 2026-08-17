@@ -3,8 +3,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { cognitoEnabled } from "@/lib/auth/authMode";
 import {
   CognitoConfigError,
+  decodeOAuthCookie,
   exchangeCode,
+  publicAppOrigin,
   verifyIdToken,
+  buildLogoutUrl,
+  isSilentAuthError,
+  REAUTH_COOKIE,
+  reauthCookieOptions,
 } from "@/lib/auth/cognitoOidc";
 import {
   AUTH_COOKIE_NAME,
@@ -18,16 +24,8 @@ const OAUTH_COOKIE = "nexus_oauth";
 
 type UserRow = NexusDbUser & { cognito_sub: string | null };
 
-function appOrigin(request: NextRequest) {
-  return (
-    process.env.APP_URL?.replace(/\/$/, "") ||
-    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
-    `${request.nextUrl.protocol}//${request.nextUrl.host}`
-  );
-}
-
 function errorRedirect(request: NextRequest, code: string) {
-  const url = new URL("/login", appOrigin(request));
+  const url = new URL("/login", publicAppOrigin(request));
   url.searchParams.set("sso_error", code);
   return NextResponse.redirect(url);
 }
@@ -66,7 +64,14 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  if (request.nextUrl.searchParams.get("error")) {
+  const oauthError = request.nextUrl.searchParams.get("error");
+  if (oauthError) {
+    if (isSilentAuthError(oauthError)) {
+      const response = NextResponse.redirect(buildLogoutUrl());
+      response.cookies.set(REAUTH_COOKIE, "1", reauthCookieOptions(120));
+      response.cookies.set(OAUTH_COOKIE, "", reauthCookieOptions(0));
+      return response;
+    }
     return errorRedirect(request, "cognito_denied");
   }
 
@@ -83,7 +88,7 @@ export async function GET(request: NextRequest) {
 
   let oauth: { state?: string; nonce?: string; code_verifier?: string };
   try {
-    oauth = JSON.parse(rawCookie) as typeof oauth;
+    oauth = decodeOAuthCookie(rawCookie);
   } catch {
     return errorRedirect(request, "invalid_oauth_cookie");
   }
@@ -131,7 +136,7 @@ export async function GET(request: NextRequest) {
     }
 
     const response = NextResponse.redirect(
-      new URL("/mapa", appOrigin(request)),
+      new URL("/mapa", publicAppOrigin(request)),
     );
     response.cookies.set(
       AUTH_COOKIE_NAME,

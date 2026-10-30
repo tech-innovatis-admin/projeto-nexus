@@ -13,6 +13,7 @@ import Nexus3D from "../components/Nexus3D";
 import DisableLogsClient from "@/components/DisableLogsClient";
 // Contexto do usuário
 import { UserProvider } from "../contexts/UserContext";
+import { CartoKeyProvider } from "../contexts/CartoKeyContext";
 import { MapDataProvider } from "../contexts/MapDataContext";
 import { EstrategiaDataProvider } from "../contexts/EstrategiaDataContext";
 import AppShell from '@/components/AppShell';
@@ -47,6 +48,7 @@ export default function RootLayout({
       </head>
       <body className="antialiased">
         <DisableLogsClient />
+        <CartoKeyProvider apiKey={process.env["API_CARTO_KEY"]?.trim() ?? ""}>
         <UserProvider>
           <MapDataProvider>
             <EstrategiaDataProvider>
@@ -56,6 +58,7 @@ export default function RootLayout({
             </EstrategiaDataProvider>
           </MapDataProvider>
         </UserProvider>
+        </CartoKeyProvider>
       </body>
     </html>
   )

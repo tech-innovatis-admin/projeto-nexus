@@ -6,6 +6,8 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import * as turf from '@turf/turf';
 import * as XLSX from 'xlsx';
 import { registerMapInstance } from '@/utils/mapRegistry';
+import { useCartoApiKey } from '@/contexts/CartoKeyContext';
+import { cartoPositronStyleUrl } from '@/lib/cartoBasemap';
 import { setupMapLibreHover, setupMapLibreHoverSemTag, removeMapLibreHover, readCssVar } from '@/utils/mapLibreHoverHandlers';
 
 // Tipos para o sistema de exportação do raio
@@ -188,6 +190,7 @@ export default function MapLibrePolygons({
   // 🆕 Set de códigos de municípios em negociação
   municipiosEmNegociacao?: Set<string>;
 }) {
+  const cartoApiKey = useCartoApiKey();
   const mapRef = useRef<MapLibreMap | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const popupRef = useRef<maplibregl.Popup | null>(null);
@@ -562,7 +565,7 @@ export default function MapLibrePolygons({
     if (mapRef.current || !containerRef.current) return;
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+      style: cartoPositronStyleUrl(cartoApiKey),
       center: [-54, -14],
       zoom: 3,
       attributionControl: false,
@@ -1216,7 +1219,7 @@ export default function MapLibrePolygons({
       // Desregistrar a instância do mapa
       registerMapInstance(null);
     };
-  }, []);
+  }, [cartoApiKey]);
 
   // Atualiza visibilidade quando os toggles mudam
   useEffect(() => {

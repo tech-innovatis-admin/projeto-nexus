@@ -86,6 +86,7 @@ services:
       
       # API Keys (configure conforme necessário)
       GOOGLE_MAPS_API_KEY: "${GOOGLE_MAPS_API_KEY:-}"
+      API_CARTO_KEY: "${API_CARTO_KEY:-}"
       AWS_REGION: "${AWS_REGION:-us-east-1}"
       AWS_S3_BUCKET: "${AWS_S3_BUCKET:-}"
       

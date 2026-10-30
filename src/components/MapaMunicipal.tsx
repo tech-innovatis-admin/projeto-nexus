@@ -5,6 +5,8 @@ import "leaflet/dist/leaflet.css";
 import "leaflet-draw/dist/leaflet.draw.css";
 import "leaflet-draw";
 import { useMapData } from "../contexts/MapDataContext";
+import { useCartoApiKey } from "../contexts/CartoKeyContext";
+import { cartoLightTileUrl } from "../lib/cartoBasemap";
 import * as turf from '@turf/turf';
 import polylabel from 'polylabel';
 import { attachMuniHoverHandlers, applyMuniHoverToLayer } from "../utils/mapHoverHandlers";
@@ -116,6 +118,7 @@ export default function MapaMunicipal({ municipioSelecionado, onMunicipioClick }
   const [mapReady, setMapReady] = useState(false);
 
   const { mapData, loading, error } = useMapData();
+  const cartoApiKey = useCartoApiKey();
 
   // Carrega o mapa e as camadas apenas uma vez
   useEffect(() => {
@@ -140,8 +143,8 @@ export default function MapaMunicipal({ municipioSelecionado, onMunicipioClick }
       });
       
       // Camada base
-      const carto = L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
-        attribution: "&copy; CartoDB",
+      const carto = L.tileLayer(cartoLightTileUrl(cartoApiKey), {
+        attribution: "&copy; OpenStreetMap contributors &copy; CARTO",
       }).addTo(mapRef.current);
       
       // Adiciona controle de desenho
@@ -286,7 +289,7 @@ export default function MapaMunicipal({ municipioSelecionado, onMunicipioClick }
       // Marca que o mapa está pronto para receber destaques
       setMapReady(true);
     }, 100);
-  }, [mapData, loading, layerState, onMunicipioClick]);
+  }, [mapData, loading, layerState, onMunicipioClick, cartoApiKey]);
 
   // Atualiza visibilidade das camadas ao mudar o estado
   useEffect(() => {

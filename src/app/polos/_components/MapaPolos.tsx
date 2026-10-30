@@ -7,6 +7,8 @@ import * as turf from '@turf/turf';
 import type GeoJSON from 'geojson';
 import type { MunicipiosGeoJSON, MunicipioRelacionamento } from '@/contexts/PolosDataContext';
 import { setupPolosHover, POPUP_HOVER_CONFIG } from './polosHoverHandlers';
+import { useCartoApiKey } from '@/contexts/CartoKeyContext';
+import { cartoPositronStyleUrl } from '@/lib/cartoBasemap';
 
 type MapLibreMap = maplibregl.Map;
 
@@ -47,6 +49,7 @@ interface MapaPolosProps {
 }
 
 export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [], municipiosSatelites = [], municipiosBloqueados = [], selectedMunicipio, selectedUFs = [], radarFilterActive = false, relacionamentoFilterActive = false, poloLogisticoFilterActive = false, pistas = [], pistasFilterActive = false, onMunicipioClick }: MapaPolosProps) {
+  const cartoApiKey = useCartoApiKey();
   const mapRef = useRef<MapLibreMap | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const hoverCleanupRef = useRef<(() => void) | null>(null);
@@ -412,7 +415,7 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
     
     const map = new maplibregl.Map({
       container: containerRef.current,
-      style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+      style: cartoPositronStyleUrl(cartoApiKey),
       center: [-40, -8],
       zoom: 5,
       attributionControl: false,
@@ -714,7 +717,7 @@ export default function MapaPolos({ baseMunicipios, municipiosRelacionamento = [
       }
       setMapReady(false);
     };
-  }, []);
+  }, [cartoApiKey]);
 
   // Atualizar dados do mapa quando baseMunicipios mudar (usando pipeline centralizado)
   useEffect(() => {

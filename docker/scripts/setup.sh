@@ -72,6 +72,9 @@ JWT_SECRET="nexus_jwt_secret_2025_change_in_production"
 # Google Maps API
 GOOGLE_MAPS_API_KEY="your_google_maps_api_key_here"
 
+# CARTO Basemaps (tiles do mapa)
+API_CARTO_KEY="your_carto_basemaps_api_key_here"
+
 # AWS Configuration
 AWS_REGION="us-east-1"
 AWS_S3_BUCKET="your_s3_bucket"

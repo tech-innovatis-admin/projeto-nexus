@@ -18,6 +18,8 @@ import { MapDataProvider } from "../contexts/MapDataContext";
 import { EstrategiaDataProvider } from "../contexts/EstrategiaDataContext";
 import AppShell from '@/components/AppShell';
 
+export const dynamic = "force-dynamic";
+
 // Metadados da aplicação (SEO e configurações da página)
 export const metadata: Metadata = {
   title: 'NEXUS - Plataforma de Produtos',
